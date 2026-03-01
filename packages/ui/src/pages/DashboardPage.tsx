@@ -17,6 +17,9 @@ import { AIBriefingCard } from '../components/AIBriefingCard';
 import { TimelineView } from '../components/TimelineView';
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton';
 import { QUICK_ADD_ITEMS, QuickAddModal } from '../components/QuickAddModal';
+import { ArtifactCard } from '../components/ArtifactCard';
+import { artifactsApi } from '../api/endpoints/artifacts';
+import type { Artifact } from '../api/endpoints/artifacts';
 import type { QuickAddType } from '../components/QuickAddModal';
 
 import { summaryApi } from '../api';
@@ -29,6 +32,16 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [quickAddType, setQuickAddType] = useState<QuickAddType | null>(null);
+  const [pinnedArtifacts, setPinnedArtifacts] = useState<Artifact[]>([]);
+
+  const fetchPinnedArtifacts = async () => {
+    try {
+      const result = await artifactsApi.list({ pinned: true, limit: 20 });
+      setPinnedArtifacts(result.artifacts);
+    } catch {
+      // silent — not critical for dashboard
+    }
+  };
 
   const fetchSummary = async () => {
     try {
@@ -47,6 +60,7 @@ export function DashboardPage() {
 
   useEffect(() => {
     fetchSummary();
+    fetchPinnedArtifacts();
   }, []);
 
   // WS-triggered refresh
@@ -55,7 +69,10 @@ export function DashboardPage() {
       subscribe('system:notification', debouncedRefresh),
       subscribe('channel:message', debouncedRefresh),
       subscribe('tool:end', debouncedRefresh),
-      subscribe('data:changed', debouncedRefresh),
+      subscribe<{ entity: string }>('data:changed', (data) => {
+        debouncedRefresh();
+        if (data.entity === 'artifact') fetchPinnedArtifacts();
+      }),
       subscribe('trigger:executed', debouncedRefresh),
     ];
     return () => unsubs.forEach((fn) => fn());
@@ -248,6 +265,38 @@ export function DashboardPage() {
               {summary.tasks.overdue > 0 && (
                 <span className="text-error">{summary.tasks.overdue} overdue</span>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Pinned Artifacts */}
+        {pinnedArtifacts.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-text-secondary dark:text-dark-text-secondary">
+                Pinned Artifacts
+              </h3>
+              <Link to="/artifacts" className="text-xs text-primary hover:underline">
+                View all
+              </Link>
+            </div>
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              {pinnedArtifacts.map((artifact) => (
+                <ArtifactCard
+                  key={artifact.id}
+                  artifact={artifact}
+                  onUpdate={(updated) =>
+                    setPinnedArtifacts((prev) =>
+                      updated.pinned
+                        ? prev.map((a) => (a.id === updated.id ? updated : a))
+                        : prev.filter((a) => a.id !== updated.id)
+                    )
+                  }
+                  onDelete={(id) =>
+                    setPinnedArtifacts((prev) => prev.filter((a) => a.id !== id))
+                  }
+                />
+              ))}
             </div>
           </div>
         )}

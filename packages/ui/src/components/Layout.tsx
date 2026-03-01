@@ -49,6 +49,7 @@ import {
   Send,
   Repeat,
   MonitorCheck,
+  LayoutTemplate,
 } from './icons';
 import { StatsPanel } from './StatsPanel';
 import { RealtimeBridge, type BadgeCounts } from './RealtimeBridge';
@@ -110,6 +111,7 @@ const navGroups: NavGroup[] = [
       { to: '/triggers', icon: Zap, label: 'Triggers' },
       { to: '/workflows', icon: GitBranch, label: 'Workflows' },
       { to: '/background-agents', icon: Repeat, label: 'Background Agents' },
+      { to: '/artifacts', icon: LayoutTemplate, label: 'Artifacts' },
       { to: '/approvals', icon: ShieldCheck, label: 'Approvals' },
       { to: '/autonomy', icon: Shield, label: 'Autonomy' },
     ],

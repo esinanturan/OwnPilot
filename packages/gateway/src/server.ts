@@ -374,6 +374,10 @@ async function main() {
   const { getOrchestraEngine } = await import('./services/orchestra-engine.js');
   registry.register(Services.Orchestra, getOrchestraEngine());
 
+  // 24. Artifact Service (AI-generated interactive content)
+  const { getArtifactService } = await import('./services/artifact-service.js');
+  registry.register(Services.Artifact, getArtifactService());
+
   // Start trigger engine (proactive automation)
   log.info('Starting Trigger Engine...');
   try {

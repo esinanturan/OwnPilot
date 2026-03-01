@@ -117,6 +117,13 @@ export {
   ClipboardPaste,
   Scissors,
   Command,
+  PinOff,
+  Code2,
+  PenTool,
+  FormInput,
+  BarChart3,
+  Component,
+  LayoutTemplate,
 } from 'lucide-react';
 
 // Custom icons not available in lucide-react

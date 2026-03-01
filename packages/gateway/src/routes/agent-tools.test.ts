@@ -152,6 +152,8 @@ vi.mock('../tools/index.js', () => ({
   executeSubagentTool: vi.fn(),
   ORCHESTRA_TOOL_DEFINITIONS: [],
   executeOrchestraTool: vi.fn(),
+  ARTIFACT_TOOLS: [],
+  executeArtifactTool: vi.fn(),
 }));
 vi.mock('../services/config-tools.js', () => ({
   CONFIG_TOOLS: [],

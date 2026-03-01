@@ -115,6 +115,18 @@ export type {
   SubagentToolCall as SubagentToolCallView,
   SpawnSubagentInput,
 } from './subagents';
+export { artifactsApi } from './artifacts';
+export type {
+  Artifact,
+  ArtifactVersion,
+  ArtifactType as ArtifactContentType,
+  DashboardSize,
+  DataBinding,
+  DataBindingSource,
+  CreateArtifactInput,
+  UpdateArtifactInput,
+  ArtifactListQuery,
+} from './artifacts';
 export type {
   McpServer,
   McpServerTool,

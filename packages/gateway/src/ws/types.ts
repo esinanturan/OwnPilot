@@ -251,7 +251,8 @@ export interface ServerEvents {
       | 'channel'
       | 'conversation'
       | 'mcp_server'
-      | 'workflow';
+      | 'workflow'
+      | 'artifact';
     action: 'created' | 'updated' | 'deleted';
     id?: string;
     count?: number;

@@ -74,6 +74,7 @@ import {
   subagentRoutes,
   bridgeRoutes,
   orchestraRoutes,
+  artifactsRoutes,
 } from './routes/index.js';
 import {
   RATE_LIMIT_WINDOW_MS,
@@ -330,6 +331,9 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
   // Agent Orchestra (multi-agent collaboration & delegation)
   app.route('/api/v1/orchestra', orchestraRoutes);
 
+  // Artifacts (AI-generated interactive content)
+  app.route('/api/v1/artifacts', artifactsRoutes);
+
   // Root route (API-only mode, when UI is not bundled)
   if (!UI_AVAILABLE) {
     app.get('/', (c) => {
@@ -419,6 +423,8 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
         subagents: '/api/v1/subagents',
         // Agent Orchestra (multi-agent collaboration)
         orchestra: '/api/v1/orchestra',
+        // Artifacts (AI-generated interactive content)
+        artifacts: '/api/v1/artifacts',
         // Webhooks (external service callbacks, no auth required)
         webhooks: '/webhooks/telegram/:secret',
       },

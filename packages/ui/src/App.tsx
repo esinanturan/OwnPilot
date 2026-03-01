@@ -151,6 +151,9 @@ const BackgroundAgentsPage = lazy(() =>
 const EventMonitorPage = lazy(() =>
   import('./pages/EventMonitorPage').then((m) => ({ default: m.EventMonitorPage }))
 );
+const ArtifactsPage = lazy(() =>
+  import('./pages/ArtifactsPage').then((m) => ({ default: m.ArtifactsPage }))
+);
 
 function PageLoader() {
   return (
@@ -219,6 +222,7 @@ export function App() {
         <Route path="data-browser" element={page(<DataBrowserPage />)} />
         <Route path="coding-agents" element={page(<CodingAgentsPage />)} />
         <Route path="background-agents" element={page(<BackgroundAgentsPage />)} />
+        <Route path="artifacts" element={page(<ArtifactsPage />)} />
         <Route path="event-monitor" element={page(<EventMonitorPage />)} />
         <Route path="channels" element={page(<ChannelsPage />)} />
         <Route path="inbox" element={<Navigate to="/history" replace />} />

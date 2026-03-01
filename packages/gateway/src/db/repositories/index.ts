@@ -376,3 +376,6 @@ export {
   createCliToolPoliciesRepository,
   type ToolPolicyRecord,
 } from './cli-tool-policies.js';
+
+// Artifacts repository
+export { ArtifactsRepository, createArtifactsRepository } from './artifacts.js';

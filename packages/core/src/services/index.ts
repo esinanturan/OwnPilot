@@ -263,6 +263,20 @@ export {
   MAX_SUBAGENT_DEPTH,
 } from './subagent-service.js';
 
+// Artifact Service
+export type {
+  IArtifactService,
+  Artifact,
+  ArtifactVersion,
+  ArtifactType,
+  DashboardSize,
+  DataBinding,
+  DataBindingSource,
+  CreateArtifactInput,
+  UpdateArtifactInput,
+  ArtifactQuery,
+} from './artifact-service.js';
+
 // Config Center
 export * from './config-center.js';
 

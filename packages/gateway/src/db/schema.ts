@@ -1587,6 +1587,48 @@ FROM channel_sessions cs
 WHERE cm.channel_id = cs.channel_plugin_id
   AND cm.conversation_id IS NULL
   AND cs.conversation_id IS NOT NULL;
+
+-- =====================================================
+-- UCP (Universal Channel Protocol) MIGRATIONS
+-- =====================================================
+
+-- CHANNEL_MESSAGES: Add UCP thread ID and rich content columns
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'channel_messages' AND column_name = 'ucp_thread_id') THEN
+    ALTER TABLE channel_messages ADD COLUMN ucp_thread_id TEXT;
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'channel_messages' AND column_name = 'ucp_content') THEN
+    ALTER TABLE channel_messages ADD COLUMN ucp_content JSONB;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_channel_messages_ucp_thread
+  ON channel_messages(ucp_thread_id)
+  WHERE ucp_thread_id IS NOT NULL;
+
+-- CHANNEL_BRIDGES: Cross-channel message bridging
+CREATE TABLE IF NOT EXISTS channel_bridges (
+  id TEXT PRIMARY KEY,
+  source_channel_id TEXT NOT NULL,
+  target_channel_id TEXT NOT NULL,
+  direction TEXT NOT NULL DEFAULT 'both'
+    CHECK (direction IN ('source_to_target', 'target_to_source', 'both')),
+  filter_pattern TEXT,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_channel_bridges_source
+  ON channel_bridges(source_channel_id)
+  WHERE enabled = true;
+
+CREATE INDEX IF NOT EXISTS idx_channel_bridges_target
+  ON channel_bridges(target_channel_id)
+  WHERE enabled = true;
 `;
 
 export const INDEXES_SQL = `

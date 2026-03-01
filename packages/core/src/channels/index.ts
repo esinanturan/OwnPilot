@@ -59,3 +59,46 @@ export {
   getChannelService,
   hasChannelService,
 } from './service.js';
+
+// UCP (Universal Channel Protocol)
+export {
+  // Types
+  type UCPContentType,
+  type UCPFeature,
+  type UCPButton,
+  type UCPFormField,
+  type UCPContent,
+  type UCPIdentity,
+  type UCPMetadata,
+  type UCPMessage,
+  type UCPChannelLimits,
+  type UCPChannelCapabilities,
+  type BridgeDirection,
+  type UCPBridgeConfig,
+  adaptContent,
+  stripMarkdown,
+  stripHtml,
+
+  // Adapter
+  UCPChannelAdapter,
+
+  // Pipeline
+  UCPPipeline,
+
+  // Bridge
+  UCPBridgeManager,
+  type BridgeStore,
+  type BridgeSendFn,
+
+  // Middleware
+  type UCPMiddleware,
+  type NamedUCPMiddleware,
+  rateLimiter,
+  type RateLimiterConfig,
+  threadTracker,
+  createInMemoryThreadStore,
+  type ThreadStore,
+  languageDetector,
+  detectLanguage,
+  type LanguageDetection,
+} from './ucp/index.js';

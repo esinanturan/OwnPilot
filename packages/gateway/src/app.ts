@@ -72,6 +72,7 @@ import {
   securityRoutes,
   backgroundAgentsRoutes,
   subagentRoutes,
+  bridgeRoutes,
 } from './routes/index.js';
 import {
   RATE_LIMIT_WINDOW_MS,
@@ -321,6 +322,9 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
 
   // Subagents (ephemeral, task-oriented child agents)
   app.route('/api/v1/subagents', subagentRoutes);
+
+  // Channel Bridges (UCP cross-channel bridging)
+  app.route('/api/v1/bridges', bridgeRoutes);
 
   // Root route (API-only mode, when UI is not bundled)
   if (!UI_AVAILABLE) {

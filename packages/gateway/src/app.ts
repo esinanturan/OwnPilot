@@ -73,6 +73,7 @@ import {
   backgroundAgentsRoutes,
   subagentRoutes,
   bridgeRoutes,
+  orchestraRoutes,
 } from './routes/index.js';
 import {
   RATE_LIMIT_WINDOW_MS,
@@ -326,6 +327,9 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
   // Channel Bridges (UCP cross-channel bridging)
   app.route('/api/v1/bridges', bridgeRoutes);
 
+  // Agent Orchestra (multi-agent collaboration & delegation)
+  app.route('/api/v1/orchestra', orchestraRoutes);
+
   // Root route (API-only mode, when UI is not bundled)
   if (!UI_AVAILABLE) {
     app.get('/', (c) => {
@@ -413,6 +417,8 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
         // Background Agents (persistent autonomous agents)
         backgroundAgents: '/api/v1/background-agents',
         subagents: '/api/v1/subagents',
+        // Agent Orchestra (multi-agent collaboration)
+        orchestra: '/api/v1/orchestra',
         // Webhooks (external service callbacks, no auth required)
         webhooks: '/webhooks/telegram/:secret',
       },

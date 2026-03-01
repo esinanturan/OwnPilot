@@ -150,6 +150,8 @@ vi.mock('../tools/index.js', () => ({
   executeEventTool: vi.fn(),
   SUBAGENT_TOOLS: [],
   executeSubagentTool: vi.fn(),
+  ORCHESTRA_TOOL_DEFINITIONS: [],
+  executeOrchestraTool: vi.fn(),
 }));
 vi.mock('../services/config-tools.js', () => ({
   CONFIG_TOOLS: [],

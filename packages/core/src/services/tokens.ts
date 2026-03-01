@@ -38,6 +38,7 @@ import type { ICodingAgentService } from './coding-agent-service.js';
 import type { ICliToolService } from './cli-tool-service.js';
 import type { IBackgroundAgentService } from './background-agent-service.js';
 import type { ISubagentService } from './subagent-service.js';
+import type { IOrchestraService } from '../agent/orchestra/types.js';
 
 /**
  * All service tokens.
@@ -123,4 +124,7 @@ export const Services = {
 
   /** Subagents (ephemeral, task-oriented child agents) */
   Subagent: new ServiceToken<ISubagentService>('subagent'),
+
+  /** Agent Orchestra (multi-agent collaboration & delegation) */
+  Orchestra: new ServiceToken<IOrchestraService>('orchestra'),
 } as const;

@@ -1876,6 +1876,25 @@ CREATE INDEX IF NOT EXISTS idx_bg_agent_history_agent ON background_agent_histor
 -- Subagent history indexes
 CREATE INDEX IF NOT EXISTS idx_subagent_history_parent ON subagent_history(parent_id, spawned_at DESC);
 CREATE INDEX IF NOT EXISTS idx_subagent_history_user ON subagent_history(user_id, spawned_at DESC);
+
+-- ORCHESTRA_EXECUTIONS: Multi-agent plan execution audit
+CREATE TABLE IF NOT EXISTS orchestra_executions (
+  id TEXT PRIMARY KEY,
+  parent_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  description TEXT NOT NULL,
+  strategy TEXT NOT NULL,
+  state TEXT NOT NULL,
+  plan JSONB NOT NULL,
+  task_results JSONB NOT NULL DEFAULT '[]',
+  total_duration_ms INTEGER,
+  error TEXT,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_orchestra_executions_parent ON orchestra_executions(parent_id, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orchestra_executions_user ON orchestra_executions(user_id, started_at DESC);
 `;
 
 /**

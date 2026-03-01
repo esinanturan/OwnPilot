@@ -249,6 +249,26 @@ export class WSGateway {
       })
     );
 
+    // orchestra.* → orchestra:* (started, task.complete, completed)
+    this.legacyUnsubs.push(
+      eventSystem.onAny('orchestra.started', (event) => {
+        this.broadcast('orchestra:started', event.data as ServerEvents['orchestra:started']);
+      })
+    );
+    this.legacyUnsubs.push(
+      eventSystem.onAny('orchestra.task.complete', (event) => {
+        this.broadcast(
+          'orchestra:task:complete',
+          event.data as ServerEvents['orchestra:task:complete']
+        );
+      })
+    );
+    this.legacyUnsubs.push(
+      eventSystem.onAny('orchestra.completed', (event) => {
+        this.broadcast('orchestra:completed', event.data as ServerEvents['orchestra:completed']);
+      })
+    );
+
     // channel.user.* → channel:user:* (pending, blocked, unblocked, verified, first_seen)
     this.legacyUnsubs.push(
       eventSystem.onPattern('channel.user.*', (event) => {

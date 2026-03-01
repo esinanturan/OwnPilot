@@ -33,6 +33,8 @@ import {
   executeBackgroundAgentTool,
   SUBAGENT_TOOLS,
   executeSubagentTool,
+  ORCHESTRA_TOOL_DEFINITIONS,
+  executeOrchestraTool,
 } from '../../tools/index.js';
 import { CONFIG_TOOLS, executeConfigTool } from '../config-tools.js';
 import { getErrorMessage } from '../../routes/helpers.js';
@@ -277,6 +279,45 @@ export function createSubagentToolProvider(userId: string): ToolProvider {
             const effectiveUserId = context?.userId ?? userId;
             const conversationId = context?.conversationId;
             const result = await executeSubagentTool(
+              def.name,
+              args,
+              effectiveUserId,
+              conversationId
+            );
+            if (result.success) {
+              const content =
+                typeof result.result === 'string'
+                  ? result.result
+                  : JSON.stringify(result.result, null, 2);
+              return { content };
+            }
+            return { content: result.error ?? 'Unknown error', isError: true };
+          } catch (err) {
+            return { content: getErrorMessage(err, 'Tool execution failed'), isError: true };
+          }
+        },
+      })),
+  };
+}
+
+/**
+ * Create a provider for orchestra tools (requires userId).
+ * Uses custom wrapper because executeOrchestraTool needs conversationId from ToolContext.
+ */
+export function createOrchestraToolProvider(userId: string): ToolProvider {
+  return {
+    name: 'orchestra',
+    getTools: () =>
+      ORCHESTRA_TOOL_DEFINITIONS.map((def) => ({
+        definition: def,
+        executor: async (
+          args: Record<string, unknown>,
+          context: ToolContext
+        ): Promise<ToolExecutionResult> => {
+          try {
+            const effectiveUserId = context?.userId ?? userId;
+            const conversationId = context?.conversationId ?? 'unknown';
+            const result = await executeOrchestraTool(
               def.name,
               args,
               effectiveUserId,

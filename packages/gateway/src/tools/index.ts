@@ -19,3 +19,8 @@ export { CLI_TOOL_TOOLS, executeCliToolTool } from './cli-tool-tools.js';
 export { BACKGROUND_AGENT_TOOLS, executeBackgroundAgentTool } from './background-agent-tools.js';
 export { EVENT_TOOLS, executeEventTool } from './event-tools.js';
 export { SUBAGENT_TOOLS, executeSubagentTool } from './subagent-tools.js';
+export {
+  ORCHESTRA_TOOL_DEFINITIONS,
+  ORCHESTRA_TOOL_NAMES,
+  executeOrchestraTool,
+} from './orchestra-tools.js';

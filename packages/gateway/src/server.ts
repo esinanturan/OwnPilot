@@ -370,6 +370,10 @@ async function main() {
   const { getSubagentService } = await import('./services/subagent-service.js');
   registry.register(Services.Subagent, getSubagentService());
 
+  // 23. Orchestra Service (multi-agent collaboration & delegation)
+  const { getOrchestraEngine } = await import('./services/orchestra-engine.js');
+  registry.register(Services.Orchestra, getOrchestraEngine());
+
   // Start trigger engine (proactive automation)
   log.info('Starting Trigger Engine...');
   try {

@@ -50,3 +50,4 @@ export { securityRoutes } from './security.js';
 export { backgroundAgentsRoutes } from './background-agents.js';
 export { subagentRoutes } from './subagents.js';
 export { bridgeRoutes } from './bridges.js';
+export { orchestraRoutes } from './orchestra.js';

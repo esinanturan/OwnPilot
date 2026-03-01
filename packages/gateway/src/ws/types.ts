@@ -358,6 +358,34 @@ export interface ServerEvents {
     toolCallsUsed: number;
   };
 
+  // Orchestra events
+  'orchestra:started': {
+    executionId: string;
+    parentId: string;
+    userId: string;
+    description: string;
+    strategy: string;
+    taskCount: number;
+  };
+  'orchestra:task:complete': {
+    executionId: string;
+    taskId: string;
+    agentName: string;
+    success: boolean;
+    durationMs: number;
+    tasksCompleted: number;
+    tasksTotal: number;
+  };
+  'orchestra:completed': {
+    executionId: string;
+    parentId: string;
+    userId: string;
+    state: string;
+    totalDurationMs: number;
+    tasksSucceeded: number;
+    tasksFailed: number;
+  };
+
   // EventBus bridge events
   'event:subscribed': { pattern: string; success: boolean; error?: string };
   'event:unsubscribed': { pattern: string };

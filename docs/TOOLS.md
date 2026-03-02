@@ -1,6 +1,6 @@
 # OwnPilot Tool System
 
-Comprehensive reference for the OwnPilot tool architecture, all 170+ built-in tools, the registration lifecycle, execution model, and extensibility system.
+Comprehensive reference for the OwnPilot tool architecture, all 190+ built-in tools, the registration lifecycle, execution model, and extensibility system.
 
 ---
 
@@ -51,6 +51,7 @@ Comprehensive reference for the OwnPilot tool architecture, all 170+ built-in to
   - [Utilities](#24-utilities)
   - [CLI Tools](#25-cli-tools)
   - [Coding Agents](#26-coding-agents)
+  - [Edge Devices](#27-edge-devices)
 - [Security Model](#security-model)
 - [Definition-Only vs Built-In Executor Tools](#definition-only-vs-built-in-executor-tools)
 - [Dynamic Tool Creation](#dynamic-tool-creation)
@@ -1429,16 +1430,20 @@ All tool source files are located under `packages/core/src/agent/tools/`.
 
 **Related files outside the tools directory:**
 
-| File                                     | Description                                                                       |
-| ---------------------------------------- | --------------------------------------------------------------------------------- |
-| `packages/core/src/agent/types.ts`       | All TypeScript interfaces (`ToolDefinition`, `ToolExecutor`, `ToolContext`, etc.) |
-| `packages/core/src/agent/tools.ts`       | `ToolRegistry` class, `createToolRegistry()`, core tool definitions               |
-| `packages/core/src/agent/tool-config.ts` | `TOOL_GROUPS`, `DEFAULT_ENABLED_GROUPS`, group configuration helpers              |
-| `packages/core/src/agent/debug.ts`       | `logToolCall()`, `logToolResult()` debug logging                                  |
+| File                                            | Description                                                                       |
+| ----------------------------------------------- | --------------------------------------------------------------------------------- |
+| `packages/core/src/agent/types.ts`              | All TypeScript interfaces (`ToolDefinition`, `ToolExecutor`, `ToolContext`, etc.) |
+| `packages/core/src/agent/tools.ts`              | `ToolRegistry` class, `createToolRegistry()`, core tool definitions               |
+| `packages/core/src/agent/tool-config.ts`        | `TOOL_GROUPS`, `DEFAULT_ENABLED_GROUPS`, group configuration helpers              |
+| `packages/gateway/src/tools/edge-tools.ts`      | Edge device tools (MQTT-based IoT)                                                |
+| `packages/gateway/src/tools/browser-tools.ts`   | Browser automation tools (Playwright)                                             |
+| `packages/gateway/src/tools/orchestra-tools.ts` | Multi-agent orchestration tools                                                   |
+| `packages/gateway/src/tools/artifact-tools.ts`  | Artifact (versioned document) tools                                               |
+| `packages/core/src/agent/debug.ts`              | `logToolCall()`, `logToolResult()` debug logging                                  |
 
 ---
 
-## Quick Reference: All 170+ Tools by Category
+## Quick Reference: All Tools by Category
 
 | #   | Category        | Tool Count | Tools                                                                                                                                                                                                                                                                                                                                                     |
 | --- | --------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1468,6 +1473,7 @@ All tool source files are located under `packages/core/src/agent/tools/`.
 | 24  | Utilities       | 22         | `get_current_datetime`, `date_diff`, `date_add`, `calculate`, `statistics`, `convert_units`, `generate_uuid`, `generate_password`, `random_number`, `hash_text`, `encode_decode`, `count_text`, `extract_from_text`, `transform_text`, `compare_text`, `regex`, `format_json`, `parse_csv`, `generate_csv`, `array_operations`, `validate`, `system_info` |
 | 25  | CLI Tools       | 3          | `run_cli_tool`, `list_cli_tools`, `install_cli_tool`                                                                                                                                                                                                                                                                                                      |
 | 26  | Coding Agents   | 4          | `run_coding_task`, `list_coding_agents`, `get_task_result`, `list_task_results`                                                                                                                                                                                                                                                                           |
+| 27  | Edge Devices    | 6          | `list_edge_devices`, `get_device_status`, `read_sensor`, `send_device_command`, `control_actuator`, `register_edge_device`                                                                                                                                                                                                                                |
 
 ### 25. CLI Tools
 
@@ -1514,3 +1520,55 @@ Gateway-registered tools for delegating coding tasks to external AI coding agent
 | `max_budget_usd`  | `number` | No       | Maximum cost in USD (default: 1.0, Claude Code SDK only)        |
 | `max_turns`       | `number` | No       | Maximum agent turns (default: 10, Claude Code SDK only)         |
 | `timeout_seconds` | `number` | No       | Timeout in seconds (default: 300, max: 1800)                    |
+
+---
+
+### 27. Edge Devices
+
+**Source:** `packages/gateway/src/tools/edge-tools.ts`
+
+Gateway-registered tools for managing IoT/edge devices connected via MQTT. Register devices, read sensor data, send commands, and control actuators.
+
+| Tool                   | Description                                                              |
+| ---------------------- | ------------------------------------------------------------------------ |
+| `list_edge_devices`    | List all registered IoT/edge devices with status, sensor/actuator count. |
+| `get_device_status`    | Get detailed device status including all sensor readings and actuators.  |
+| `read_sensor`          | Read the latest value from a specific sensor, with optional history.     |
+| `send_device_command`  | Send a command to a device via MQTT (reboot, calibrate, etc.).           |
+| `control_actuator`     | Set state on a specific actuator (relay, servo, LED, motor, etc.).       |
+| `register_edge_device` | Register a new edge device in the system.                                |
+
+**Parameters for `list_edge_devices`:**
+
+| Parameter | Type     | Required | Description                                          |
+| --------- | -------- | -------- | ---------------------------------------------------- |
+| `status`  | `string` | No       | Filter: `online`, `offline`, `error`                 |
+| `type`    | `string` | No       | Filter: `raspberry-pi`, `esp32`, `arduino`, `custom` |
+| `search`  | `string` | No       | Search by device name                                |
+
+**Parameters for `read_sensor`:**
+
+| Parameter       | Type     | Required | Description                                |
+| --------------- | -------- | -------- | ------------------------------------------ |
+| `device_id`     | `string` | Yes      | ID of the edge device                      |
+| `sensor_id`     | `string` | Yes      | ID of the sensor to read                   |
+| `history_limit` | `number` | No       | Number of historical readings (default: 1) |
+
+**Parameters for `control_actuator`:**
+
+| Parameter     | Type     | Required | Description                                       |
+| ------------- | -------- | -------- | ------------------------------------------------- |
+| `device_id`   | `string` | Yes      | ID of the edge device                             |
+| `actuator_id` | `string` | Yes      | ID of the actuator to control                     |
+| `state`       | `object` | Yes      | Desired state (e.g., `{"state": true}` for relay) |
+
+**Parameters for `register_edge_device`:**
+
+| Parameter          | Type     | Required | Description                                  |
+| ------------------ | -------- | -------- | -------------------------------------------- |
+| `name`             | `string` | Yes      | Human-readable device name                   |
+| `type`             | `string` | Yes      | `raspberry-pi`, `esp32`, `arduino`, `custom` |
+| `protocol`         | `string` | No       | `mqtt` (default), `websocket`, `http-poll`   |
+| `sensors`          | `array`  | No       | Sensor definitions (id, name, type, unit)    |
+| `actuators`        | `array`  | No       | Actuator definitions (id, name, type)        |
+| `firmware_version` | `string` | No       | Current firmware version                     |

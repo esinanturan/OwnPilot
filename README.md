@@ -6,7 +6,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-≥22-green?logo=node.js)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript)](https://www.typescriptlang.org/)
 
-Privacy-first personal AI assistant platform with autonomous background agents, tool orchestration, multi-provider support, MCP integration, and Telegram + WhatsApp connectivity.
+Privacy-first personal AI assistant platform with autonomous background agents, multi-agent orchestration, tool orchestration, multi-provider support, MCP integration, voice pipeline, browser automation, IoT edge device control, and Telegram + WhatsApp connectivity.
 
 **Self-hosted. Your data stays yours.**
 
@@ -26,10 +26,15 @@ Privacy-first personal AI assistant platform with autonomous background agents, 
   - [CLI](#cli-ownpilotcli)
 - [AI Providers](#ai-providers)
 - [Agent System](#agent-system)
+- [Agent Orchestra](#agent-orchestra)
 - [Background Agents](#background-agents-1)
 - [Subagents](#subagents)
 - [Tool System](#tool-system)
 - [MCP Integration](#mcp-integration)
+- [Artifacts](#artifacts)
+- [Voice Pipeline](#voice-pipeline)
+- [Browser Agent](#browser-agent)
+- [Edge Devices](#edge-devices)
 - [Personal Data](#personal-data)
 - [Autonomy & Automation](#autonomy--automation)
 - [Database](#database)
@@ -57,12 +62,12 @@ Privacy-first personal AI assistant platform with autonomous background agents, 
 
 ### Tools & Extensions
 
-- **170+ Built-in Tools** across 28 categories (personal data, files, code execution, web, email, media, git, translation, weather, finance, automation, vector search, data extraction, utilities)
+- **190+ Built-in Tools** across 32 categories (personal data, files, code execution, web, email, media, git, translation, weather, finance, automation, vector search, data extraction, utilities, orchestra, artifacts, browser, edge devices)
 - **Meta-tool Proxy** — Only 4 meta-tools sent to the LLM (`search_tools`, `get_tool_help`, `use_tool`, `batch_use_tool`); all tools remain available via dynamic discovery
 - **Tool Namespaces** — Qualified tool names with prefixes (`core.`, `custom.`, `plugin.`, `skill.`, `mcp.`) for clear origin tracking
 - **MCP Client** — Connect to external MCP servers (Filesystem, GitHub, Brave Search, etc.) and use their tools natively
 - **MCP Server** — Expose OwnPilot's tools as an MCP endpoint for Claude Desktop and other MCP clients
-- **User Extensions** — Installable tool bundles with custom tools, triggers, services, and configurations; Extension SDK provides `utils.callTool()` to invoke any of 170+ built-in tools
+- **User Extensions** — Installable tool bundles with custom tools, triggers, services, and configurations; Extension SDK provides `utils.callTool()` to invoke any of 190+ built-in tools
 - **6 Default Extensions** — Daily Briefing, Knowledge Base, Project Tracker, Smart Search, Automation Builder, Contact Enricher bundled out-of-the-box
 - **Extension Security Audit** — LLM-powered security analysis for skills and extensions before installation
 - **Skills** — Open standard SKILL.md format (AgentSkills.io) for instruction-based AI knowledge packages
@@ -91,7 +96,7 @@ Privacy-first personal AI assistant platform with autonomous background agents, 
 
 - **Persistent Autonomous Agents** — Long-running agents that operate independently with configurable missions, schedules, and tool access
 - **3 Scheduling Modes** — Interval (fixed timer), continuous (adaptive delays), event-driven (reactive to triggers)
-- **Full Tool Access** — Same capabilities as chat agents: 170+ tools, extensions, plugins, MCP tools, memory injection
+- **Full Tool Access** — Same capabilities as chat agents: 190+ tools, extensions, plugins, MCP tools, memory injection
 - **Configurable Provider/Model** — Each agent can use a different AI provider and model, with fallback to system defaults
 - **Workspace Isolation** — Each agent gets an isolated file workspace for safe file operations
 - **Rate Limiting & Budget** — Cycles-per-hour enforcement, budget tracking with auto-stop, auto-pause on consecutive errors
@@ -106,6 +111,47 @@ Privacy-first personal AI assistant platform with autonomous background agents, 
 - **Full Tool Access** — Subagents inherit the parent's full tool pipeline; optional `allowedTools` restriction
 - **Independent Model Selection** — Each subagent can use a different provider/model (e.g., expensive model for parent, cheap model for subagents)
 - **5 LLM-Callable Tools** — `spawn_subagent`, `check_subagent`, `get_subagent_result`, `cancel_subagent`, `list_subagents`
+
+### Agent Orchestra
+
+- **Multi-Agent Orchestration** — Fan-out/fan-in, race, pipeline, and voting strategies for concurrent multi-provider agent execution
+- **Real-time Progress** — WebSocket events for orchestra session lifecycle (started, step completed, finished)
+- **6 LLM Tools** — `create_orchestra`, `run_orchestra`, `list_orchestras`, `get_orchestra_result`, `cancel_orchestra`, `list_strategies`
+
+### Artifacts
+
+- **Versioned Documents** — Create, update, and track markdown, code, JSON, HTML, CSV, SVG, and Mermaid diagram artifacts
+- **Data Binding** — Expression-based bindings (`{{source.field}}`) that auto-resolve from conversation context
+- **Diff Tracking** — Version history with content diffs for every update
+- **5 LLM Tools** — `create_artifact`, `update_artifact`, `list_artifacts`, `get_artifact`, `delete_artifact`
+
+### Voice Pipeline
+
+- **Speech-to-Text** — Whisper API integration for audio transcription with configurable models
+- **Text-to-Speech** — OpenAI TTS with multiple voices (alloy, echo, fable, onyx, nova, shimmer)
+- **Chat Integration** — VoiceButton for recording in ChatInput, VoicePlayButton for AI response playback
+- **Channel Support** — WhatsApp voice message transcription via channel normalizer
+
+### Browser Agent
+
+- **Headless Automation** — Playwright-powered Chromium for AI-driven web browsing
+- **7 LLM Tools** — Navigate, click, type, screenshot, evaluate JavaScript, extract content, fill forms
+- **Workflow Persistence** — Browser automation workflows stored in DB for replay and audit
+
+### Skills Platform
+
+- **Enhanced Lifecycle** — Sandboxed skill execution with granular permissions (network, filesystem, database, shell, email, scheduling)
+- **npm Dependencies** — Skills can declare and install npm packages via `ownpilot skill install`
+- **CLI Management** — `ownpilot skill` commands for install, list, info, search, update, remove
+- **Permission Review** — PermissionReviewModal UI for approving skill capabilities before activation
+
+### Edge Devices (IoT)
+
+- **MQTT Integration** — Mosquitto broker for lightweight IoT device communication
+- **Device Registry** — Register edge devices (Raspberry Pi, ESP32, Arduino, custom) with sensors and actuators
+- **Telemetry Ingestion** — Real-time sensor data via MQTT topics, stored with full history
+- **Command Queue** — Send commands to devices with acknowledgment tracking
+- **6 LLM Tools** — `list_edge_devices`, `get_device_status`, `read_sensor`, `send_device_command`, `control_actuator`, `register_edge_device`
 
 ### CLI Tools
 
@@ -128,13 +174,13 @@ Privacy-first personal AI assistant platform with autonomous background agents, 
 
 ### Communication
 
-- **Web UI** — React 19 + Vite 7 + Tailwind CSS 4 with dark mode, 53 pages, 100+ components, code-split
+- **Web UI** — React 19 + Vite 7 + Tailwind CSS 4 with dark mode, 55+ pages, 110+ components, code-split
 - **Telegram Bot** — Full bot integration with user/chat filtering, message splitting, HTML/Markdown formatting
 - **WhatsApp (Baileys)** — QR code authentication (no Meta Business account needed), self-chat mode with loop prevention, session persistence
 - **Channel User Approval** — Multi-step verification: approval code flow, manual admin approval, user blocking/unblocking with real-time notifications
 - **EventBus** — Unified event backbone with EventBusBridge translating dot-notation events to WebSocket colon-notation; Event Monitor UI for live debugging
 - **WebSocket** — Real-time broadcasts for all data mutations, event subscriptions, session management
-- **REST API** — 110+ route modules with standardized responses, pagination, and error codes
+- **REST API** — 120+ route modules with standardized responses, pagination, and error codes
 
 ### Security
 
@@ -168,13 +214,17 @@ Privacy-first personal AI assistant platform with autonomous background agents, 
                        │
               ┌────────▼────────┐
               │    Gateway      │  Hono HTTP API Server
-              │  (Port 8080)    │  110+ Route Modules
+              │  (Port 8080)    │  120+ Route Modules
               ├─────────────────┤
               │  MessageBus     │  Middleware Pipeline
               │  Agent Engine   │  Tool Orchestration
+              │  Orchestra      │  Multi-Agent Coordination
               │  Provider Router│  Smart Model Selection
               │  Background Agt │  Persistent Autonomous Agents
               │  Coding Agents  │  External AI CLIs
+              │  Browser Agent  │  Headless Web Automation
+              │  Voice Pipeline │  STT/TTS Integration
+              │  Edge Manager   │  MQTT + IoT Devices
               │  CLI Tools      │  40+ Discoverable Tools
               │  Pulse Engine   │  Proactive Autonomy
               │  MCP Client     │  External Tool Servers
@@ -183,17 +233,14 @@ Privacy-first personal AI assistant platform with autonomous background agents, 
               │  WebSocket      │  Real-time Broadcasts
               ├─────────────────┤
               │     Core        │  AI Engine & Tool Framework
-              │  170+ Tools     │  Multi-Provider Support
+              │  190+ Tools     │  Multi-Provider Support
               │  Sandbox, Crypto│  Privacy, Audit
               └────────┬────────┘
                        │
-              ┌────────▼────────┐
-              │   PostgreSQL    │  85+ Repositories
-              │                 │  Conversations, Personal Data,
-              │                 │  Memories, Goals, Triggers, Plans,
-              │                 │  MCP Servers, User Extensions,
-              │                 │  CLI Tools, Coding Agents,
-              │                 │  Background Agents
+              ┌────────▼────────┐  ┌─────────────┐
+              │   PostgreSQL    │  │  Mosquitto   │
+              │  88+ Repos      │  │  MQTT Broker │
+              │                 │  └──────────────┘
               └─────────────────┘
 ```
 
@@ -287,7 +334,8 @@ ownpilot/
 │   │   ├── src/
 │   │   │   ├── agent/           # Agent engine, orchestrator, providers
 │   │   │   │   ├── providers/   # Multi-provider implementations
-│   │   │   │   └── tools/       # 170+ built-in tool definitions
+│   │   │   │   ├── orchestra/   # Multi-agent orchestration engine
+│   │   │   │   └── tools/       # 190+ built-in tool definitions
 │   │   │   ├── plugins/         # Plugin system with isolation, marketplace
 │   │   │   ├── events/          # EventBus, HookBus, ScopedBus
 │   │   │   ├── services/        # Service registry (DI container)
@@ -297,7 +345,8 @@ ownpilot/
 │   │   │   ├── audit/           # Tamper-evident hash chain logging
 │   │   │   ├── privacy/         # PII detection & redaction
 │   │   │   ├── security/        # Critical pattern blocking, permissions
-│   │   │   ├── channels/        # Channel plugin architecture
+│   │   │   ├── channels/        # Channel plugin architecture + UCP
+│   │   │   ├── edge/            # Edge device types and interfaces
 │   │   │   ├── assistant/       # Intent classifier, orchestrator
 │   │   │   ├── workspace/       # Per-user isolated environments
 │   │   │   └── types/           # Branded types, Result<T,E>, guards
@@ -305,11 +354,11 @@ ownpilot/
 │   │
 │   ├── gateway/                 # Hono API server (~72K LOC)
 │   │   ├── src/
-│   │   │   ├── routes/          # 50+ route modules
-│   │   │   ├── services/        # 50+ business logic services
-│   │   │   ├── tools/           # Coding agent & CLI tool providers
+│   │   │   ├── routes/          # 55+ route modules
+│   │   │   ├── services/        # 60+ business logic services
+│   │   │   ├── tools/           # Tool providers (coding, CLI, edge, browser, etc.)
 │   │   │   ├── db/
-│   │   │   │   ├── repositories/  # 40+ data access repositories
+│   │   │   │   ├── repositories/  # 45+ data access repositories
 │   │   │   │   ├── adapters/      # PostgreSQL adapter
 │   │   │   │   ├── migrations/    # Schema migrations
 │   │   │   │   └── seeds/         # Default data
@@ -325,10 +374,10 @@ ownpilot/
 │   │   │   └── audit/           # Gateway audit logging
 │   │   └── package.json
 │   │
-│   ├── ui/                      # React 19 web interface (~38K LOC)
+│   ├── ui/                      # React 19 web interface (~40K LOC)
 │   │   ├── src/
-│   │   │   ├── pages/           # 47 page components
-│   │   │   ├── components/      # 60+ reusable components
+│   │   │   ├── pages/           # 55+ page components
+│   │   │   ├── components/      # 70+ reusable components
 │   │   │   ├── hooks/           # Custom hooks (chat store, theme, WebSocket)
 │   │   │   ├── api/             # Typed fetch wrapper + endpoint modules
 │   │   │   ├── types/           # UI type definitions
@@ -368,8 +417,9 @@ The foundational runtime library. Contains the AI engine, tool system, plugin ar
 | Module             | Description                                                                                      |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
 | `agent/`           | Agent engine with multi-provider support, orchestrator, tool-calling loop                        |
+| `agent/orchestra/` | Multi-agent orchestration (fan-out, race, pipeline, voting strategies)                           |
 | `agent/providers/` | Provider implementations (OpenAI, Anthropic, Google, Zhipu, OpenAI-compatible, 8 aggregators)    |
-| `agent/tools/`     | 170+ built-in tool definitions across 28 tool files                                              |
+| `agent/tools/`     | 190+ built-in tool definitions across 32 tool files                                              |
 | `plugins/`         | Plugin system with isolation, marketplace, signing, runtime                                      |
 | `events/`          | 3-in-1 event system: EventBus (fire-and-forget), HookBus (interceptable), ScopedBus (namespaced) |
 | `services/`        | Service registry (DI container) with typed tokens                                                |
@@ -379,6 +429,8 @@ The foundational runtime library. Contains the AI engine, tool system, plugin ar
 | `audit/`           | Tamper-evident logging with hash chain verification                                              |
 | `privacy/`         | PII detection (15+ categories) and redaction                                                     |
 | `security/`        | Critical pattern blocking (100+ patterns), permission matrix                                     |
+| `channels/`        | Channel plugin architecture, Universal Channel Protocol (UCP)                                    |
+| `edge/`            | Edge device types (sensors, actuators, telemetry, commands)                                      |
 | `types/`           | Result<T,E> pattern, branded types, error classes, type guards                                   |
 
 ### Gateway (`@ownpilot/gateway`)
@@ -387,7 +439,7 @@ The API server built on [Hono](https://hono.dev/). Handles HTTP/WebSocket commun
 
 **~76,000 LOC** across 210+ source files. **239 test files** with **11,750+ tests**.
 
-**Route Modules (44 top-level + 70+ sub-modules):**
+**Route Modules (50+ top-level + 70+ sub-modules):**
 
 | Category               | Routes                                                                                                                                                                            |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -396,15 +448,17 @@ The API server built on [Hono](https://hono.dev/). Handles HTTP/WebSocket commun
 | **Personal Data**      | `personal-data.ts`, `personal-data-tools.ts`, `memories.ts`, `goals.ts`, `expenses.ts`, `custom-data.ts`                                                                          |
 | **Productivity**       | `productivity.ts` (Pomodoro, Habits, Captures)                                                                                                                                    |
 | **Automation**         | `triggers.ts`, `heartbeats.ts`, `plans.ts`, `autonomy.ts`, `workflows.ts`, `workflow-copilot.ts`, `background-agents.ts`                                                          |
-| **Tools & Extensions** | `tools.ts`, `custom-tools.ts`, `plugins.ts`, `extensions.ts`, `mcp.ts`, `composio.ts`                                                                                             |
+| **Tools & Extensions** | `tools.ts`, `custom-tools.ts`, `plugins.ts`, `extensions.ts`, `skills.ts`, `mcp.ts`, `composio.ts`                                                                                |
 | **Coding & CLI**       | `coding-agents.ts`, `cli-tools.ts`, `cli-providers.ts`                                                                                                                            |
+| **Orchestration**      | `orchestra.ts`, `artifacts.ts`, `browser.ts`, `voice.ts`, `bridges.ts`                                                                                                            |
+| **Edge / IoT**         | `edge.ts` (devices, commands, telemetry, MQTT status)                                                                                                                             |
 | **Channels**           | `channels.ts`, `channel-auth.ts`, `webhooks.ts`                                                                                                                                   |
 | **Configuration**      | `settings.ts`, `config-services.ts`, `ui-auth.ts`                                                                                                                                 |
 | **System**             | `health.ts`, `dashboard.ts`, `costs.ts`, `audit.ts`, `debug.ts`, `database.ts`, `profile.ts`, `workspaces.ts`, `file-workspaces.ts`, `execution-permissions.ts`, `error-codes.ts` |
 
-**Services (100+):** MessageBus, ConfigCenter, ToolExecutor, ProviderService, McpClientService, McpServerService, ExtensionService, ComposioService, EmbeddingService, HeartbeatService, AuditService, PluginService, MemoryService, GoalService, TriggerService, PlanService, WorkspaceService, DatabaseService, SessionService, LogService, ResourceService, LocalDiscovery, WorkflowService, AgentSkillsParser, CodingAgentService, CodingAgentSessions, CliToolService, CliToolsDiscovery, ModelRouting, ExecutionApproval, BackgroundAgentManager, BackgroundAgentRunner, ChannelVerificationService, and more.
+**Services (110+):** MessageBus, ConfigCenter, ToolExecutor, ProviderService, McpClientService, McpServerService, ExtensionService, ComposioService, EmbeddingService, HeartbeatService, AuditService, PluginService, MemoryService, GoalService, TriggerService, PlanService, WorkspaceService, DatabaseService, SessionService, LogService, ResourceService, LocalDiscovery, WorkflowService, AgentSkillsParser, CodingAgentService, CodingAgentSessions, CliToolService, CliToolsDiscovery, ModelRouting, ExecutionApproval, BackgroundAgentManager, BackgroundAgentRunner, ChannelVerificationService, OrchestraEngine, ArtifactService, ArtifactDataResolver, VoiceService, BrowserService, EdgeService, EdgeMqttClient, SubagentService, SubagentManager, and more.
 
-**Repositories (85+):** agents, conversations, messages, tasks, notes, bookmarks, calendar, contacts, memories, goals, triggers, plans, expenses, custom-data, custom-tools, plugins, channels, channel-messages, channel-users, channel-sessions, channel-verification, costs, settings, config-services, pomodoro, habits, captures, workspaces, model-configs, execution-permissions, logs, mcp-servers, extensions, local-providers, heartbeats, embedding-cache, workflows, autonomy-log, coding-agent-results, cli-providers, cli-tool-policies, background-agents.
+**Repositories (88+):** agents, conversations, messages, tasks, notes, bookmarks, calendar, contacts, memories, goals, triggers, plans, expenses, custom-data, custom-tools, plugins, channels, channel-messages, channel-users, channel-sessions, channel-verification, costs, settings, config-services, pomodoro, habits, captures, workspaces, model-configs, execution-permissions, logs, mcp-servers, extensions, local-providers, heartbeats, embedding-cache, workflows, autonomy-log, coding-agent-results, cli-providers, cli-tool-policies, background-agents, orchestra, artifacts, channel-bridges, browser-workflows, edge-devices, edge-commands, edge-telemetry, subagent-history.
 
 ### UI (`@ownpilot/ui`)
 
@@ -418,7 +472,7 @@ Modern web interface built with React 19, Vite 7, and Tailwind CSS 4. Minimal de
 | Tailwind CSS         | 4.2.0   |
 | prism-react-renderer | 2.4.1   |
 
-**Pages (53):**
+**Pages (55+):**
 
 | Page                                                | Description                                                                                |
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -446,6 +500,8 @@ Modern web interface built with React 19, Vite 7, and Tailwind CSS 4. Minimal de
 | **Event Monitor**                                   | Live EventBus event stream viewer for real-time debugging                                  |
 | **Channels**                                        | Channel management with connect/disconnect/logout, user approval, QR code display          |
 | **Plugins / Workspaces / Wizards**                  | Extension management, workspace management, guided setup wizards                           |
+| **Artifacts**                                       | Versioned document viewer with ArtifactCard grid and ArtifactRenderer                      |
+| **Edge Devices**                                    | IoT device management with sensor readings, actuator control, MQTT status                  |
 | **Data Browser / Custom Data**                      | Universal data exploration and custom tables                                               |
 | **Settings / Config Center / API Keys**             | Service configuration, API key management                                                  |
 | **Coding Agent Settings / CLI Tools Settings**      | Coding agent provider config, CLI tool policy management                                   |
@@ -561,7 +617,7 @@ Any OpenAI-compatible endpoint can be added as a custom provider.
 
 - **Anthropic Prompt Caching** — Static system prompt sections (persona, tools, capabilities) marked with `cache_control: { type: 'ephemeral' }`. Dynamic sections (current context, code execution) sent without caching. Reduces input token costs on multi-turn conversations.
 - **Context Compaction** — When context grows large, old messages can be AI-summarized into a compact summary, preserving recent messages. Reduces token usage while maintaining conversation continuity.
-- **Meta-tool Proxy** — Only 4 small tool definitions sent to the LLM instead of 170+ full schemas.
+- **Meta-tool Proxy** — Only 4 small tool definitions sent to the LLM instead of 190+ full schemas.
 
 ---
 
@@ -636,7 +692,7 @@ Persistent autonomous agents that run independently from user chat sessions.
 
 ### Features
 
-- **Full tool access** — Same 170+ tools as chat agents, plus extensions, plugins, and MCP tools
+- **Full tool access** — Same 190+ tools as chat agents, plus extensions, plugins, and MCP tools
 - **Memory injection** — Agent system prompt enhanced with relevant memories and active goals
 - **Workspace isolation** — Each agent gets a dedicated file workspace
 - **Stop conditions** — `MISSION_COMPLETE` sentinel or `max_cycles:N` to auto-stop
@@ -700,7 +756,7 @@ Parent Agent (chat or background agent)
 
 ### Overview
 
-OwnPilot has **170+ tools** organized into **28 categories**. Rather than sending all tool definitions to the LLM (which would consume too many tokens), OwnPilot uses a **meta-tool proxy pattern**:
+OwnPilot has **190+ tools** organized into **32 categories**. Rather than sending all tool definitions to the LLM (which would consume too many tokens), OwnPilot uses a **meta-tool proxy pattern**:
 
 1. **`search_tools`** — Find tools by keyword with optional `include_params` for inline parameter schemas
 2. **`get_tool_help`** — Get detailed help for a specific tool (supports batch lookup)
@@ -738,6 +794,12 @@ OwnPilot has **170+ tools** organized into **28 categories**. Rather than sendin
 | **Utilities (Date)** | date_math, format_date, timezone_convert                                 |
 | **Utilities (Data)** | json_query, csv_parse, data_transform                                    |
 | **Utilities (Gen)**  | generate_uuid, hash_text, random_number                                  |
+| **CLI Tools**        | run_cli_tool, list_cli_tools, install_cli_tool                           |
+| **Coding Agents**    | run_coding_task, list_coding_agents, get_task_result                     |
+| **Orchestra**        | create_orchestra, run_orchestra, get_orchestra_result                    |
+| **Artifacts**        | create_artifact, update_artifact, list_artifacts, get_artifact           |
+| **Browser**          | browser_navigate, browser_click, browser_type, browser_screenshot        |
+| **Edge Devices**     | list_edge_devices, get_device_status, read_sensor, control_actuator      |
 | **Dynamic Tools**    | create_tool, list_custom_tools, delete_custom_tool                       |
 
 ### Tool Namespaces
@@ -804,7 +866,115 @@ OwnPilot exposes its full tool registry as an MCP endpoint:
 POST /mcp/serve   — Streamable HTTP transport
 ```
 
-External MCP clients (Claude Desktop, other agents) can connect and use OwnPilot's 170+ tools.
+External MCP clients (Claude Desktop, other agents) can connect and use OwnPilot's 190+ tools.
+
+---
+
+## Artifacts
+
+Versioned document management for AI-created content — markdown, code, JSON, HTML, CSV, SVG, and Mermaid diagrams.
+
+### Features
+
+- **Version Tracking** — Every update creates a new version with content diffs
+- **Data Binding** — Expressions like `{{conversation.summary}}` that auto-resolve from context
+- **Rendering Pipeline** — ArtifactRenderer component renders each content type natively (syntax highlighting for code, Mermaid→SVG for diagrams)
+- **Dashboard Widget** — Recent artifacts shown on the Dashboard page
+
+### LLM Tools
+
+| Tool              | Description                     |
+| ----------------- | ------------------------------- |
+| `create_artifact` | Create a new versioned document |
+| `update_artifact` | Update content (creates diff)   |
+| `list_artifacts`  | List all artifacts              |
+| `get_artifact`    | Get artifact with version info  |
+| `delete_artifact` | Delete an artifact              |
+
+---
+
+## Voice Pipeline
+
+Speech-to-text and text-to-speech integration for voice-powered AI interactions.
+
+- **STT (Whisper)** — Transcribe audio files or microphone input via OpenAI Whisper API
+- **TTS (OpenAI)** — Generate speech from AI responses with 6 voice options (alloy, echo, fable, onyx, nova, shimmer)
+- **VoiceButton** — Microphone recording UI in the ChatInput component
+- **VoicePlayButton** — Inline playback button on AI responses
+- **Channel Support** — WhatsApp voice messages auto-transcribed via channel normalizer
+
+---
+
+## Browser Agent
+
+Headless Chromium automation via Playwright for AI-driven web browsing and data extraction.
+
+### LLM Tools
+
+| Tool                 | Description                              |
+| -------------------- | ---------------------------------------- |
+| `browser_navigate`   | Navigate to a URL                        |
+| `browser_click`      | Click an element by selector             |
+| `browser_type`       | Type text into an input                  |
+| `browser_screenshot` | Capture a screenshot of the current page |
+| `browser_evaluate`   | Execute JavaScript in the page context   |
+| `browser_extract`    | Extract structured content from the page |
+| `browser_fill_form`  | Fill out a form with multiple fields     |
+
+### Features
+
+- **Workflow Persistence** — Browser workflows stored in DB for replay and audit
+- **Session Management** — Isolated browser contexts per session
+- **REST API** — Full CRUD at `/api/v1/browser` plus workflow execution
+
+---
+
+## Edge Devices
+
+MQTT-based IoT/edge device management. OwnPilot acts as the brain; cheap edge hardware (ESP32, Raspberry Pi) acts as the hands.
+
+### Architecture
+
+```
+Edge Device (ESP32/RPi/Arduino)
+  │
+  │ MQTT (lightweight pub/sub)
+  │
+  ├── ownpilot/{userId}/devices/{deviceId}/telemetry   → Server
+  ├── ownpilot/{userId}/devices/{deviceId}/commands     ← Server
+  └── ownpilot/{userId}/devices/{deviceId}/status       → Server (LWT)
+  │
+Mosquitto Broker ←→ OwnPilot Gateway (EdgeMqttClient)
+```
+
+### Device Types
+
+| Type           | Hardware                  |
+| -------------- | ------------------------- |
+| `raspberry-pi` | Raspberry Pi (any model)  |
+| `esp32`        | Espressif ESP32 boards    |
+| `arduino`      | Arduino-compatible boards |
+| `custom`       | Any custom hardware       |
+
+### Sensor & Actuator Types
+
+**Sensors:** temperature, humidity, motion, light, pressure, camera, door, custom
+**Actuators:** relay, servo, LED, buzzer, display, motor, custom
+
+### LLM Tools
+
+| Tool                   | Description                               |
+| ---------------------- | ----------------------------------------- |
+| `list_edge_devices`    | List all registered IoT devices           |
+| `get_device_status`    | Get device status, sensors, and actuators |
+| `read_sensor`          | Read latest value from a sensor           |
+| `send_device_command`  | Send a command to a device via MQTT       |
+| `control_actuator`     | Set state on an actuator                  |
+| `register_edge_device` | Register a new edge device                |
+
+### REST API
+
+10 endpoints at `/api/v1/edge` — device CRUD, commands, telemetry, MQTT status.
 
 ---
 
@@ -1321,6 +1491,9 @@ cp .env.example .env
 
 # Start OwnPilot + PostgreSQL
 docker compose --profile postgres up -d
+
+# With MQTT broker for edge/IoT devices
+docker compose --profile postgres --profile mqtt up -d
 
 # UI + API: http://localhost:8080
 ```

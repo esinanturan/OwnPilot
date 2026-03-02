@@ -16,9 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Subagent DB Persistence** — `subagent_history` table for audit trail of completed executions
 - **Subagent Model Routing** — Per-process model routing now supports `subagent` process type alongside chat, channel, and pulse
 
+#### Mega Upgrade (Phases 1–7)
+
+- **Universal Channel Protocol (UCP)** — Standardized message envelope with platform-agnostic types (text, image, audio, video, file, location, contact, reaction, typing, read receipt), middleware pipeline (rate limiter, language detector, thread tracker), typed adapters, and bridge persistence (Phase 1)
+- **Agent Orchestra** — Concurrent multi-provider agent orchestration engine with fan-out/fan-in, race, pipeline, and voting strategies; real-time WebSocket progress events; dedicated DB table and repository; 6 LLM tools for composing agent ensembles (Phase 2)
+- **Artifacts System** — Versioned document management (markdown, code, JSON, HTML, CSV, SVG, Mermaid diagrams) with data binding expressions, diff tracking, rendering pipeline, 5 LLM tools, REST API, ArtifactCard and ArtifactRenderer UI components, Dashboard integration (Phase 3)
+- **Voice Pipeline** — Speech-to-text (Whisper API) and text-to-speech (OpenAI TTS) with configurable models and voices; VoiceButton for recording in ChatInput, VoicePlayButton for AI response playback; channel normalizer audio support for WhatsApp voice messages; REST API at `/api/v1/voice` (Phase 4)
+- **Browser Agent** — Headless Chromium automation via Playwright with page navigation, element interaction, screenshot capture, JavaScript evaluation, and form filling; browser workflow persistence; 7 LLM tools for AI-driven web browsing; REST API at `/api/v1/browser` (Phase 5)
+- **Skills Platform** — Enhanced skill lifecycle with sandboxed execution, granular permissions (network, filesystem, database, shell, email, scheduling), npm dependency installation, CLI `ownpilot skill` commands (install, list, info, search, update, remove); PermissionReviewModal UI; REST API at `/api/v1/skills` (Phase 6)
+- **Edge Delegation Protocol** — MQTT broker integration (Mosquitto) for IoT/edge device management; device registry with sensors and actuators; command queue with acknowledgment; telemetry ingestion and history; 6 LLM tools (`list_edge_devices`, `get_device_status`, `read_sensor`, `send_device_command`, `control_actuator`, `register_edge_device`); REST API at `/api/v1/edge` (10 endpoints); DeviceCard and SensorChart UI components; Mosquitto added to docker-compose (Phase 7)
+
 ### Testing
 
-- 389+ test files, 22,100+ tests total (91 new subagent tests across 6 files)
+- 389+ test files, 22,100+ tests total
 
 ## [0.1.4] - 2026-02-28
 

@@ -21,6 +21,7 @@ Comprehensive reference for OwnPilot's PostgreSQL database layer. This document 
    - [Plugin Tables](#310-plugin-tables)
    - [Local AI Tables](#311-local-ai-tables)
    - [Coding & CLI Tables](#312-coding--cli-tables)
+   - [Edge / IoT Tables](#313-edge--iot-tables)
 4. [Relationships and Entity Diagram](#4-relationships-and-entity-diagram)
 5. [Index Strategy](#5-index-strategy)
 6. [Repository Pattern](#6-repository-pattern)
@@ -1162,6 +1163,76 @@ Per-tool security policies for CLI tool execution.
 
 ---
 
+### 3.13 Edge / IoT Tables
+
+**Migration:** `packages/gateway/src/db/migrations/postgres/010_edge_delegation.sql`
+
+Tables for MQTT-based IoT/edge device management, command queues, and telemetry storage.
+
+#### `edge_devices`
+
+Registered IoT/edge devices with sensor and actuator configurations.
+
+| Column             | Type        | Constraints                                                            | Description             |
+| ------------------ | ----------- | ---------------------------------------------------------------------- | ----------------------- |
+| `id`               | `TEXT`      | `PRIMARY KEY`                                                          | Device UUID             |
+| `user_id`          | `TEXT`      | `NOT NULL`                                                             | Owner user ID           |
+| `name`             | `TEXT`      | `NOT NULL`                                                             | Device name             |
+| `type`             | `TEXT`      | `NOT NULL`, CHECK IN (`raspberry-pi`, `esp32`, `arduino`, `custom`)    | Hardware type           |
+| `protocol`         | `TEXT`      | `NOT NULL DEFAULT 'mqtt'`, CHECK IN (`mqtt`, `websocket`, `http-poll`) | Communication protocol  |
+| `sensors`          | `JSONB`     | `NOT NULL DEFAULT '[]'`                                                | Sensor configurations   |
+| `actuators`        | `JSONB`     | `NOT NULL DEFAULT '[]'`                                                | Actuator configurations |
+| `status`           | `TEXT`      | `NOT NULL DEFAULT 'offline'`, CHECK IN (`online`, `offline`, `error`)  | Connection status       |
+| `last_seen`        | `TIMESTAMP` |                                                                        | Last heartbeat time     |
+| `firmware_version` | `TEXT`      |                                                                        | Firmware version        |
+| `metadata`         | `JSONB`     | `DEFAULT '{}'`                                                         | Extra metadata          |
+| `created_at`       | `TIMESTAMP` | `NOT NULL DEFAULT NOW()`                                               | Creation time           |
+| `updated_at`       | `TIMESTAMP` | `NOT NULL DEFAULT NOW()`                                               | Last update             |
+
+**Indexes:** `idx_edge_devices_user` on `(user_id)`, `idx_edge_devices_status` on `(user_id, status)`.
+
+#### `edge_commands`
+
+Command queue for device commands sent via MQTT.
+
+| Column         | Type        | Constraints                                                                | Description         |
+| -------------- | ----------- | -------------------------------------------------------------------------- | ------------------- |
+| `id`           | `TEXT`      | `PRIMARY KEY`                                                              | Command UUID        |
+| `device_id`    | `TEXT`      | `NOT NULL`                                                                 | Target device ID    |
+| `user_id`      | `TEXT`      | `NOT NULL`                                                                 | Sender user ID      |
+| `command_type` | `TEXT`      | `NOT NULL`                                                                 | Command type string |
+| `payload`      | `JSONB`     | `DEFAULT '{}'`                                                             | Command payload     |
+| `status`       | `TEXT`      | `NOT NULL DEFAULT 'pending'`, CHECK IN (`pending`, `sent`, `ack`, `error`) | Command status      |
+| `result`       | `JSONB`     |                                                                            | Execution result    |
+| `created_at`   | `TIMESTAMP` | `NOT NULL DEFAULT NOW()`                                                   | Creation time       |
+| `completed_at` | `TIMESTAMP` |                                                                            | Completion time     |
+
+**Indexes:** `idx_edge_commands_device` on `(device_id)`, `idx_edge_commands_user` on `(user_id)`.
+
+#### `edge_telemetry`
+
+Time-series sensor data from edge devices.
+
+| Column        | Type        | Constraints              | Description    |
+| ------------- | ----------- | ------------------------ | -------------- |
+| `id`          | `TEXT`      | `PRIMARY KEY`            | Telemetry UUID |
+| `device_id`   | `TEXT`      | `NOT NULL`               | Source device  |
+| `sensor_id`   | `TEXT`      | `NOT NULL`               | Sensor ID      |
+| `value`       | `JSONB`     | `NOT NULL`               | Sensor reading |
+| `recorded_at` | `TIMESTAMP` | `NOT NULL DEFAULT NOW()` | Recording time |
+
+**Indexes:** `idx_edge_telemetry_device_sensor` on `(device_id, sensor_id)`, `idx_edge_telemetry_recorded` on `(recorded_at DESC)`.
+
+**Repositories:**
+
+| Repository                | Source File | Description                                |
+| ------------------------- | ----------- | ------------------------------------------ |
+| `EdgeDevicesRepository`   | `edge.ts`   | Device CRUD, status updates, listing       |
+| `EdgeCommandsRepository`  | `edge.ts`   | Command creation, status tracking, history |
+| `EdgeTelemetryRepository` | `edge.ts`   | Telemetry insertion, history queries       |
+
+---
+
 ## 4. Relationships and Entity Diagram
 
 ### 4.1 Cascade Delete Relationships
@@ -1257,6 +1328,13 @@ goals.parent_id  -> goals.id    (ON DELETE SET NULL)  -- sub-goal hierarchy
  │                                                          │
  │  plans ──────< plan_steps                                │
  │       └──────< plan_history ···· plan_steps (SET NULL)   │
+ └──────────────────────────────────────────────────────────┘
+
+                       EDGE / IoT
+ ┌──────────────────────────────────────────────────────────┐
+ │                                                          │
+ │  edge_devices ──────< edge_commands                      │
+ │               ──────< edge_telemetry                     │
  └──────────────────────────────────────────────────────────┘
 
                    WORKSPACE / CONFIG / AI

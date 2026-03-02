@@ -75,6 +75,14 @@ Error responses:
 35. [Coding Agents](#35-coding-agents)
 36. [CLI Providers](#36-cli-providers)
 37. [Model Routing](#37-model-routing)
+38. [Orchestra](#38-orchestra)
+39. [Artifacts](#39-artifacts)
+40. [Voice](#40-voice)
+41. [Browser](#41-browser)
+42. [Bridges (UCP)](#42-bridges-ucp)
+43. [Skills](#43-skills)
+44. [Edge Devices](#44-edge-devices)
+45. [Subagents](#45-subagents)
 
 ---
 
@@ -2166,4 +2174,219 @@ Returns routing configuration and resolved provider/model for each process.
 }
 ```
 
-Valid process names: `chat`, `telegram`, `pulse`.
+Valid process names: `chat`, `telegram`, `pulse`, `subagent`.
+
+---
+
+## 38. Orchestra
+
+**Mount:** `/api/v1/orchestra`
+**Source:** `packages/gateway/src/routes/orchestra.ts`
+
+Multi-agent orchestration engine. Create orchestra sessions with different strategies (fan-out, race, pipeline, voting) to coordinate multiple AI agents.
+
+### Endpoints
+
+| Method | Path          | Description                       |
+| ------ | ------------- | --------------------------------- |
+| `GET`  | `/`           | List orchestra sessions           |
+| `POST` | `/`           | Create and run an orchestra       |
+| `GET`  | `/:id`        | Get orchestra session details     |
+| `GET`  | `/:id/result` | Get the final result of a session |
+
+---
+
+## 39. Artifacts
+
+**Mount:** `/api/v1/artifacts`
+**Source:** `packages/gateway/src/routes/artifacts.ts`
+
+Versioned document management. Supports markdown, code, JSON, HTML, CSV, SVG, and Mermaid diagrams with data binding expressions and diff tracking.
+
+### Endpoints
+
+| Method   | Path   | Description                           |
+| -------- | ------ | ------------------------------------- |
+| `GET`    | `/`    | List artifacts (paginated, filtered)  |
+| `POST`   | `/`    | Create a new artifact                 |
+| `GET`    | `/:id` | Get artifact with version history     |
+| `PATCH`  | `/:id` | Update artifact content (new version) |
+| `DELETE` | `/:id` | Delete artifact                       |
+
+---
+
+## 40. Voice
+
+**Mount:** `/api/v1/voice`
+**Source:** `packages/gateway/src/routes/voice.ts`
+
+Speech-to-text (Whisper) and text-to-speech (OpenAI TTS) pipeline.
+
+### Endpoints
+
+| Method | Path          | Description                        |
+| ------ | ------------- | ---------------------------------- |
+| `POST` | `/transcribe` | Transcribe audio to text (Whisper) |
+| `POST` | `/synthesize` | Convert text to speech (TTS)       |
+| `GET`  | `/voices`     | List available TTS voices          |
+| `GET`  | `/status`     | Voice service configuration status |
+
+---
+
+## 41. Browser
+
+**Mount:** `/api/v1/browser`
+**Source:** `packages/gateway/src/routes/browser.ts`
+
+Headless Chromium automation via Playwright for AI-driven web browsing and data extraction.
+
+### Endpoints
+
+| Method   | Path                 | Description                        |
+| -------- | -------------------- | ---------------------------------- |
+| `POST`   | `/navigate`          | Navigate to a URL                  |
+| `POST`   | `/click`             | Click an element                   |
+| `POST`   | `/type`              | Type text into an input            |
+| `POST`   | `/screenshot`        | Capture a screenshot               |
+| `POST`   | `/evaluate`          | Execute JavaScript in page context |
+| `POST`   | `/extract`           | Extract structured content         |
+| `GET`    | `/status`            | Browser service status             |
+| `GET`    | `/workflows`         | List browser workflows             |
+| `POST`   | `/workflows`         | Create a browser workflow          |
+| `GET`    | `/workflows/:id`     | Get workflow details               |
+| `DELETE` | `/workflows/:id`     | Delete a workflow                  |
+| `POST`   | `/workflows/:id/run` | Execute a workflow                 |
+
+---
+
+## 42. Bridges (UCP)
+
+**Mount:** `/api/v1/bridges`
+**Source:** `packages/gateway/src/routes/bridges.ts`
+
+Universal Channel Protocol (UCP) bridge management. Bridges connect channels to the UCP message pipeline with middleware processing.
+
+### Endpoints
+
+| Method   | Path   | Description                 |
+| -------- | ------ | --------------------------- |
+| `GET`    | `/`    | List all bridges            |
+| `POST`   | `/`    | Create a new bridge         |
+| `GET`    | `/:id` | Get bridge details          |
+| `PATCH`  | `/:id` | Update bridge configuration |
+| `DELETE` | `/:id` | Delete a bridge             |
+
+---
+
+## 43. Skills
+
+**Mount:** `/api/v1/skills`
+**Source:** `packages/gateway/src/routes/skills.ts`
+
+Skill lifecycle management with sandboxed execution, permissions, and npm dependency installation.
+
+### Endpoints
+
+| Method   | Path               | Description                       |
+| -------- | ------------------ | --------------------------------- |
+| `GET`    | `/`                | List installed skills             |
+| `POST`   | `/install`         | Install a skill from SKILL.md URL |
+| `GET`    | `/:id`             | Get skill details                 |
+| `DELETE` | `/:id`             | Uninstall a skill                 |
+| `POST`   | `/:id/enable`      | Enable a skill                    |
+| `POST`   | `/:id/disable`     | Disable a skill                   |
+| `GET`    | `/:id/permissions` | Get skill permissions             |
+| `PUT`    | `/:id/permissions` | Update skill permissions          |
+
+---
+
+## 44. Edge Devices
+
+**Mount:** `/api/v1/edge`
+**Source:** `packages/gateway/src/routes/edge.ts`
+
+IoT/edge device management with MQTT broker integration. Register devices, send commands, and read sensor telemetry.
+
+### Endpoints
+
+| Method   | Path                       | Description                    |
+| -------- | -------------------------- | ------------------------------ |
+| `GET`    | `/`                        | List devices (filtered, paged) |
+| `POST`   | `/`                        | Register a new device          |
+| `GET`    | `/:id`                     | Get device details             |
+| `PATCH`  | `/:id`                     | Update device                  |
+| `DELETE` | `/:id`                     | Remove device                  |
+| `POST`   | `/:id/command`             | Send command to device         |
+| `GET`    | `/:id/commands`            | Command history                |
+| `GET`    | `/:id/telemetry`           | Latest telemetry per sensor    |
+| `GET`    | `/:id/telemetry/:sensorId` | Sensor history                 |
+| `GET`    | `/mqtt/status`             | MQTT connection status         |
+
+### POST `/`
+
+Register a new edge device.
+
+**Body:**
+
+```json
+{
+  "name": "Living Room Sensor Hub",
+  "type": "esp32",
+  "protocol": "mqtt",
+  "sensors": [
+    { "id": "temp1", "name": "Temperature", "type": "temperature", "unit": "°C" },
+    { "id": "hum1", "name": "Humidity", "type": "humidity", "unit": "%" }
+  ],
+  "actuators": [{ "id": "relay1", "name": "Main Light", "type": "relay" }],
+  "firmwareVersion": "1.2.0"
+}
+```
+
+### POST `/:id/command`
+
+Send a command to a device via MQTT.
+
+**Body:**
+
+```json
+{
+  "commandType": "set_actuator",
+  "payload": {
+    "actuatorId": "relay1",
+    "state": { "state": true }
+  }
+}
+```
+
+### GET `/mqtt/status`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "connected": true,
+    "brokerUrl": "mqtt://localhost:1883"
+  }
+}
+```
+
+---
+
+## 45. Subagents
+
+**Mount:** `/api/v1/subagents`
+**Source:** `packages/gateway/src/routes/subagents.ts`
+
+Ephemeral child agents for parallel task delegation.
+
+### Endpoints
+
+| Method | Path          | Description                          |
+| ------ | ------------- | ------------------------------------ |
+| `POST` | `/spawn`      | Spawn a new subagent                 |
+| `GET`  | `/`           | List subagents for a session         |
+| `GET`  | `/:id`        | Get subagent status and result       |
+| `POST` | `/:id/cancel` | Cancel a running subagent            |
+| `GET`  | `/history`    | Get completed subagent execution log |

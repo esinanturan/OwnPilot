@@ -58,11 +58,6 @@ import { hasServiceRegistry, getServiceRegistry, Services } from '@ownpilot/core
 import type { IAuditService } from '@ownpilot/core';
 import { checkToolPermission } from './tool-permission-service.js';
 import type { ToolExecContext } from './permission-utils.js';
-import {
-  checkPermission,
-  getRequiredPermission,
-  logPermissionDenied,
-} from './extension-permissions.js';
 import { getExtensionSandbox } from './extension-sandbox.js';
 import type { SkillPermission } from './extension-types.js';
 import { extensionsRepo } from '../db/repositories/extensions.js';

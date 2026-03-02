@@ -88,7 +88,7 @@ export function BackgroundAgentsPage() {
     try {
       const data = await backgroundAgentsApi.list();
       setAgents(data);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load agents');
     } finally {
       setLoading(false);
@@ -160,7 +160,7 @@ export function BackgroundAgentsPage() {
       await backgroundAgentsApi.start(id);
       toast.success('Agent started');
       loadAgents();
-    } catch (err) {
+    } catch {
       toast.error('Failed to start agent');
     }
   };
@@ -170,7 +170,7 @@ export function BackgroundAgentsPage() {
       await backgroundAgentsApi.pause(id);
       toast.success('Agent paused');
       loadAgents();
-    } catch (err) {
+    } catch {
       toast.error('Failed to pause agent');
     }
   };
@@ -180,7 +180,7 @@ export function BackgroundAgentsPage() {
       await backgroundAgentsApi.resume(id);
       toast.success('Agent resumed');
       loadAgents();
-    } catch (err) {
+    } catch {
       toast.error('Failed to resume agent');
     }
   };
@@ -190,7 +190,7 @@ export function BackgroundAgentsPage() {
       await backgroundAgentsApi.stop(id);
       toast.success('Agent stopped');
       loadAgents();
-    } catch (err) {
+    } catch {
       toast.error('Failed to stop agent');
     }
   };
@@ -208,7 +208,7 @@ export function BackgroundAgentsPage() {
       toast.success('Agent deleted');
       if (selectedId === id) setSelectedId(null);
       loadAgents();
-    } catch (err) {
+    } catch {
       toast.error('Failed to delete agent');
     }
   };
@@ -219,7 +219,7 @@ export function BackgroundAgentsPage() {
       await backgroundAgentsApi.sendMessage(selectedId, messageInput.trim());
       setMessageInput('');
       toast.success('Message sent');
-    } catch (err) {
+    } catch {
       toast.error('Failed to send message');
     }
   };
@@ -230,7 +230,7 @@ export function BackgroundAgentsPage() {
       toast.success('Agent created');
       setShowCreateDialog(false);
       loadAgents();
-    } catch (err) {
+    } catch {
       toast.error('Failed to create agent');
     }
   };

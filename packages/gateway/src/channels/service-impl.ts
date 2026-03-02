@@ -31,7 +31,6 @@ import {
   type NormalizedMessage,
   type StreamCallbacks,
   type ToolCall,
-  type NormalizedAttachment,
 } from '@ownpilot/core';
 
 import { channelUsersRepo, type ChannelUsersRepository } from '../db/repositories/channel-users.js';

@@ -144,11 +144,6 @@ switch (toolName) {
     });
 
     it('handles missing case gracefully', () => {
-      const source = `
-switch (toolName) {
-  case 'other_tool': { break; }
-}
-`;
       const result = getToolSource('nonexistent_tool');
       expect(result).toBeNull();
     });

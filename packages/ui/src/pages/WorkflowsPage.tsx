@@ -420,7 +420,7 @@ function LogEntry({
           className={`font-medium text-sm text-text-primary dark:text-dark-text-primary ${log.workflowId ? 'cursor-pointer hover:text-primary' : ''}`}
           onClick={(e) => {
             e.stopPropagation();
-            log.workflowId && onNavigate(log.workflowId);
+            if (log.workflowId) onNavigate(log.workflowId);
           }}
         >
           {log.workflowName ?? 'Deleted Workflow'}

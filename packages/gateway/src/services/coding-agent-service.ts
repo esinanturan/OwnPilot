@@ -35,7 +35,6 @@ import {
   validateCwd,
   createSanitizedEnv,
   spawnCliProcess,
-  MAX_OUTPUT_SIZE,
 } from './binary-utils.js';
 import { getLog } from './log.js';
 

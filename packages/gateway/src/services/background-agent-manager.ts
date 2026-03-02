@@ -18,7 +18,6 @@ import type {
   BackgroundAgentConfig,
   BackgroundAgentSession,
   BackgroundAgentCycleResult,
-  BackgroundAgentState,
   EventHandler,
   EventType,
   EventPayload,

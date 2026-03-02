@@ -253,7 +253,7 @@ describe('notification-tools', () => {
       );
 
       expect(result.success).toBe(true);
-      expect((result.result as any).delivered).toContain('websocket');
+      expect((result.result as Record<string, unknown>).delivered).toContain('websocket');
     });
 
     it('reports both telegram and websocket deliveries', async () => {
@@ -271,10 +271,11 @@ describe('notification-tools', () => {
       );
 
       expect(result.success).toBe(true);
-      const delivered = (result.result as any).delivered;
+      const res = result.result as Record<string, unknown>;
+      const delivered = res.delivered;
       expect(delivered).toContain('telegram');
       expect(delivered).toContain('websocket');
-      expect((result.result as any).message).toContain('telegram, websocket');
+      expect(res.message).toContain('telegram, websocket');
     });
 
     it('defaults userId to "default" when not provided', async () => {

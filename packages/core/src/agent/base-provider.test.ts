@@ -7,7 +7,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
-  ProviderConfig,
   CompletionRequest,
   CompletionResponse,
   StreamChunk,
@@ -292,7 +291,7 @@ describe('BaseProvider', () => {
 
     it('clears previous timeout when called again', () => {
       provider.testCreateFetchOptions({}, 10000);
-      const firstController = provider.getAbortController()!;
+      const _firstController = provider.getAbortController()!;
 
       // Create new options, should clear old timeout
       provider.testCreateFetchOptions({}, 20000);

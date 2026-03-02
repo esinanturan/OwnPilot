@@ -4,10 +4,6 @@
  * Database Adapter abstract interface (PostgreSQL)
  */
 
-import { getLog } from '../../services/log.js';
-
-const log = getLog('DbAdapter');
-
 export type DatabaseType = 'postgres';
 
 /**

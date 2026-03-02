@@ -17,10 +17,8 @@ import { generateId, getEventSystem, getErrorMessage } from '@ownpilot/core';
 import type {
   SpawnSubagentInput,
   SubagentSession,
-  SubagentState,
   SubagentLimits,
   SubagentBudget,
-  SubagentToolCall,
   ToolCall,
 } from '@ownpilot/core';
 import {

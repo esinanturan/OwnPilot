@@ -19,7 +19,7 @@ import {
   isAggregatorProvider,
   type ModelCapability,
 } from '@ownpilot/core';
-import { hasApiKey, getApiKey } from '../settings.js';
+import { getApiKey } from '../settings.js';
 import { getLog } from '../../services/log.js';
 import {
   getUserId,

@@ -184,7 +184,6 @@ export class SubagentRunner {
       }
 
       const errorMsg = getErrorMessage(error);
-      const isTimeout = errorMsg.includes('timed out');
 
       log.error(`[subagent:${this.input.name}] Failed: ${errorMsg}`);
 

@@ -41,7 +41,7 @@ import {
   filterAllowedTools,
   resetToolPermissionService,
 } from './tool-permission-service.js';
-import type { ToolExecContext } from './permission-utils.js';
+
 
 // Access mocks
 const { getEnabledToolGroupIds } = await import('../routes/settings.js');

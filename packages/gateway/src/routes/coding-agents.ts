@@ -7,7 +7,6 @@
 
 import { Hono } from 'hono';
 import type { CodingAgentProvider } from '@ownpilot/core';
-import { isBuiltinProvider } from '@ownpilot/core';
 import { getCodingAgentService } from '../services/coding-agent-service.js';
 import { codingAgentResultsRepo } from '../db/repositories/coding-agent-results.js';
 import {

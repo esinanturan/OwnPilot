@@ -52,7 +52,7 @@ export const discordNormalizer: ChannelNormalizer = {
   },
 
   normalizeOutgoing(response: string): string[] {
-    let cleaned = stripInternalTags(response);
+    const cleaned = stripInternalTags(response);
     if (!cleaned) return [];
 
     // Discord supports Markdown natively — no conversion needed

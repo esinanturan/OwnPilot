@@ -2,7 +2,7 @@
  * Tests for Event Tools
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getEventSystem, resetEventSystem } from '@ownpilot/core';
 
 const { EVENT_TOOLS, executeEventTool } = await import('./event-tools.js');
@@ -133,8 +133,9 @@ describe('event-tools', () => {
       });
 
       expect(result.success).toBe(true);
-      expect((result.result as any).event.type).toBe('memory.created');
-      expect((result.result as any).event.data).toEqual({ memoryId: 'mem-1' });
+      expect((result.result as Record<string, unknown>).event).toEqual(
+        expect.objectContaining({ type: 'memory.created', data: { memoryId: 'mem-1' } })
+      );
     });
 
     it('times out when event does not fire', async () => {
@@ -217,7 +218,7 @@ describe('event-tools', () => {
       const result = await executeEventTool('list_event_categories', {});
 
       expect(result.success).toBe(true);
-      const categories = (result.result as any).categories;
+      const categories = (result.result as Record<string, unknown>).categories as Record<string, unknown>;
       expect(categories).toHaveProperty('agent');
       expect(categories).toHaveProperty('memory');
       expect(categories).toHaveProperty('trigger');
@@ -227,7 +228,7 @@ describe('event-tools', () => {
 
     it('includes description text', async () => {
       const result = await executeEventTool('list_event_categories', {});
-      expect((result.result as any).description).toContain('emit_event');
+      expect((result.result as Record<string, unknown>).description).toContain('emit_event');
     });
   });
 

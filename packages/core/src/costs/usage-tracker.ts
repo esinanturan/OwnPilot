@@ -10,7 +10,6 @@ import { generateId } from '../services/id-utils.js';
 import type {
   AIProvider,
   DailyUsage,
-  ModelUsage,
   ProviderUsage,
   UsageRecord,
   UsageSummary,

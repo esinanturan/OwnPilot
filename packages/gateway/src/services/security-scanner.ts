@@ -14,7 +14,7 @@
 import { analyzeToolCode, calculateSecurityScore } from '@ownpilot/core';
 import type { CliToolCatalogEntry, CliToolPolicy } from '@ownpilot/core';
 import { getExtensionService } from './extension-service.js';
-import { auditSkillSecurity, type SkillSecurityResult } from './skill-security-audit.js';
+import { auditSkillSecurity } from './skill-security-audit.js';
 import { CLI_TOOLS_CATALOG, CLI_TOOLS_BY_NAME } from './cli-tools-catalog.js';
 import {
   createCustomToolsRepo,
@@ -22,10 +22,8 @@ import {
   createWorkflowsRepository,
   cliToolPoliciesRepo,
 } from '../db/repositories/index.js';
-import type { CustomToolRecord } from '../db/repositories/custom-tools.js';
 import type { Trigger } from '../db/repositories/triggers.js';
 import type { Workflow, WorkflowNode } from '../db/repositories/workflows.js';
-import type { ExtensionRecord } from '../db/repositories/extensions.js';
 import { getLog } from './log.js';
 
 const log = getLog('SecurityScanner');

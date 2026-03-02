@@ -5,7 +5,7 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { BudgetAlert, BudgetConfig, BudgetStatus, UsageRecord } from './types.js';
+import type { BudgetConfig, BudgetStatus, UsageRecord } from './types.js';
 import type { UsageTracker } from './usage-tracker.js';
 import { costLog } from './usage-tracker.js';
 

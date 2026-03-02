@@ -202,7 +202,7 @@ async function createAgentFromRecord(record: AgentRecord): Promise<Agent> {
 
   const basePrompt = record.systemPrompt ?? 'You are a helpful personal AI assistant.';
 
-  let { systemPrompt: enhancedPrompt } = await injectMemoryIntoPrompt(basePrompt, {
+  const { systemPrompt: enhancedPrompt } = await injectMemoryIntoPrompt(basePrompt, {
     userId: 'default',
     tools: toolDefs,
     includeProfile: true,
@@ -455,7 +455,7 @@ async function createChatAgentInstance(
   const toolDefs = [...filteredChatTools, ...chatAlwaysIncluded];
 
   const basePrompt = BASE_SYSTEM_PROMPT;
-  let { systemPrompt: enhancedPrompt } = await injectMemoryIntoPrompt(basePrompt, {
+  const { systemPrompt: enhancedPrompt } = await injectMemoryIntoPrompt(basePrompt, {
     userId: 'default',
     tools: toolDefs,
     includeProfile: true,

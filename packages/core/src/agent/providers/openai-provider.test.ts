@@ -7,9 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { CompletionRequest, Message, StreamChunk, ToolDefinition } from '../types.js';
-import type { Result } from '../../types/result.js';
-import type { InternalError } from '../../types/errors.js';
+import type { CompletionRequest, Message, ToolDefinition } from '../types.js';
 
 // Mock debug functions
 vi.mock('../debug.js', () => ({

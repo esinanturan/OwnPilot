@@ -25,7 +25,7 @@ const mockToolRegistry = {
 
 const mockPluginService = {
   getTool: vi.fn(),
-  getEnabled: vi.fn(() => [] as any[]),
+  getEnabled: vi.fn(() => [] as unknown[]),
   get: vi.fn(),
 };
 
@@ -114,7 +114,6 @@ import {
   createHeartbeatToolProvider,
   createExtensionToolProvider,
   createCodingAgentToolProvider,
-  createCliToolProvider,
   createBackgroundAgentToolProvider,
   createBrowserToolProvider,
   createEdgeToolProvider,
@@ -436,7 +435,7 @@ describe('Tool Executor', () => {
         {
           manifest: { id: 'test-plugin', category: 'integration' },
           tools: new Map([['tool1', { name: 'tool1' }]]),
-        } as any,
+        } as unknown,
       ]);
 
       getSharedToolRegistry('test-user');
@@ -453,7 +452,7 @@ describe('Tool Executor', () => {
         {
           manifest: { id: 'core-plugin', category: 'core' },
           tools: new Map([['tool1', { name: 'tool1' }]]),
-        } as any,
+        } as unknown,
       ]);
 
       getSharedToolRegistry('test-user');

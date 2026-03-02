@@ -164,9 +164,9 @@ webhookRoutes.post('/trigger/:triggerId', async (c) => {
   }
 
   // Extract payload from body
-  let payload: Record<string, unknown> = {};
+  let _payload: Record<string, unknown> = {};
   try {
-    payload = await c.req.json();
+    _payload = await c.req.json();
   } catch {
     // Non-JSON body is OK — just pass empty payload
   }

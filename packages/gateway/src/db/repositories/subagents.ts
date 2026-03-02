@@ -6,7 +6,6 @@
  * results are stored here.
  */
 
-import { generateId } from '@ownpilot/core';
 import type { SubagentSession, SubagentHistoryEntry, SubagentToolCall } from '@ownpilot/core';
 import { BaseRepository, parseJsonField, parseJsonFieldNullable } from './base.js';
 

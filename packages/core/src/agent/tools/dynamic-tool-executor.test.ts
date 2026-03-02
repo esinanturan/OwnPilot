@@ -87,7 +87,7 @@ vi.mock('./utility-tools.js', () => ({
 
 import { executeDynamicTool } from './dynamic-tool-executor.js';
 import type { DynamicToolDefinition } from './dynamic-tool-types.js';
-import type { ToolContext, ToolDefinition, ToolExecutor } from '../types.js';
+import type { ToolContext } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Helpers

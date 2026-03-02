@@ -31,7 +31,7 @@ const soulTabs: { id: TabId; label: string }[] = [
 ];
 
 const inputClass =
-  'w-full rounded-lg border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
+  'w-full rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
@@ -61,6 +61,7 @@ export function SoulEditor({ agentId }: Props) {
       setEdited(deepClone(data));
     } catch {
       setSoul(null);
+      toast.error('Failed to load soul data');
     } finally {
       setIsLoading(false);
     }
@@ -87,10 +88,7 @@ export function SoulEditor({ agentId }: Props) {
     if (!edited) return;
     setIsSaving(true);
     try {
-      const updated = await soulsApi.update(
-        edited.agentId,
-        edited as unknown as Record<string, unknown>
-      );
+      const updated = await soulsApi.update(edited.agentId, edited);
       toast.success('Soul saved');
       setSoul(updated);
       setEdited(deepClone(updated));
@@ -180,13 +178,15 @@ export function SoulEditor({ agentId }: Props) {
         ))}
         <button
           onClick={() => {
-            soulsApi
-              .getVersions(agentId)
-              .then(setVersions)
-              .catch(() => {});
+            if (!showVersions) {
+              soulsApi
+                .getVersions(agentId)
+                .then(setVersions)
+                .catch(() => toast.error('Failed to load version history'));
+            }
             setShowVersions(!showVersions);
           }}
-          className="ml-auto px-3 py-2 text-xs text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary"
+          className="ml-auto px-3 py-2 text-xs text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary transition-colors"
         >
           <History className="w-3.5 h-3.5 inline mr-1" />
           Versions
@@ -492,7 +492,7 @@ export function SoulEditor({ agentId }: Props) {
                   className={`px-2 py-1 text-xs rounded ${
                     feedbackType === t
                       ? 'bg-primary text-white'
-                      : 'bg-surface dark:bg-dark-surface text-text-muted dark:text-dark-text-muted border border-border dark:border-dark-border'
+                      : 'bg-bg-primary dark:bg-dark-bg-primary text-text-muted dark:text-dark-text-muted border border-border dark:border-dark-border'
                   }`}
                 >
                   {t === 'personality_tweak' ? 'tweak' : t}
@@ -577,6 +577,7 @@ function TagList({
             {item}
             <button
               onClick={() => onChange(items.filter((_, j) => j !== i))}
+              aria-label={`Remove ${item}`}
               className="hover:text-danger"
             >
               ×
@@ -595,7 +596,7 @@ function TagList({
           }
         }}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
+        className="w-full rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary"
       />
     </div>
   );

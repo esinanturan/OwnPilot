@@ -2,7 +2,7 @@
  * CreateAgentWizard — multi-step modal for creating soul or background agents
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { soulsApi, crewsApi } from '../../../api/endpoints/souls';
 import type { CrewTemplate } from '../../../api/endpoints/souls';
 import { backgroundAgentsApi } from '../../../api/endpoints/background-agents';
@@ -15,6 +15,7 @@ import { cronToHuman } from '../helpers';
 
 interface Props {
   templates: CrewTemplate[];
+  initialStep?: 'type' | 'templates';
   onClose: () => void;
   onCreated: () => void;
   prefilledTemplate?: AgentTemplate;
@@ -22,11 +23,27 @@ interface Props {
 
 type Step = 'type' | 'templates' | 'identity' | 'config' | 'review';
 
-export function CreateAgentWizard({ templates, onClose, onCreated, prefilledTemplate }: Props) {
+export function CreateAgentWizard({
+  templates,
+  initialStep,
+  onClose,
+  onCreated,
+  prefilledTemplate,
+}: Props) {
   const toast = useToast();
-  const [step, setStep] = useState<Step>(prefilledTemplate ? 'review' : 'type');
+  const [step, setStep] = useState<Step>(prefilledTemplate ? 'review' : (initialStep ?? 'type'));
   const [kind, setKind] = useState<AgentKind>(prefilledTemplate?.kind ?? 'soul');
   const [isCreating, setIsCreating] = useState(false);
+  const [cameFromTemplates, setCameFromTemplates] = useState(!!prefilledTemplate);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   // Soul fields — pre-fill from template if provided
   const [name, setName] = useState(prefilledTemplate?.name ?? '');
@@ -62,11 +79,12 @@ export function CreateAgentWizard({ templates, onClose, onCreated, prefilledTemp
       setBgMode(t.bgMode ?? 'interval');
       setBgIntervalMs(t.bgIntervalMs ?? 300000);
     }
+    setCameFromTemplates(true);
     setStep('review');
   };
 
   const inputClass =
-    'w-full rounded-lg border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
+    'w-full rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
 
   const handleCreateSoul = async () => {
     setIsCreating(true);
@@ -148,11 +166,12 @@ export function CreateAgentWizard({ templates, onClose, onCreated, prefilledTemp
     }
   };
 
-  const handleDeployTemplate = async () => {
-    if (!selectedTemplateId) return;
+  const handleDeployTemplate = async (templateId?: string) => {
+    const deployId = templateId || selectedTemplateId;
+    if (!deployId) return;
     setIsCreating(true);
     try {
-      await crewsApi.deploy(selectedTemplateId);
+      await crewsApi.deploy(deployId);
       toast.success('Crew deployed from template');
       onCreated();
       onClose();
@@ -164,9 +183,14 @@ export function CreateAgentWizard({ templates, onClose, onCreated, prefilledTemp
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div
-        className={`bg-surface dark:bg-dark-surface border border-border dark:border-dark-border rounded-2xl w-full mx-4 max-h-[90vh] overflow-y-auto ${
+        className={`bg-bg-primary dark:bg-dark-bg-primary border border-border dark:border-dark-border rounded-2xl w-full mx-4 max-h-[90vh] overflow-y-auto ${
           step === 'templates' ? 'max-w-4xl' : 'max-w-lg'
         }`}
       >
@@ -177,7 +201,8 @@ export function CreateAgentWizard({ templates, onClose, onCreated, prefilledTemp
           </h2>
           <button
             onClick={onClose}
-            className="p-1 text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary"
+            aria-label="Close wizard"
+            className="p-1 text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -215,7 +240,7 @@ export function CreateAgentWizard({ templates, onClose, onCreated, prefilledTemp
                     <div className="w-full border-t border-border dark:border-dark-border" />
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-surface dark:bg-dark-surface px-2 text-xs text-text-muted dark:text-dark-text-muted">
+                    <span className="bg-bg-primary dark:bg-dark-bg-primary px-2 text-xs text-text-muted dark:text-dark-text-muted">
                       or create from scratch
                     </span>
                   </div>
@@ -270,7 +295,7 @@ export function CreateAgentWizard({ templates, onClose, onCreated, prefilledTemp
                         <div className="w-full border-t border-border dark:border-dark-border" />
                       </div>
                       <div className="relative flex justify-center">
-                        <span className="bg-surface dark:bg-dark-surface px-2 text-xs text-text-muted dark:text-dark-text-muted">
+                        <span className="bg-bg-primary dark:bg-dark-bg-primary px-2 text-xs text-text-muted dark:text-dark-text-muted">
                           or deploy a crew template
                         </span>
                       </div>
@@ -298,7 +323,7 @@ export function CreateAgentWizard({ templates, onClose, onCreated, prefilledTemp
                     </div>
                     {selectedTemplateId && (
                       <button
-                        onClick={handleDeployTemplate}
+                        onClick={() => handleDeployTemplate()}
                         disabled={isCreating}
                         className="w-full flex items-center justify-center gap-2 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50"
                       >
@@ -317,10 +342,7 @@ export function CreateAgentWizard({ templates, onClose, onCreated, prefilledTemp
             <TemplateCatalog
               onSelect={applyTemplate}
               crewTemplates={templates}
-              onDeployCrew={async (id) => {
-                setSelectedTemplateId(id);
-                await handleDeployTemplate();
-              }}
+              onDeployCrew={(id) => handleDeployTemplate(id)}
             />
           )}
 
@@ -569,7 +591,14 @@ export function CreateAgentWizard({ templates, onClose, onCreated, prefilledTemp
               else if (step === 'templates') setStep('type');
               else if (step === 'identity') setStep('type');
               else if (step === 'config') setStep('identity');
-              else if (step === 'review') setStep(kind === 'soul' ? 'config' : 'identity');
+              else if (step === 'review') {
+                if (cameFromTemplates) {
+                  setCameFromTemplates(false);
+                  setStep('templates');
+                } else {
+                  setStep(kind === 'soul' ? 'config' : 'identity');
+                }
+              }
             }}
             className="text-sm text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary"
           >

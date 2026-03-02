@@ -6,15 +6,19 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { soulsApi, heartbeatLogsApi, agentMessagesApi } from '../../api/endpoints/souls';
+import { soulsApi, heartbeatLogsApi, agentMessagesApi, crewsApi } from '../../api/endpoints/souls';
 import type {
   AgentSoul,
+  AgentCrew,
   HeartbeatLog,
   HeartbeatStats,
   AgentMessage,
 } from '../../api/endpoints/souls';
 import { backgroundAgentsApi } from '../../api/endpoints/background-agents';
-import type { BackgroundAgentConfig } from '../../api/endpoints/background-agents';
+import type {
+  BackgroundAgentConfig,
+  BackgroundAgentHistoryEntry,
+} from '../../api/endpoints/background-agents';
 import {
   ChevronLeft,
   Pause,
@@ -25,9 +29,11 @@ import {
   RefreshCw,
   CheckCircle2,
   AlertCircle,
+  Trash2,
 } from '../../components/icons';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useToast } from '../../components/ToastProvider';
+import { useDialog } from '../../components/ConfirmDialog';
 import { AgentStatusBadge } from './components/AgentStatusBadge';
 import { SoulEditor } from './components/SoulEditor';
 import type { AgentStatus, ProfileTab } from './types';
@@ -38,15 +44,19 @@ export function AgentProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const toast = useToast();
+  const { confirm } = useDialog();
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Agent data
   const [soul, setSoul] = useState<AgentSoul | null>(null);
   const [bgAgent, setBgAgent] = useState<BackgroundAgentConfig | null>(null);
   const [stats, setStats] = useState<HeartbeatStats | null>(null);
   const [heartbeats, setHeartbeats] = useState<HeartbeatLog[]>([]);
+  const [bgHistory, setBgHistory] = useState<BackgroundAgentHistoryEntry[]>([]);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const [crews, setCrews] = useState<AgentCrew[]>([]);
 
   // Derived
   const isSoul = !!soul;
@@ -58,11 +68,13 @@ export function AgentProfilePage() {
     : soul?.heartbeat.enabled
       ? 'running'
       : 'idle';
-  const crewName = soul?.relationships?.crewId;
+  const crewId = soul?.relationships?.crewId;
+  const crewName = crewId ? (crews.find((c) => c.id === crewId)?.name ?? crewId) : undefined;
 
   // Data loading
   const fetchData = useCallback(async () => {
     if (!id) return;
+    setFetchError(null);
     try {
       const results = await Promise.allSettled([
         soulsApi.get(id),
@@ -70,7 +82,18 @@ export function AgentProfilePage() {
         heartbeatLogsApi.getStats(id),
         heartbeatLogsApi.listByAgent(id, 20, 0),
         agentMessagesApi.listByAgent(id, 30, 0),
+        backgroundAgentsApi.getHistory(id, 20, 0).catch(() => null),
+        crewsApi.list().catch(() => null),
       ]);
+
+      // Check if both primary sources failed — real API error
+      const soulFailed = results[0].status === 'rejected';
+      const bgFailed =
+        results[1].status === 'rejected' ||
+        (results[1].status === 'fulfilled' && !results[1].value);
+      if (soulFailed && bgFailed && results[0].status === 'rejected') {
+        setFetchError('Failed to load agent data. Please check your connection and try again.');
+      }
 
       if (results[0].status === 'fulfilled') setSoul(results[0].value);
       if (results[1].status === 'fulfilled' && results[1].value)
@@ -84,6 +107,16 @@ export function AgentProfilePage() {
         const msgData = results[4].value;
         setMessages(Array.isArray(msgData) ? msgData : []);
       }
+      if (results[5].status === 'fulfilled' && results[5].value) {
+        const histData = results[5].value as { entries: BackgroundAgentHistoryEntry[] };
+        setBgHistory(histData.entries ?? []);
+      }
+      if (results[6].status === 'fulfilled' && results[6].value) {
+        const crewsData = results[6].value as { items: AgentCrew[] };
+        setCrews(crewsData.items ?? []);
+      }
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +136,7 @@ export function AgentProfilePage() {
         await soulsApi.update(id, {
           ...soul,
           heartbeat: { ...soul.heartbeat, enabled: false },
-        } as unknown as Record<string, unknown>);
+        });
       }
       toast.success('Agent paused');
       fetchData();
@@ -121,7 +154,7 @@ export function AgentProfilePage() {
         await soulsApi.update(id, {
           ...soul,
           heartbeat: { ...soul.heartbeat, enabled: true },
-        } as unknown as Record<string, unknown>);
+        });
       }
       toast.success('Agent resumed');
       fetchData();
@@ -129,6 +162,28 @@ export function AgentProfilePage() {
       toast.error('Failed to resume');
     }
   }, [id, bgAgent, soul, toast, fetchData]);
+
+  const handleDelete = useCallback(async () => {
+    if (!id) return;
+    if (
+      !(await confirm({
+        message: `Delete "${name}"? This cannot be undone.`,
+        variant: 'danger',
+      }))
+    )
+      return;
+    try {
+      if (bgAgent) {
+        await backgroundAgentsApi.delete(id);
+      } else {
+        await soulsApi.delete(id);
+      }
+      toast.success('Agent deleted');
+      navigate('/autonomous');
+    } catch {
+      toast.error('Failed to delete agent');
+    }
+  }, [id, name, bgAgent, confirm, toast, navigate]);
 
   const profileTabs: { key: ProfileTab; label: string }[] = [
     { key: 'overview', label: 'Overview' },
@@ -143,13 +198,32 @@ export function AgentProfilePage() {
   if (!soul && !bgAgent) {
     return (
       <div className="p-6 max-w-6xl mx-auto text-center py-16">
-        <p className="text-text-muted dark:text-dark-text-muted">Agent not found.</p>
-        <button
-          onClick={() => navigate('/autonomous')}
-          className="mt-4 text-sm text-primary hover:text-primary-dark"
-        >
-          ← Back to hub
-        </button>
+        {fetchError ? (
+          <>
+            <AlertCircle className="w-12 h-12 text-danger mx-auto mb-3" />
+            <p className="text-text-primary dark:text-dark-text-primary font-medium">
+              Failed to load agent
+            </p>
+            <p className="text-sm text-text-muted dark:text-dark-text-muted mt-1">{fetchError}</p>
+            <button
+              onClick={fetchData}
+              className="mt-4 px-4 py-2 text-sm bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors mx-auto"
+            >
+              Retry
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-text-muted dark:text-dark-text-muted">Agent not found.</p>
+            <button
+              onClick={() => navigate('/autonomous')}
+              className="mt-4 flex items-center gap-1 text-sm text-primary hover:text-primary-dark transition-colors mx-auto"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back to hub
+            </button>
+          </>
+        )}
       </div>
     );
   }
@@ -161,6 +235,7 @@ export function AgentProfilePage() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/autonomous')}
+            aria-label="Back to hub"
             className="p-1.5 text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary"
           >
             <ChevronLeft className="w-5 h-5" />
@@ -194,6 +269,12 @@ export function AgentProfilePage() {
               <Play className="w-4 h-4" /> Resume
             </button>
           )}
+          <button
+            onClick={handleDelete}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-danger text-danger rounded-lg hover:bg-danger/10 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" /> Delete
+          </button>
         </div>
       </div>
 
@@ -221,6 +302,7 @@ export function AgentProfilePage() {
           bgAgent={bgAgent}
           stats={stats}
           heartbeats={heartbeats}
+          bgHistory={bgHistory}
           messages={messages}
         />
       )}
@@ -231,7 +313,9 @@ export function AgentProfilePage() {
         <MessagesTab agentId={id} messages={messages} onRefresh={fetchData} />
       )}
 
-      {activeTab === 'activity' && <ActivityTab heartbeats={heartbeats} onRefresh={fetchData} />}
+      {activeTab === 'activity' && (
+        <ActivityTab heartbeats={heartbeats} bgHistory={bgHistory} onRefresh={fetchData} />
+      )}
 
       {activeTab === 'budget' && <BudgetTab soul={soul} bgAgent={bgAgent} stats={stats} />}
     </div>
@@ -247,12 +331,14 @@ function OverviewTab({
   bgAgent,
   stats,
   heartbeats,
+  bgHistory,
   messages,
 }: {
   soul: AgentSoul | null;
   bgAgent: BackgroundAgentConfig | null;
   stats: HeartbeatStats | null;
   heartbeats: HeartbeatLog[];
+  bgHistory: BackgroundAgentHistoryEntry[];
   messages: AgentMessage[];
 }) {
   return (
@@ -260,12 +346,20 @@ function OverviewTab({
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
-          label="Heartbeat Cycles"
-          value={String(stats?.totalCycles ?? heartbeats.length)}
+          label={soul ? 'Heartbeat Cycles' : 'Completed Cycles'}
+          value={String(
+            stats?.totalCycles ?? bgAgent?.session?.cyclesCompleted ?? heartbeats.length
+          )}
         />
         <StatCard
           label="Success Rate"
-          value={stats ? `${((1 - stats.failureRate) * 100).toFixed(0)}%` : '—'}
+          value={
+            stats
+              ? `${((1 - stats.failureRate) * 100).toFixed(0)}%`
+              : bgHistory.length > 0
+                ? `${((bgHistory.filter((e) => e.success).length / bgHistory.length) * 100).toFixed(0)}%`
+                : '—'
+          }
         />
         <StatCard
           label="Total Cost"
@@ -302,14 +396,18 @@ function OverviewTab({
             <>
               <InfoRow label="Mode" value={bgAgent.mode} />
               <InfoRow label="Cycles" value={String(bgAgent.session?.cyclesCompleted ?? 0)} />
+              <InfoRow label="Tool Calls" value={String(bgAgent.session?.totalToolCalls ?? 0)} />
               <InfoRow label="Mission" value={bgAgent.mission} />
               <InfoRow label="Created" value={new Date(bgAgent.createdAt).toLocaleDateString()} />
+              {bgAgent.session?.lastCycleAt && (
+                <InfoRow label="Last Cycle" value={formatTimeAgo(bgAgent.session.lastCycleAt)} />
+              )}
             </>
           )}
         </div>
       </div>
 
-      {/* Recent activity */}
+      {/* Recent heartbeats */}
       {heartbeats.length > 0 && (
         <div className="border border-border dark:border-dark-border rounded-xl p-4">
           <h3 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-3">
@@ -331,6 +429,35 @@ function OverviewTab({
                   {formatCost(hb.cost)}
                 </span>
                 <span className="ml-auto">{formatTimeAgo(hb.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent background cycles */}
+      {bgHistory.length > 0 && (
+        <div className="border border-border dark:border-dark-border rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-3">
+            Recent Cycles
+          </h3>
+          <div className="space-y-2">
+            {bgHistory.slice(0, 5).map((entry) => (
+              <div
+                key={entry.id}
+                className="text-xs flex items-center gap-2 text-text-muted dark:text-dark-text-muted"
+              >
+                {entry.success ? (
+                  <CheckCircle2 className="w-3 h-3 text-success" />
+                ) : (
+                  <AlertCircle className="w-3 h-3 text-danger" />
+                )}
+                <span>
+                  Cycle #{entry.cycleNumber} · {entry.toolCalls.length} tool calls ·{' '}
+                  {formatDuration(entry.durationMs)}
+                  {entry.costUsd != null && ` · ${formatCost(entry.costUsd)}`}
+                </span>
+                <span className="ml-auto">{formatTimeAgo(entry.executedAt)}</span>
               </div>
             ))}
           </div>
@@ -372,7 +499,7 @@ function MessagesTab({
   }, [agentId, composeTo, composeContent, toast, onRefresh]);
 
   const inputClass =
-    'w-full rounded-lg border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
+    'w-full rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
 
   return (
     <div className="space-y-4">
@@ -411,7 +538,8 @@ function MessagesTab({
         </h3>
         <button
           onClick={onRefresh}
-          className="text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary"
+          aria-label="Refresh messages"
+          className="text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
         </button>
@@ -453,73 +581,169 @@ function MessagesTab({
 
 function ActivityTab({
   heartbeats,
+  bgHistory,
   onRefresh,
 }: {
   heartbeats: HeartbeatLog[];
+  bgHistory: BackgroundAgentHistoryEntry[];
   onRefresh: () => void;
 }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const hasHeartbeats = heartbeats.length > 0;
+  const hasBgHistory = bgHistory.length > 0;
+  const isEmpty = !hasHeartbeats && !hasBgHistory;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary">
-          Heartbeat History ({heartbeats.length})
+          Activity History
         </h3>
         <button
           onClick={onRefresh}
-          className="text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary"
+          aria-label="Refresh activity"
+          className="text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
-      {heartbeats.length === 0 ? (
+
+      {isEmpty ? (
         <p className="text-sm text-text-muted dark:text-dark-text-muted text-center py-8">
-          No heartbeat history yet.
+          No activity history yet.
         </p>
       ) : (
         <div className="space-y-2">
-          {heartbeats.map((hb) => {
-            const hasFailed = hb.tasksFailed.length > 0;
-            return (
-              <div
-                key={hb.id}
-                className="border border-border dark:border-dark-border rounded-lg p-3 text-xs"
-              >
-                <div className="flex items-center gap-2">
-                  {hasFailed ? (
-                    <AlertCircle className="w-3.5 h-3.5 text-danger" />
-                  ) : (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-success" />
-                  )}
-                  <span className="font-medium text-text-primary dark:text-dark-text-primary">
-                    {hb.tasksRun.length} task{hb.tasksRun.length !== 1 ? 's' : ''} run
-                  </span>
-                  {hasFailed && <span className="text-danger">{hb.tasksFailed.length} failed</span>}
-                  <span className="text-text-muted dark:text-dark-text-muted ml-auto">
-                    {formatDuration(hb.durationMs)} · {formatCost(hb.cost)} ·{' '}
-                    {formatTimeAgo(hb.createdAt)}
-                  </span>
-                </div>
-                {hb.tasksRun.length > 0 && (
-                  <div className="mt-1 pl-5 flex flex-wrap gap-1">
-                    {hb.tasksRun.map((t) => (
-                      <span key={t.id} className="px-2 py-0.5 rounded bg-success/10 text-success">
-                        {t.name}
+          {/* Heartbeat entries */}
+          {hasHeartbeats && (
+            <>
+              <h4 className="text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
+                Heartbeat Cycles ({heartbeats.length})
+              </h4>
+              {heartbeats.map((hb) => {
+                const hasFailed = hb.tasksFailed.length > 0;
+                return (
+                  <div
+                    key={hb.id}
+                    className="border border-border dark:border-dark-border rounded-lg p-3 text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      {hasFailed ? (
+                        <AlertCircle className="w-3.5 h-3.5 text-danger" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                      )}
+                      <span className="font-medium text-text-primary dark:text-dark-text-primary">
+                        {hb.tasksRun.length} task{hb.tasksRun.length !== 1 ? 's' : ''} run
                       </span>
-                    ))}
+                      {hasFailed && (
+                        <span className="text-danger">{hb.tasksFailed.length} failed</span>
+                      )}
+                      <span className="text-text-muted dark:text-dark-text-muted ml-auto">
+                        {formatDuration(hb.durationMs)} · {formatCost(hb.cost)} ·{' '}
+                        {formatTimeAgo(hb.createdAt)}
+                      </span>
+                    </div>
+                    {hb.tasksRun.length > 0 && (
+                      <div className="mt-1 pl-5 flex flex-wrap gap-1">
+                        {hb.tasksRun.map((t) => (
+                          <span
+                            key={t.id}
+                            className="px-2 py-0.5 rounded bg-success/10 text-success"
+                          >
+                            {t.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {hb.tasksFailed.length > 0 && (
+                      <div className="mt-1 pl-5">
+                        {hb.tasksFailed.map((t) => (
+                          <p key={t.id} className="text-danger">
+                            {t.id}: {t.error || 'failed'}
+                          </p>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-                {hb.tasksFailed.length > 0 && (
-                  <div className="mt-1 pl-5">
-                    {hb.tasksFailed.map((t) => (
-                      <p key={t.id} className="text-danger">
-                        {t.id}: {t.error || 'failed'}
+                );
+              })}
+            </>
+          )}
+
+          {/* Background agent cycle entries */}
+          {hasBgHistory && (
+            <>
+              <h4 className="text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider mt-4">
+                Background Cycles ({bgHistory.length})
+              </h4>
+              {bgHistory.map((entry) => {
+                const isExpanded = expandedId === entry.id;
+                return (
+                  <div
+                    key={entry.id}
+                    className="border border-border dark:border-dark-border rounded-lg p-3 text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      {entry.success ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                      ) : (
+                        <AlertCircle className="w-3.5 h-3.5 text-danger" />
+                      )}
+                      <span className="font-medium text-text-primary dark:text-dark-text-primary">
+                        Cycle #{entry.cycleNumber}
+                      </span>
+                      <span className="text-text-muted dark:text-dark-text-muted">
+                        {entry.turns} turn{entry.turns !== 1 ? 's' : ''} · {entry.toolCalls.length}{' '}
+                        tool call{entry.toolCalls.length !== 1 ? 's' : ''}
+                      </span>
+                      {!entry.success && entry.error && (
+                        <span className="text-danger truncate max-w-40">{entry.error}</span>
+                      )}
+                      <span className="text-text-muted dark:text-dark-text-muted ml-auto">
+                        {formatDuration(entry.durationMs)}
+                        {entry.costUsd != null && ` · ${formatCost(entry.costUsd)}`} ·{' '}
+                        {formatTimeAgo(entry.executedAt)}
+                      </span>
+                      {entry.toolCalls.length > 0 && (
+                        <button
+                          onClick={() => setExpandedId(isExpanded ? null : entry.id)}
+                          className="text-primary hover:text-primary-dark transition-colors"
+                        >
+                          {isExpanded ? '−' : '+'}
+                        </button>
+                      )}
+                    </div>
+                    {entry.outputMessage && (
+                      <p className="mt-1 pl-5 text-text-muted dark:text-dark-text-muted line-clamp-2">
+                        {entry.outputMessage}
                       </p>
-                    ))}
+                    )}
+                    {isExpanded && entry.toolCalls.length > 0 && (
+                      <div className="mt-2 pl-5 space-y-1">
+                        {entry.toolCalls.map((tc, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-2 text-text-muted dark:text-dark-text-muted"
+                          >
+                            <span className="px-2 py-0.5 rounded bg-primary/10 text-primary">
+                              {tc.tool}
+                            </span>
+                            <span>{formatDuration(tc.duration)}</span>
+                          </div>
+                        ))}
+                        {entry.tokensUsed && (
+                          <div className="pt-1 text-text-muted dark:text-dark-text-muted">
+                            Tokens: {entry.tokensUsed.prompt}in / {entry.tokensUsed.completion}out
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </>
+          )}
         </div>
       )}
     </div>
@@ -559,7 +783,7 @@ function BudgetTab({
           <h3 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-3">
             Daily Budget Usage
           </h3>
-          <div className="w-full bg-surface dark:bg-dark-surface rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-bg-secondary dark:bg-dark-bg-secondary rounded-full h-3 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${
                 totalCost / dailyLimit > 0.8

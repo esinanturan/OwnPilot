@@ -74,6 +74,7 @@ export function fromSoul(soul: AgentSoul, crews: AgentCrew[]): UnifiedAgent {
     status: soul.heartbeat.enabled ? 'running' : 'idle',
     crewId: soul.relationships?.crewId,
     crewName: crew?.name,
+    lastActiveAt: soul.updatedAt,
     todayCost: 0,
     unreadMessages: 0,
     heartbeatEnabled: soul.heartbeat.enabled,

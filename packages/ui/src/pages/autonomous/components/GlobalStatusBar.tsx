@@ -4,15 +4,20 @@
 
 import { Link } from 'react-router-dom';
 import type { UnifiedAgent } from '../types';
+import { formatCost } from '../helpers';
 
 interface Props {
   agents: UnifiedAgent[];
+  isRefreshing?: boolean;
+  isConnected?: boolean;
 }
 
-export function GlobalStatusBar({ agents }: Props) {
+export function GlobalStatusBar({ agents, isRefreshing, isConnected }: Props) {
   const running = agents.filter(
     (a) => a.status === 'running' || a.status === 'starting' || a.status === 'waiting'
   ).length;
+  const paused = agents.filter((a) => a.status === 'paused').length;
+  const errors = agents.filter((a) => a.status === 'error').length;
   const totalCost = agents.reduce((sum, a) => sum + a.todayCost, 0);
 
   return (
@@ -23,13 +28,31 @@ export function GlobalStatusBar({ agents }: Props) {
       {running > 0 && (
         <span className="flex items-center gap-1.5">
           <span className="relative flex">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75 animate-ping" />
-            <span className="relative inline-flex rounded-full w-2 h-2 bg-green-500" />
+            <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-75 animate-ping" />
+            <span className="relative inline-flex rounded-full w-2 h-2 bg-success" />
           </span>
-          <span className="text-green-600 dark:text-green-400 font-medium">{running} running</span>
+          <span className="text-success font-medium">{running} running</span>
         </span>
       )}
-      {totalCost > 0 && <span>${totalCost.toFixed(2)} today</span>}
+      {paused > 0 && <span className="text-warning font-medium">{paused} paused</span>}
+      {errors > 0 && (
+        <span className="flex items-center gap-1 text-danger font-medium">
+          <span className="inline-flex rounded-full w-2 h-2 bg-danger" />
+          {errors} error{errors !== 1 ? 's' : ''}
+        </span>
+      )}
+      {totalCost > 0 && <span>{formatCost(totalCost)} today</span>}
+      {isRefreshing && <span className="text-primary animate-pulse">Refreshing...</span>}
+      {isConnected !== undefined && (
+        <span
+          className={`flex items-center gap-1 ${isConnected ? 'text-success' : 'text-text-muted dark:text-dark-text-muted'}`}
+        >
+          <span
+            className={`inline-flex rounded-full w-1.5 h-1.5 ${isConnected ? 'bg-success' : 'bg-text-muted dark:bg-dark-text-muted'}`}
+          />
+          {isConnected ? 'Live' : 'Offline'}
+        </span>
+      )}
       <Link to="/autonomy" className="text-primary hover:text-primary-dark transition-colors">
         Autonomy Settings →
       </Link>

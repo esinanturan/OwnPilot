@@ -6,7 +6,7 @@
 [![Node.js](https://img.shields.io/badge/Node.js-≥22-green?logo=node.js)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?logo=typescript)](https://www.typescriptlang.org/)
 
-Privacy-first personal AI assistant platform with autonomous background agents, multi-agent orchestration, tool orchestration, multi-provider support, MCP integration, voice pipeline, browser automation, IoT edge device control, and Telegram + WhatsApp connectivity.
+Privacy-first personal AI assistant platform with soul agents, autonomous background agents, multi-agent orchestration, AI agent creator, tool orchestration, multi-provider support, MCP integration, voice pipeline, browser automation, IoT edge device control, and Telegram + WhatsApp connectivity.
 
 **Self-hosted. Your data stays yours.**
 
@@ -26,6 +26,8 @@ Privacy-first personal AI assistant platform with autonomous background agents, 
   - [CLI](#cli-ownpilotcli)
 - [AI Providers](#ai-providers)
 - [Agent System](#agent-system)
+- [Soul Agents](#soul-agents)
+- [Autonomous Hub](#autonomous-hub)
 - [Agent Orchestra](#agent-orchestra)
 - [Background Agents](#background-agents-1)
 - [Subagents](#subagents)
@@ -91,6 +93,26 @@ Privacy-first personal AI assistant platform with autonomous background agents, 
 - **Dual Execution Modes** — Auto mode (headless `child_process.spawn`) and interactive mode (PTY terminal)
 - **Custom Providers** — Register any CLI binary as a coding agent provider
 - **Result Persistence** — Task output, exit codes, and duration stored in the database
+
+### Soul Agents
+
+- **Rich Agent Identity** — Agents with personality, role, mission, voice, boundaries, and emoji; full identity framework for autonomous operation
+- **Heartbeat Lifecycle** — Cron-scheduled execution cycles with configurable checklist, self-healing, max duration, and cost tracking
+- **Crew System** — Multi-agent crews with role assignments, delegation protocols, and ready-made crew templates
+- **Inter-Agent Communication** — Agents can send messages to each other with subject, content, and type classification
+- **Evolution Tracking** — Version-controlled agent evolution with core/mutable traits, learnings, and feedback log
+- **Autonomy Controls** — Per-agent autonomy levels with allowed/blocked actions, approval requirements, and budget limits (per-cycle, per-day, per-month)
+- **Boot Sequences** — Configurable `onStart`, `onHeartbeat`, and `onMessage` action sequences
+- **16+ Agent Templates** — Pre-built configurations for common use cases (Morning Briefer, News Monitor, Code Reviewer, Budget Tracker, etc.)
+
+### Autonomous Hub
+
+- **Unified Command Center** — Single tabbed dashboard consolidating all autonomous agents (soul + background), crews, messaging, and activity
+- **AI Agent Creator** — Conversational agent creation: describe what you need in plain language, refine through chat, preview JSON config, create in one click
+- **Agent Cards** — At-a-glance agent status with real-time indicators, mission preview, cost tracking, and quick actions (pause/resume/delete)
+- **Activity Feed** — Unified timeline of heartbeat logs and agent messages with aggregate stats (total runs, success rate, avg duration, total cost)
+- **Global Status Bar** — Live agent count, running/paused/error breakdown, daily cost, and WebSocket connection state
+- **Search & Filters** — Filter agents by status, type (soul/background), and text search across name, role, and mission
 
 ### Background Agents
 
@@ -174,7 +196,7 @@ Privacy-first personal AI assistant platform with autonomous background agents, 
 
 ### Communication
 
-- **Web UI** — React 19 + Vite 7 + Tailwind CSS 4 with dark mode, 55+ pages, 110+ components, code-split
+- **Web UI** — React 19 + Vite 7 + Tailwind CSS 4 with dark mode, 57+ pages, 120+ components, code-split
 - **Telegram Bot** — Full bot integration with user/chat filtering, message splitting, HTML/Markdown formatting
 - **WhatsApp (Baileys)** — QR code authentication (no Meta Business account needed), self-chat mode with loop prevention, session persistence
 - **Channel User Approval** — Multi-step verification: approval code flow, manual admin approval, user blocking/unblocking with real-time notifications
@@ -447,7 +469,7 @@ The API server built on [Hono](https://hono.dev/). Handles HTTP/WebSocket commun
 | **AI Configuration**   | `models.ts`, `providers.ts`, `model-configs.ts`, `local-providers.ts`, `model-routing.ts`                                                                                         |
 | **Personal Data**      | `personal-data.ts`, `personal-data-tools.ts`, `memories.ts`, `goals.ts`, `expenses.ts`, `custom-data.ts`                                                                          |
 | **Productivity**       | `productivity.ts` (Pomodoro, Habits, Captures)                                                                                                                                    |
-| **Automation**         | `triggers.ts`, `heartbeats.ts`, `plans.ts`, `autonomy.ts`, `workflows.ts`, `workflow-copilot.ts`, `background-agents.ts`                                                          |
+| **Automation**         | `triggers.ts`, `heartbeats.ts`, `plans.ts`, `autonomy.ts`, `workflows.ts`, `workflow-copilot.ts`, `background-agents.ts`, `souls.ts`                                              |
 | **Tools & Extensions** | `tools.ts`, `custom-tools.ts`, `plugins.ts`, `extensions.ts`, `skills.ts`, `mcp.ts`, `composio.ts`                                                                                |
 | **Coding & CLI**       | `coding-agents.ts`, `cli-tools.ts`, `cli-providers.ts`                                                                                                                            |
 | **Orchestration**      | `orchestra.ts`, `artifacts.ts`, `browser.ts`, `voice.ts`, `bridges.ts`                                                                                                            |
@@ -456,9 +478,9 @@ The API server built on [Hono](https://hono.dev/). Handles HTTP/WebSocket commun
 | **Configuration**      | `settings.ts`, `config-services.ts`, `ui-auth.ts`                                                                                                                                 |
 | **System**             | `health.ts`, `dashboard.ts`, `costs.ts`, `audit.ts`, `debug.ts`, `database.ts`, `profile.ts`, `workspaces.ts`, `file-workspaces.ts`, `execution-permissions.ts`, `error-codes.ts` |
 
-**Services (110+):** MessageBus, ConfigCenter, ToolExecutor, ProviderService, McpClientService, McpServerService, ExtensionService, ComposioService, EmbeddingService, HeartbeatService, AuditService, PluginService, MemoryService, GoalService, TriggerService, PlanService, WorkspaceService, DatabaseService, SessionService, LogService, ResourceService, LocalDiscovery, WorkflowService, AgentSkillsParser, CodingAgentService, CodingAgentSessions, CliToolService, CliToolsDiscovery, ModelRouting, ExecutionApproval, BackgroundAgentManager, BackgroundAgentRunner, ChannelVerificationService, OrchestraEngine, ArtifactService, ArtifactDataResolver, VoiceService, BrowserService, EdgeService, EdgeMqttClient, SubagentService, SubagentManager, and more.
+**Services (115+):** MessageBus, ConfigCenter, ToolExecutor, ProviderService, McpClientService, McpServerService, ExtensionService, ComposioService, EmbeddingService, HeartbeatService, AuditService, PluginService, MemoryService, GoalService, TriggerService, PlanService, WorkspaceService, DatabaseService, SessionService, LogService, ResourceService, LocalDiscovery, WorkflowService, AgentSkillsParser, CodingAgentService, CodingAgentSessions, CliToolService, CliToolsDiscovery, ModelRouting, ExecutionApproval, BackgroundAgentManager, BackgroundAgentRunner, ChannelVerificationService, OrchestraEngine, ArtifactService, ArtifactDataResolver, VoiceService, BrowserService, EdgeService, EdgeMqttClient, SubagentService, SubagentManager, SoulService, CrewService, AgentMessagesService, and more.
 
-**Repositories (88+):** agents, conversations, messages, tasks, notes, bookmarks, calendar, contacts, memories, goals, triggers, plans, expenses, custom-data, custom-tools, plugins, channels, channel-messages, channel-users, channel-sessions, channel-verification, costs, settings, config-services, pomodoro, habits, captures, workspaces, model-configs, execution-permissions, logs, mcp-servers, extensions, local-providers, heartbeats, embedding-cache, workflows, autonomy-log, coding-agent-results, cli-providers, cli-tool-policies, background-agents, orchestra, artifacts, channel-bridges, browser-workflows, edge-devices, edge-commands, edge-telemetry, subagent-history.
+**Repositories (90+):** agents, conversations, messages, tasks, notes, bookmarks, calendar, contacts, memories, goals, triggers, plans, expenses, custom-data, custom-tools, plugins, channels, channel-messages, channel-users, channel-sessions, channel-verification, costs, settings, config-services, pomodoro, habits, captures, workspaces, model-configs, execution-permissions, logs, mcp-servers, extensions, local-providers, heartbeats, embedding-cache, workflows, autonomy-log, coding-agent-results, cli-providers, cli-tool-policies, background-agents, orchestra, artifacts, channel-bridges, browser-workflows, edge-devices, edge-commands, edge-telemetry, subagent-history, souls, crews, agent-messages.
 
 ### UI (`@ownpilot/ui`)
 
@@ -472,7 +494,7 @@ Modern web interface built with React 19, Vite 7, and Tailwind CSS 4. Minimal de
 | Tailwind CSS         | 4.2.0   |
 | prism-react-renderer | 2.4.1   |
 
-**Pages (55+):**
+**Pages (57+):**
 
 | Page                                                | Description                                                                                |
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -496,6 +518,7 @@ Modern web interface built with React 19, Vite 7, and Tailwind CSS 4. Minimal de
 | **Models / AI Models / Costs**                      | AI model browser, configuration, and usage tracking                                        |
 | **Providers**                                       | Provider management and status                                                             |
 | **Model Routing**                                   | Per-process model selection with fallback chains                                           |
+| **Autonomous Hub**                                  | Unified command center for soul agents, background agents, crews, messaging, and activity  |
 | **Background Agents**                               | Create, monitor, and manage persistent autonomous agents with cycle history                |
 | **Event Monitor**                                   | Live EventBus event stream viewer for real-time debugging                                  |
 | **Channels**                                        | Channel management with connect/disconnect/logout, user approval, QR code display          |
@@ -653,6 +676,90 @@ Agents are AI assistants with specific system prompts, tool assignments, model p
 - **Execution Context** — Code execution instructions injected into system prompt (not user message)
 - **Context Tracking** — Real-time context bar showing token usage, fill percentage, and per-section breakdown
 - **Streaming** — Real-time SSE responses with tool execution progress events
+
+---
+
+## Soul Agents
+
+Soul agents are autonomous agents with rich identity, personality, and heartbeat-driven lifecycle. They combine the scheduling power of background agents with a full identity framework.
+
+### Soul Configuration
+
+```typescript
+{
+  agentId: string              // Unique agent ID
+  identity: {
+    name: string               // Display name
+    emoji: string              // Agent emoji
+    role: string               // Professional role
+    personality: string        // Personality description
+    voice: { tone, language }  // Communication style
+    boundaries: string[]       // Behavioral constraints
+  }
+  purpose: {
+    mission: string            // Core mission statement
+    goals: string[]            // Active goals
+    expertise: string[]        // Domain expertise
+    toolPreferences: string[]  // Preferred tools
+  }
+  autonomy: {
+    level: 1-4                 // Autonomy level
+    allowedActions: string[]   // Permitted actions
+    blockedActions: string[]   // Blocked actions
+    requiresApproval: string[] // Actions needing user approval
+    maxCostPerCycle: number    // Budget per heartbeat cycle
+    maxCostPerDay: number      // Daily budget limit
+    maxCostPerMonth: number    // Monthly budget limit
+  }
+  heartbeat: {
+    enabled: boolean           // Enable scheduled execution
+    interval: string           // Cron expression
+    checklist: string[]        // Tasks to run each cycle
+    selfHealingEnabled: boolean
+    maxDurationMs: number      // Cycle timeout
+  }
+  relationships: {
+    delegates: string[]        // Agents this soul can delegate to
+    peers: string[]            // Peer agents
+    channels: string[]         // Communication channels
+  }
+}
+```
+
+### Crews
+
+Multi-agent crews coordinate soul agents for complex tasks:
+
+- **Role Assignment** — Each crew member has a defined role within the crew
+- **Delegation Protocol** — Automatic task delegation between crew members
+- **Crew Templates** — Pre-built crew configurations for common multi-agent workflows
+
+---
+
+## Autonomous Hub
+
+The Autonomous Hub is a unified command center for managing all autonomous agents from a single interface.
+
+### Tabs
+
+| Tab          | Description                                                                                |
+| ------------ | ------------------------------------------------------------------------------------------ |
+| **Agents**   | Grid of all agents (soul + background) with search, status/type filters, and quick actions |
+| **Crews**    | Crew management with templates and member configuration                                    |
+| **Messages** | Inter-agent communication panel with compose and message history                           |
+| **Activity** | Unified timeline of heartbeat logs and agent messages with stats                           |
+
+### AI Agent Creator
+
+Describe what you want in plain English and the AI designs the agent configuration:
+
+1. Open the AI Creator modal from the hub header
+2. Describe your agent (e.g., "Monitor my GitHub PRs daily")
+3. The AI designs a configuration with name, mission, schedule, tools, and cost estimate
+4. Review the preview card and refine through conversation
+5. Click "Create This Agent" to deploy
+
+The creator uses a dedicated agent with a specialized system prompt, ensuring it acts as an agent designer rather than a general chatbot.
 
 ---
 
@@ -1087,7 +1194,7 @@ PostgreSQL with 85+ repositories via the `pg` adapter.
 
 **Productivity:** `pomodoro_sessions`, `habits`, `captures`
 
-**Autonomous AI:** `memories`, `goals`, `triggers`, `plans`, `heartbeats`, `workflows`, `autonomy_log`, `background_agents`, `background_agent_sessions`, `background_agent_history`
+**Autonomous AI:** `memories`, `goals`, `triggers`, `plans`, `heartbeats`, `workflows`, `autonomy_log`, `background_agents`, `background_agent_sessions`, `background_agent_history`, `souls`, `crews`, `agent_messages`
 
 **Channels:** `channel_messages`, `channel_users`, `channel_sessions`, `channel_verification`
 
@@ -1306,6 +1413,22 @@ Sliding window algorithm with configurable window (default 60s), max requests (d
 | `GET`    | `/api/v1/coding-agents/sessions`     | List active sessions             |
 | `DELETE` | `/api/v1/coding-agents/sessions/:id` | Stop a running session           |
 | `GET`    | `/api/v1/coding-agents/results`      | List past execution results      |
+
+### Soul Agents
+
+| Method   | Endpoint                             | Description                        |
+| -------- | ------------------------------------ | ---------------------------------- |
+| `GET`    | `/api/v1/souls`                      | List all soul agents               |
+| `POST`   | `/api/v1/souls`                      | Create a new soul agent            |
+| `GET`    | `/api/v1/souls/:id`                  | Get soul agent details             |
+| `PUT`    | `/api/v1/souls/:id`                  | Update soul agent config           |
+| `DELETE` | `/api/v1/souls/:id`                  | Delete soul agent                  |
+| `GET`    | `/api/v1/souls/crews`                | List all crews                     |
+| `GET`    | `/api/v1/souls/crews/templates`      | List crew templates                |
+| `GET`    | `/api/v1/souls/heartbeat-logs`       | Paginated heartbeat execution logs |
+| `GET`    | `/api/v1/souls/heartbeat-logs/stats` | Heartbeat statistics               |
+| `GET`    | `/api/v1/souls/messages`             | List inter-agent messages          |
+| `POST`   | `/api/v1/souls/messages`             | Send a message between agents      |
 
 ### Background Agents
 

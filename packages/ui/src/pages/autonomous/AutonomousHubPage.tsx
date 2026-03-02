@@ -7,7 +7,16 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Bot, Users, MessageSquare, Heart, Sparkles, BookOpen } from '../../components/icons';
+import {
+  Plus,
+  Bot,
+  Users,
+  MessageSquare,
+  Heart,
+  Sparkles,
+  BookOpen,
+  Search,
+} from '../../components/icons';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { crewsApi } from '../../api/endpoints/souls';
 import type { CrewTemplate } from '../../api/endpoints/souls';
@@ -17,6 +26,7 @@ import { useAgents } from './hooks/useAgents';
 import { useAgentStatus } from './hooks/useAgentStatus';
 import type { HubTab } from './types';
 import { useToast } from '../../components/ToastProvider';
+import { useDialog } from '../../components/ConfirmDialog';
 
 // Tab components
 import { AgentCard } from './components/AgentCard';
@@ -39,24 +49,35 @@ export function AutonomousHubPage() {
   const tabParam = searchParams.get('tab') as HubTab | null;
   const [activeTab, setActiveTab] = useState<HubTab>(tabParam || 'agents');
   const [showWizard, setShowWizard] = useState(false);
+  const [wizardInitialStep, setWizardInitialStep] = useState<'type' | 'templates'>('type');
   const [showAICreator, setShowAICreator] = useState(false);
   const [templates, setTemplates] = useState<CrewTemplate[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [kindFilter, setKindFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const toast = useToast();
+  const { confirm } = useDialog();
 
-  const { agents, crews, isLoading, refresh } = useAgents();
+  const { agents, crews, isLoading, isRefreshing, error: loadError, refresh } = useAgents();
+
+  // Sync tab state with URL on back/forward navigation
+  useEffect(() => {
+    const urlTab = (searchParams.get('tab') as HubTab | null) || 'agents';
+    if (urlTab !== activeTab) setActiveTab(urlTab);
+  }, [searchParams]);
 
   // Fetch templates for wizard
   useEffect(() => {
     crewsApi
       .getTemplates()
       .then(setTemplates)
-      .catch(() => {});
+      .catch(() => {
+        toast.error('Failed to load crew templates');
+      });
   }, []);
 
   // WebSocket live updates for background agents
-  useAgentStatus(
+  const { isConnected } = useAgentStatus(
     useCallback(() => {
       // Refresh on any status update
       refresh();
@@ -117,10 +138,44 @@ export function AutonomousHubPage() {
     [agents, toast, refresh]
   );
 
+  const handleDelete = useCallback(
+    async (agentId: string) => {
+      const agent = agents.find((a) => a.id === agentId);
+      if (!agent) return;
+      if (
+        !(await confirm({
+          message: `Delete "${agent.name}"? This cannot be undone.`,
+          variant: 'danger',
+        }))
+      )
+        return;
+      try {
+        if (agent.kind === 'background') {
+          await backgroundAgentsApi.delete(agentId);
+        } else {
+          await soulsApi.delete(agentId);
+        }
+        toast.success('Agent deleted');
+        refresh();
+      } catch {
+        toast.error('Failed to delete agent');
+      }
+    },
+    [agents, confirm, toast, refresh]
+  );
+
   // Filtered agents
   const filteredAgents = agents.filter((a) => {
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
     if (kindFilter !== 'all' && a.kind !== kindFilter) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return (
+        a.name.toLowerCase().includes(q) ||
+        a.role.toLowerCase().includes(q) ||
+        a.mission.toLowerCase().includes(q)
+      );
+    }
     return true;
   });
 
@@ -128,6 +183,19 @@ export function AutonomousHubPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {/* Error banner */}
+      {loadError && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-danger/10 border border-danger/30 rounded-lg">
+          <span className="text-sm text-danger font-medium">{loadError}</span>
+          <button
+            onClick={refresh}
+            className="ml-auto text-xs text-danger hover:text-danger/80 transition-colors underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -139,7 +207,11 @@ export function AutonomousHubPage() {
             the clock.
           </p>
           <div className="mt-1">
-            <GlobalStatusBar agents={agents} />
+            <GlobalStatusBar
+              agents={agents}
+              isRefreshing={isRefreshing}
+              isConnected={isConnected}
+            />
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -195,15 +267,27 @@ export function AutonomousHubPage() {
       {/* Tab content */}
       {activeTab === 'agents' && (
         <div className="space-y-4">
-          {/* Filters */}
+          {/* Search + Filters */}
           <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted dark:text-dark-text-muted" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search agents..."
+                className="text-xs rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary pl-8 pr-3 py-1.5 w-48 focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+            </div>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs rounded-lg border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary px-2 py-1.5"
+              className="text-xs rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-2 py-1.5"
             >
               <option value="all">All Status</option>
               <option value="running">Running</option>
+              <option value="starting">Starting</option>
+              <option value="waiting">Waiting</option>
               <option value="paused">Paused</option>
               <option value="idle">Idle</option>
               <option value="error">Error</option>
@@ -212,7 +296,7 @@ export function AutonomousHubPage() {
             <select
               value={kindFilter}
               onChange={(e) => setKindFilter(e.target.value)}
-              className="text-xs rounded-lg border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary px-2 py-1.5"
+              className="text-xs rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-2 py-1.5"
             >
               <option value="all">All Types</option>
               <option value="soul">Soul Agents</option>
@@ -240,7 +324,10 @@ export function AutonomousHubPage() {
               {agents.length === 0 && (
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                   <button
-                    onClick={() => setShowWizard(true)}
+                    onClick={() => {
+                      setWizardInitialStep('templates');
+                      setShowWizard(true);
+                    }}
                     className="flex items-center gap-2 px-5 py-3 border border-border dark:border-dark-border rounded-xl hover:border-primary hover:bg-primary/5 transition-colors w-full sm:w-auto"
                   >
                     <BookOpen className="w-5 h-5 text-primary" />
@@ -268,7 +355,10 @@ export function AutonomousHubPage() {
                     </div>
                   </button>
                   <button
-                    onClick={() => setShowWizard(true)}
+                    onClick={() => {
+                      setWizardInitialStep('type');
+                      setShowWizard(true);
+                    }}
                     className="flex items-center gap-2 px-5 py-3 border border-border dark:border-dark-border rounded-xl hover:border-primary hover:bg-primary/5 transition-colors w-full sm:w-auto"
                   >
                     <Plus className="w-5 h-5 text-primary" />
@@ -292,6 +382,7 @@ export function AutonomousHubPage() {
                   agent={agent}
                   onPause={handlePause}
                   onResume={handleResume}
+                  onDelete={handleDelete}
                 />
               ))}
             </div>
@@ -299,7 +390,9 @@ export function AutonomousHubPage() {
         </div>
       )}
 
-      {activeTab === 'crews' && <CrewSection crews={crews} onRefresh={refresh} />}
+      {activeTab === 'crews' && (
+        <CrewSection crews={crews} templates={templates} onRefresh={refresh} />
+      )}
 
       {activeTab === 'messages' && <CommsPanel agents={agents} />}
 
@@ -309,6 +402,7 @@ export function AutonomousHubPage() {
       {showWizard && (
         <CreateAgentWizard
           templates={templates}
+          initialStep={wizardInitialStep}
           onClose={() => setShowWizard(false)}
           onCreated={refresh}
         />

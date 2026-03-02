@@ -2,23 +2,25 @@
  * AgentCard — unified card for both soul-based and background agents
  */
 
-import { useNavigate } from 'react-router-dom';
-import { Eye, Pause, Play, MessageSquare, Heart } from '../../../components/icons';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Eye, Pause, Play, MessageSquare, Heart, Trash2, Clock } from '../../../components/icons';
 import type { UnifiedAgent } from '../types';
 import { AgentStatusBadge } from './AgentStatusBadge';
-import { formatTimeAgo, formatCost } from '../helpers';
+import { formatTimeAgo, formatCost, cronToHuman } from '../helpers';
 
 interface Props {
   agent: UnifiedAgent;
   onPause?: (id: string) => void;
   onResume?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
-export function AgentCard({ agent, onPause, onResume }: Props) {
+export function AgentCard({ agent, onPause, onResume, onDelete }: Props) {
   const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
 
   return (
-    <div className="border border-border dark:border-dark-border rounded-xl p-4 hover:shadow-md transition-shadow bg-surface dark:bg-dark-surface">
+    <div className="border border-border dark:border-dark-border rounded-xl p-4 hover:shadow-md transition-shadow bg-bg-primary dark:bg-dark-bg-primary">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3 min-w-0">
@@ -29,7 +31,17 @@ export function AgentCard({ agent, onPause, onResume }: Props) {
             </h3>
             <p className="text-xs text-text-muted dark:text-dark-text-muted truncate">
               {agent.role}
-              {agent.crewName && <span className="ml-1.5 text-primary"> · {agent.crewName}</span>}
+              {agent.crewName && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSearchParams({ tab: 'crews' });
+                  }}
+                  className="ml-1.5 text-primary hover:text-primary-dark transition-colors"
+                >
+                  · {agent.crewName}
+                </button>
+              )}
             </p>
           </div>
         </div>
@@ -52,13 +64,26 @@ export function AgentCard({ agent, onPause, onResume }: Props) {
         >
           {agent.kind === 'soul' ? 'Soul Agent' : 'Background'}
         </span>
+        {/* Schedule */}
+        {agent.soul?.heartbeat.enabled && agent.soul.heartbeat.interval && (
+          <span className="text-xs text-text-muted dark:text-dark-text-muted flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {cronToHuman(agent.soul.heartbeat.interval)}
+          </span>
+        )}
+        {agent.backgroundAgent?.mode === 'interval' && agent.backgroundAgent.intervalMs && (
+          <span className="text-xs text-text-muted dark:text-dark-text-muted flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            Every {Math.round(agent.backgroundAgent.intervalMs / 60_000)}m
+          </span>
+        )}
       </div>
 
       {/* Stats row */}
       <div className="mt-3 pt-3 border-t border-border dark:border-dark-border flex items-center gap-4 text-xs text-text-muted dark:text-dark-text-muted">
-        {agent.heartbeatEnabled && (
+        {agent.lastActiveAt && (
           <span className="flex items-center gap-1">
-            <Heart className="w-3 h-3 text-danger" />
+            <Heart className={`w-3 h-3 ${agent.heartbeatEnabled ? 'text-danger' : ''}`} />
             {formatTimeAgo(agent.lastActiveAt)}
           </span>
         )}
@@ -99,6 +124,15 @@ export function AgentCard({ agent, onPause, onResume }: Props) {
               Resume
             </button>
           )}
+        {onDelete && (
+          <button
+            onClick={() => onDelete(agent.id)}
+            aria-label="Delete agent"
+            className="flex items-center gap-1 text-xs text-danger hover:opacity-80 transition-opacity ml-auto"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );

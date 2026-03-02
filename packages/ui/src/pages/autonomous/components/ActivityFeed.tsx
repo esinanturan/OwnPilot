@@ -39,11 +39,13 @@ export function ActivityFeed({ agents }: Props) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [stats, setStats] = useState<HeartbeatStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const [hbResult, msgResult, statsResult] = await Promise.allSettled([
         heartbeatLogsApi.list(50, 0),
@@ -53,6 +55,12 @@ export function ActivityFeed({ agents }: Props) {
       if (hbResult.status === 'fulfilled') setHeartbeats(hbResult.value.items);
       if (msgResult.status === 'fulfilled') setMessages(msgResult.value.items);
       if (statsResult.status === 'fulfilled') setStats(statsResult.value);
+      // If all failed, show error
+      if (hbResult.status === 'rejected' && msgResult.status === 'rejected') {
+        setError('Failed to load activity data.');
+      }
+    } catch {
+      setError('An unexpected error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -134,7 +142,7 @@ export function ActivityFeed({ agents }: Props) {
             className={`px-3 py-1 text-xs rounded-full transition-colors ${
               filter === chip.key
                 ? 'bg-primary text-white'
-                : 'bg-surface dark:bg-dark-surface text-text-muted dark:text-dark-text-muted border border-border dark:border-dark-border hover:text-text-primary dark:hover:text-dark-text-primary'
+                : 'bg-bg-primary dark:bg-dark-bg-primary text-text-muted dark:text-dark-text-muted border border-border dark:border-dark-border hover:text-text-primary dark:hover:text-dark-text-primary'
             }`}
           >
             {chip.label}
@@ -142,16 +150,28 @@ export function ActivityFeed({ agents }: Props) {
         ))}
         <button
           onClick={fetchAll}
-          className="ml-auto p-1.5 text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary"
+          aria-label="Refresh activity"
+          className="ml-auto p-1.5 text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
 
       {/* Timeline */}
+      {error && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-danger/10 border border-danger/30 rounded-lg">
+          <span className="text-sm text-danger font-medium">{error}</span>
+          <button
+            onClick={fetchAll}
+            className="ml-auto text-xs text-danger hover:text-danger/80 transition-colors underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
       {isLoading ? (
         <p className="text-sm text-text-muted dark:text-dark-text-muted">Loading activity...</p>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && !error ? (
         <EmptyState
           icon={Heart}
           title="No activity yet"
@@ -193,7 +213,7 @@ export function ActivityFeed({ agents }: Props) {
                     </span>
                     <button
                       onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                      className="text-primary hover:text-primary-dark"
+                      className="text-primary hover:text-primary-dark transition-colors"
                     >
                       {isExpanded ? '−' : '+'}
                     </button>

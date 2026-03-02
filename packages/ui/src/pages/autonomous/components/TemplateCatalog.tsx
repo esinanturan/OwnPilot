@@ -51,7 +51,7 @@ export function TemplateCatalog({ onSelect, crewTemplates, onDeployCrew }: Props
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search templates..."
-          className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary placeholder-text-muted"
+          className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary placeholder-text-muted"
         />
       </div>
 
@@ -60,7 +60,10 @@ export function TemplateCatalog({ onSelect, crewTemplates, onDeployCrew }: Props
         {TEMPLATE_CATEGORIES.map((cat) => (
           <button
             key={cat.key}
-            onClick={() => setCategory(cat.key)}
+            onClick={() => {
+              setCategory(cat.key);
+              setSearch('');
+            }}
             className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
               category === cat.key
                 ? 'bg-primary text-white'
@@ -72,7 +75,10 @@ export function TemplateCatalog({ onSelect, crewTemplates, onDeployCrew }: Props
         ))}
         {crewTemplates.length > 0 && (
           <button
-            onClick={() => setCategory('crews')}
+            onClick={() => {
+              setCategory('crews');
+              setSearch('');
+            }}
             className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
               category === 'crews'
                 ? 'bg-primary text-white'
@@ -95,7 +101,7 @@ export function TemplateCatalog({ onSelect, crewTemplates, onDeployCrew }: Props
             return (
               <div
                 key={template.id}
-                className="border border-border dark:border-dark-border rounded-xl p-4 bg-surface dark:bg-dark-surface hover:shadow-sm transition-shadow"
+                className="border border-border dark:border-dark-border rounded-xl p-4 bg-bg-primary dark:bg-dark-bg-primary hover:shadow-sm transition-shadow"
               >
                 {/* Card header */}
                 <div className="flex items-start justify-between">
@@ -204,7 +210,7 @@ export function TemplateCatalog({ onSelect, crewTemplates, onDeployCrew }: Props
           {crewTemplates.map((crew) => (
             <div
               key={crew.id}
-              className="border border-border dark:border-dark-border rounded-xl p-4 bg-surface dark:bg-dark-surface"
+              className="border border-border dark:border-dark-border rounded-xl p-4 bg-bg-primary dark:bg-dark-bg-primary"
             >
               <div className="flex items-center gap-2.5">
                 <span className="text-xl">{crew.emoji}</span>

@@ -214,9 +214,10 @@ export const soulsApi = {
     return data;
   },
   get: (agentId: string) => apiClient.get<AgentSoul>(`/souls/${agentId}`),
-  create: (soul: Record<string, unknown>) => apiClient.post<AgentSoul>('/souls', soul),
-  update: (agentId: string, data: Record<string, unknown>) =>
-    apiClient.put<AgentSoul>(`/souls/${agentId}`, data),
+  create: (soul: Partial<AgentSoul> | Record<string, unknown>) =>
+    apiClient.post<AgentSoul>('/souls', soul as Record<string, unknown>),
+  update: (agentId: string, data: Partial<AgentSoul> | Record<string, unknown>) =>
+    apiClient.put<AgentSoul>(`/souls/${agentId}`, data as Record<string, unknown>),
   delete: (agentId: string) => apiClient.delete<void>(`/souls/${agentId}`),
   getVersions: (agentId: string) => apiClient.get<SoulVersion[]>(`/souls/${agentId}/versions`),
   getVersion: (agentId: string, version: number) =>

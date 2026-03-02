@@ -2,7 +2,7 @@
  * CrewSection — Crews tab: deploy, manage, view crews with member agents
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { crewsApi } from '../../../api/endpoints/souls';
 import type { AgentCrew, CrewTemplate, CrewAgentInfo } from '../../../api/endpoints/souls';
@@ -23,24 +23,17 @@ import { PATTERN_LABELS, formatTimeAgo } from '../helpers';
 
 interface Props {
   crews: AgentCrew[];
+  templates: CrewTemplate[];
   onRefresh: () => void;
 }
 
-export function CrewSection({ crews, onRefresh }: Props) {
+export function CrewSection({ crews, templates, onRefresh }: Props) {
   const navigate = useNavigate();
   const { confirm } = useDialog();
   const toast = useToast();
-  const [templates, setTemplates] = useState<CrewTemplate[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [crewAgents, setCrewAgents] = useState<Record<string, CrewAgentInfo[]>>({});
-
-  useEffect(() => {
-    crewsApi
-      .getTemplates()
-      .then(setTemplates)
-      .catch(() => {});
-  }, []);
 
   const handleDeploy = useCallback(
     async (templateId: string) => {
@@ -95,6 +88,11 @@ export function CrewSection({ crews, onRefresh }: Props) {
         await crewsApi.disband(crewId);
         toast.success('Crew disbanded');
         setExpandedId(null);
+        setCrewAgents((prev) => {
+          const next = { ...prev };
+          delete next[crewId];
+          return next;
+        });
         onRefresh();
       } catch {
         toast.error('Failed to disband crew');
@@ -117,7 +115,8 @@ export function CrewSection({ crews, onRefresh }: Props) {
             setCrewAgents((prev) => ({ ...prev, [crewId]: detail.agents! }));
           }
         } catch {
-          /* handled */
+          toast.error('Failed to load crew agents');
+          setExpandedId(null);
         }
       }
     },
@@ -155,7 +154,7 @@ export function CrewSection({ crews, onRefresh }: Props) {
               {templates.map((t) => (
                 <div
                   key={t.id}
-                  className="border border-border dark:border-dark-border rounded-lg p-3 bg-surface dark:bg-dark-surface hover:shadow-sm transition-shadow"
+                  className="border border-border dark:border-dark-border rounded-lg p-3 bg-bg-primary dark:bg-dark-bg-primary hover:shadow-sm transition-shadow"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-lg">{t.emoji}</span>
@@ -178,7 +177,7 @@ export function CrewSection({ crews, onRefresh }: Props) {
                     {t.agents.map((a) => (
                       <span
                         key={a.identity.role}
-                        className="text-xs px-2 py-0.5 rounded bg-surface dark:bg-dark-surface text-text-muted dark:text-dark-text-muted border border-border dark:border-dark-border"
+                        className="text-xs px-2 py-0.5 rounded bg-bg-secondary dark:bg-dark-bg-secondary text-text-muted dark:text-dark-text-muted border border-border dark:border-dark-border"
                       >
                         {a.identity.emoji} {a.identity.name}
                       </span>
@@ -301,7 +300,7 @@ export function CrewSection({ crews, onRefresh }: Props) {
                           <button
                             key={agent.agentId}
                             onClick={() => navigate(`/autonomous/agent/${agent.agentId}`)}
-                            className="text-left text-xs px-3 py-2 rounded-lg bg-surface dark:bg-dark-surface border border-border dark:border-dark-border hover:shadow-sm transition-shadow"
+                            className="text-left text-xs px-3 py-2 rounded-lg bg-bg-primary dark:bg-dark-bg-primary border border-border dark:border-dark-border hover:shadow-sm transition-shadow"
                           >
                             <div className="flex items-center gap-1.5">
                               <span>{agent.emoji}</span>

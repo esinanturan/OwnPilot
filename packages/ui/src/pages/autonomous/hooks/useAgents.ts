@@ -16,6 +16,8 @@ export interface UseAgentsResult {
   backgroundAgents: BackgroundAgentConfig[];
   crews: AgentCrew[];
   isLoading: boolean;
+  isRefreshing: boolean;
+  error: string | null;
   refresh: () => void;
 }
 
@@ -24,8 +26,11 @@ export function useAgents(): UseAgentsResult {
   const [backgroundAgents, setBackgroundAgents] = useState<BackgroundAgentConfig[]>([]);
   const [crews, setCrews] = useState<AgentCrew[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
+    setIsRefreshing(true);
     try {
       const [soulsData, bgData, crewsData] = await Promise.allSettled([
         soulsApi.list(),
@@ -36,8 +41,15 @@ export function useAgents(): UseAgentsResult {
       if (soulsData.status === 'fulfilled') setSouls(soulsData.value.items);
       if (bgData.status === 'fulfilled') setBackgroundAgents(bgData.value);
       if (crewsData.status === 'fulfilled') setCrews(crewsData.value.items);
+
+      const failures: string[] = [];
+      if (soulsData.status === 'rejected') failures.push('souls');
+      if (bgData.status === 'rejected') failures.push('background agents');
+      if (crewsData.status === 'rejected') failures.push('crews');
+      setError(failures.length > 0 ? `Failed to load: ${failures.join(', ')}` : null);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -82,6 +94,8 @@ export function useAgents(): UseAgentsResult {
     backgroundAgents,
     crews,
     isLoading,
+    isRefreshing,
+    error,
     refresh: fetchAll,
   };
 }

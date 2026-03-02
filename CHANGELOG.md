@@ -5,26 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.5] - 2026-03-02
 
 ### Added
 
-- **Autonomous Subagent System** — Chat agents and background agents can spawn lightweight child agents for parallel task execution with fire-and-forget spawning, budget enforcement (concurrent limits, total spawn limits, nesting depth cap), and independent model selection per subagent
-- **5 Subagent LLM Tools** — `spawn_subagent`, `check_subagent`, `get_subagent_result`, `cancel_subagent`, `list_subagents` for full lifecycle control from within agent conversations
-- **Subagent REST API** — `/api/v1/subagents` endpoints for spawn, list, get, cancel, and execution history
-- **Subagent WebSocket Events** — Real-time `subagent:spawned`, `subagent:progress`, `subagent:completed` events for UI updates
-- **Subagent DB Persistence** — `subagent_history` table for audit trail of completed executions
-- **Subagent Model Routing** — Per-process model routing now supports `subagent` process type alongside chat, channel, and pulse
+- **Soul Agent System** — Rich agent identity framework with personality, mission, role, relationships, heartbeat-driven lifecycle, evolution tracking, and boot sequences; gateway service with full CRUD and heartbeat execution
+- **Autonomous Hub** — Unified command center consolidating soul agents, background agents, crews, messaging, and activity into a single tabbed dashboard with search, filters, and real-time WebSocket status
+- **AI Agent Creator** — Conversational agent creation via SSE streaming chat with a dedicated designer agent; describe what you need in plain language, refine through conversation, preview the JSON config, and create in one click
+- **Crew System** — Multi-agent crews with role assignments, delegation protocols, and crew templates for coordinated multi-agent workflows
+- **Agent Communication** — Inter-agent messaging system with inbox, compose, and message history; CommsPanel for viewing and sending messages between agents
+- **Activity Feed** — Unified timeline of heartbeat logs and agent messages with aggregate stats (total runs, success rate, avg duration, total cost)
+- **16+ Agent Templates** — Pre-built agent configurations (Morning Briefer, News Monitor, Code Reviewer, Budget Tracker, Social Media Manager, Health & Wellness Coach, etc.) with one-click creation
+- **Agent Profile Page** — Detailed agent view with identity display, inline soul editor, heartbeat configuration, action controls (pause/resume/delete), and error/not-found handling
+- **Global Status Bar** — Compact header showing live agent count, running/paused/error breakdown, daily cost, WebSocket connection state, and autonomy settings link
+- **77 new AI providers** — Updated provider model data with 77 providers and 1 new addition
 
-#### Mega Upgrade (Phases 1–7)
+### Fixed
 
-- **Universal Channel Protocol (UCP)** — Standardized message envelope with platform-agnostic types (text, image, audio, video, file, location, contact, reaction, typing, read receipt), middleware pipeline (rate limiter, language detector, thread tracker), typed adapters, and bridge persistence (Phase 1)
-- **Agent Orchestra** — Concurrent multi-provider agent orchestration engine with fan-out/fan-in, race, pipeline, and voting strategies; real-time WebSocket progress events; dedicated DB table and repository; 6 LLM tools for composing agent ensembles (Phase 2)
-- **Artifacts System** — Versioned document management (markdown, code, JSON, HTML, CSV, SVG, Mermaid diagrams) with data binding expressions, diff tracking, rendering pipeline, 5 LLM tools, REST API, ArtifactCard and ArtifactRenderer UI components, Dashboard integration (Phase 3)
-- **Voice Pipeline** — Speech-to-text (Whisper API) and text-to-speech (OpenAI TTS) with configurable models and voices; VoiceButton for recording in ChatInput, VoicePlayButton for AI response playback; channel normalizer audio support for WhatsApp voice messages; REST API at `/api/v1/voice` (Phase 4)
-- **Browser Agent** — Headless Chromium automation via Playwright with page navigation, element interaction, screenshot capture, JavaScript evaluation, and form filling; browser workflow persistence; 7 LLM tools for AI-driven web browsing; REST API at `/api/v1/browser` (Phase 5)
-- **Skills Platform** — Enhanced skill lifecycle with sandboxed execution, granular permissions (network, filesystem, database, shell, email, scheduling), npm dependency installation, CLI `ownpilot skill` commands (install, list, info, search, update, remove); PermissionReviewModal UI; REST API at `/api/v1/skills` (Phase 6)
-- **Edge Delegation Protocol** — MQTT broker integration (Mosquitto) for IoT/edge device management; device registry with sensors and actuators; command queue with acknowledgment; telemetry ingestion and history; 6 LLM tools (`list_edge_devices`, `get_device_status`, `read_sensor`, `send_device_command`, `control_actuator`, `register_edge_device`); REST API at `/api/v1/edge` (10 endpoints); DeviceCard and SensorChart UI components; Mosquitto added to docker-compose (Phase 7)
+- **AI Creator chatbot behavior** — Fixed AI Agent Creator acting like a regular chatbot instead of designing agent configs; root cause was `BASE_SYSTEM_PROMPT` overriding the inline designer instruction; now uses a dedicated `__ai_agent_designer` agent with proper system prompt via `agentId` routing
+- **Autonomous Hub modal backgrounds** — Replaced invalid `bg-surface` with valid `bg-bg-primary` Tailwind token
+- **WebSocket connection status** — Fixed `useAgentStatus` hook to properly return `isConnected` state for live/offline indicator
+- **Empty state UX** — Added differentiated empty state buttons (Browse Templates / Chat with AI / Create Manually) with separate `wizardInitialStep` tracking
+- **Agent profile error handling** — Distinguished between loading errors (with retry) and agent-not-found (with navigation back) in AgentProfilePage
+- **Activity feed error state** — Added inline error display with retry button in ActivityFeed
+- **Template fetch errors** — Added toast notification when crew template loading fails on hub mount
+- **CommsPanel improvements** — Fixed "from" field population in compose form and added loading spinner during data fetch
+- **TemplateCatalog search** — Added clear button to search input for better UX
+- **Silent catches** — Replaced empty catch blocks with user-facing error toasts in CrewSection, CommsPanel, and SoulEditor
+- **Accessibility** — Added `aria-label` to all icon-only buttons across the autonomous hub (back button, stop generating, tag remove, close creator)
+- **Type safety** — Removed unsafe `as any` and `as unknown` type assertions across all autonomous hub components
+- **Structured logging** — Converted template-literal error logs to structured context objects in gateway observability
+- **Fetch security** — Added fetch timeout and download size limits with budget enforcement tests
+- **12 bugs from BUGS.md** — Resolved P0 through P3 priority bugs plus SEC-001 security finding
+
+### Changed
+
+- Provider model data updated (77 providers)
+- Soul tools registered in gateway providers with formatted structured log context
+- Cleaned up unused imports, dead code, and repo artifacts
 
 ### Testing
 
@@ -191,6 +209,7 @@ Initial release of OwnPilot.
 - Docker multi-arch image (amd64 + arm64) published to `ghcr.io/ownpilot/ownpilot`
 - PostgreSQL with pgvector for vector search
 
+[0.1.5]: https://github.com/ownpilot/ownpilot/releases/tag/v0.1.5
 [0.1.4]: https://github.com/ownpilot/ownpilot/releases/tag/v0.1.4
 [0.1.3]: https://github.com/ownpilot/ownpilot/releases/tag/v0.1.3
 [0.1.2]: https://github.com/ownpilot/ownpilot/releases/tag/v0.1.2

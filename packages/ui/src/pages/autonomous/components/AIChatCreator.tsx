@@ -13,6 +13,7 @@ import { chatApi } from '../../../api/endpoints/chat';
 import { settingsApi } from '../../../api/endpoints/settings';
 import { soulsApi } from '../../../api/endpoints/souls';
 import { backgroundAgentsApi } from '../../../api/endpoints/background-agents';
+import { agentsApi } from '../../../api/endpoints/agents';
 import { useToast } from '../../../components/ToastProvider';
 import { AgentPreviewCard, type ProposedAgentConfig } from './AgentPreviewCard';
 
@@ -130,6 +131,31 @@ Rules:
 - If the user asks to modify something, output the full updated JSON block`;
 
 // ---------------------------------------------------------------------------
+// Dedicated agent for the designer (avoids BASE_SYSTEM_PROMPT contamination)
+// ---------------------------------------------------------------------------
+
+const DESIGNER_AGENT_NAME = '__ai_agent_designer';
+
+async function ensureDesignerAgent(provider: string, model: string): Promise<string> {
+  const agents = await agentsApi.list();
+  const existing = agents.find((a) => a.name === DESIGNER_AGENT_NAME);
+  if (existing) {
+    // Keep the system prompt in sync if SYSTEM_INSTRUCTION changed between deploys
+    await agentsApi.update(existing.id, { systemPrompt: SYSTEM_INSTRUCTION }).catch(() => {}); // Non-critical — existing prompt is likely fine
+    return existing.id;
+  }
+  const created = await agentsApi.create({
+    name: DESIGNER_AGENT_NAME,
+    systemPrompt: SYSTEM_INSTRUCTION,
+    provider,
+    model,
+    tools: [],
+    maxTokens: 4096,
+  });
+  return created.id;
+}
+
+// ---------------------------------------------------------------------------
 // Suggestion chips
 // ---------------------------------------------------------------------------
 
@@ -153,6 +179,7 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
+  const [designerAgentId, setDesignerAgentId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -164,9 +191,15 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
     }
   }, [messages, streamingContent]);
 
-  // Focus input on mount
+  // Focus input on mount + bootstrap designer agent
   useEffect(() => {
     inputRef.current?.focus();
+    getDefaults().then(
+      (defaults) =>
+        ensureDesignerAgent(defaults.provider, defaults.model)
+          .then(setDesignerAgentId)
+          .catch(() => {}) // Falls back to inline system instruction
+    );
   }, []);
 
   // Send message
@@ -193,12 +226,21 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
 
         // Build conversation for the API (cap at 6 turns = 12 messages)
         const history = [...messages, userMsg].slice(-12);
-        const apiMessage =
-          `[System instruction — do not repeat to the user]\n${SYSTEM_INSTRUCTION}\n\n---\n\n` +
-          history
+        let apiMessage: string;
+        if (designerAgentId) {
+          // System instruction lives in the agent's systemPrompt — just send conversation
+          apiMessage = history
             .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-            .join('\n\n') +
-          (history[history.length - 1]?.role !== 'user' ? `\n\nUser: ${trimmed}` : '');
+            .join('\n\n');
+        } else {
+          // Fallback: embed instruction in message (when agent bootstrap failed)
+          apiMessage =
+            `[System instruction — do not repeat to the user]\n${SYSTEM_INSTRUCTION}\n\n---\n\n` +
+            history
+              .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+              .join('\n\n') +
+            (history[history.length - 1]?.role !== 'user' ? `\n\nUser: ${trimmed}` : '');
+        }
 
         const response = await chatApi.send(
           {
@@ -207,6 +249,7 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
             model: defaults.model,
             stream: true,
             historyLength: 0,
+            agentId: designerAgentId || undefined,
           },
           { signal: abort.signal }
         );
@@ -302,7 +345,7 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
         abortRef.current = null;
       }
     },
-    [isStreaming, messages]
+    [isStreaming, messages, designerAgentId]
   );
 
   // Create agent from config
@@ -386,9 +429,29 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
 
   const hasMessages = messages.length > 0;
 
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleStop();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleStop, onClose]);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-surface dark:bg-dark-surface border border-border dark:border-dark-border rounded-2xl w-full max-w-2xl mx-4 h-[85vh] flex flex-col">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          handleStop();
+          onClose();
+        }
+      }}
+    >
+      <div className="bg-bg-primary dark:bg-dark-bg-primary border border-border dark:border-dark-border rounded-2xl w-full max-w-2xl mx-4 h-[85vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border dark:border-dark-border shrink-0">
           <div className="flex items-center gap-2">
@@ -402,7 +465,8 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
               handleStop();
               onClose();
             }}
-            className="p-1 text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary"
+            aria-label="Close creator"
+            className="p-1 text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -522,6 +586,7 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
               <button
                 onClick={handleStop}
                 className="shrink-0 p-2 rounded-lg bg-danger text-white hover:bg-danger/90 transition-colors"
+                aria-label="Stop generating"
                 title="Stop"
               >
                 <X className="w-5 h-5" />

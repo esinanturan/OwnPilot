@@ -2,7 +2,7 @@
  * useAgentStatus — WebSocket-based live status tracking for background agents
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { useGateway } from '../../../hooks/useWebSocket';
 import type { BackgroundAgentState } from '../../../api/endpoints/background-agents';
 
@@ -20,13 +20,15 @@ export function useAgentStatus(onUpdate: (payload: AgentUpdatePayload) => void):
   isConnected: boolean;
 } {
   const { subscribe, status } = useGateway();
-
-  const stableOnUpdate = useCallback(onUpdate, [onUpdate]);
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
 
   useEffect(() => {
-    const unsub = subscribe<AgentUpdatePayload>('background-agent:update', stableOnUpdate);
+    const unsub = subscribe<AgentUpdatePayload>('background-agent:update', (payload) =>
+      onUpdateRef.current(payload)
+    );
     return unsub;
-  }, [subscribe, stableOnUpdate]);
+  }, [subscribe]);
 
   return { isConnected: status === 'connected' };
 }

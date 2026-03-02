@@ -21,6 +21,7 @@ export function CommsPanel({ agents }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [filterAgent, setFilterAgent] = useState('');
   const [showCompose, setShowCompose] = useState(false);
+  const [composeFrom, setComposeFrom] = useState('');
   const [composeTo, setComposeTo] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
   const [composeContent, setComposeContent] = useState('');
@@ -38,6 +39,7 @@ export function CommsPanel({ agents }: Props) {
       }
     } catch {
       setMessages([]);
+      toast.error('Failed to load messages');
     } finally {
       setIsLoading(false);
     }
@@ -51,6 +53,7 @@ export function CommsPanel({ agents }: Props) {
     if (!composeTo.trim() || !composeContent.trim()) return;
     try {
       await agentMessagesApi.send({
+        from: composeFrom || undefined,
         to: composeTo,
         content: composeContent,
         subject: composeSubject || undefined,
@@ -58,6 +61,7 @@ export function CommsPanel({ agents }: Props) {
       });
       toast.success('Message sent');
       setShowCompose(false);
+      setComposeFrom('');
       setComposeTo('');
       setComposeSubject('');
       setComposeContent('');
@@ -65,14 +69,14 @@ export function CommsPanel({ agents }: Props) {
     } catch {
       toast.error('Failed to send message');
     }
-  }, [composeTo, composeContent, composeSubject, toast, fetchMessages]);
+  }, [composeFrom, composeTo, composeContent, composeSubject, toast, fetchMessages]);
 
   const viewThread = useCallback(async (threadId: string) => {
     try {
       const data = await agentMessagesApi.getThread(threadId);
       setSelectedThread(data);
     } catch {
-      /* handled */
+      toast.error('Failed to load thread');
     }
   }, []);
 
@@ -82,7 +86,7 @@ export function CommsPanel({ agents }: Props) {
   };
 
   const inputClass =
-    'w-full rounded-lg border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
+    'w-full rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
 
   return (
     <div className="space-y-4">
@@ -102,7 +106,8 @@ export function CommsPanel({ agents }: Props) {
         </select>
         <button
           onClick={fetchMessages}
-          className="p-2 text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary"
+          aria-label="Refresh messages"
+          className="p-2 text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
         </button>
@@ -118,18 +123,32 @@ export function CommsPanel({ agents }: Props) {
       {/* Compose form */}
       {showCompose && (
         <div className="border border-primary/20 rounded-xl p-4 bg-primary/5 space-y-3">
-          <select
-            value={composeTo}
-            onChange={(e) => setComposeTo(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">Select recipient...</option>
-            {agents.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.emoji} {a.name}
-              </option>
-            ))}
-          </select>
+          <div className="grid grid-cols-2 gap-3">
+            <select
+              value={composeFrom}
+              onChange={(e) => setComposeFrom(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">From (optional)...</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.emoji} {a.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={composeTo}
+              onChange={(e) => setComposeTo(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">Select recipient...</option>
+              {agents.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.emoji} {a.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <input
             type="text"
             value={composeSubject}
@@ -154,7 +173,7 @@ export function CommsPanel({ agents }: Props) {
             </button>
             <button
               onClick={() => setShowCompose(false)}
-              className="text-sm text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary"
+              className="text-sm text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary transition-colors"
             >
               Cancel
             </button>
@@ -164,14 +183,14 @@ export function CommsPanel({ agents }: Props) {
 
       {/* Thread detail panel */}
       {selectedThread && (
-        <div className="border border-border dark:border-dark-border rounded-xl p-4 bg-surface dark:bg-dark-surface space-y-2">
+        <div className="border border-border dark:border-dark-border rounded-xl p-4 bg-bg-primary dark:bg-dark-bg-primary space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary">
               Thread ({selectedThread.length} messages)
             </h3>
             <button
               onClick={() => setSelectedThread(null)}
-              className="text-xs text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary"
+              className="text-xs text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary transition-colors"
             >
               Close
             </button>
@@ -201,7 +220,12 @@ export function CommsPanel({ agents }: Props) {
 
       {/* Message list */}
       {isLoading ? (
-        <p className="text-sm text-text-muted dark:text-dark-text-muted">Loading messages...</p>
+        <div className="flex items-center gap-2 py-8 justify-center">
+          <RefreshCw className="w-4 h-4 text-text-muted dark:text-dark-text-muted animate-spin" />
+          <span className="text-sm text-text-muted dark:text-dark-text-muted">
+            Loading messages...
+          </span>
+        </div>
       ) : messages.length === 0 ? (
         <EmptyState
           icon={MessageSquare}
@@ -245,7 +269,7 @@ export function CommsPanel({ agents }: Props) {
               {msg.threadId && (
                 <button
                   onClick={() => viewThread(msg.threadId!)}
-                  className="text-xs text-primary hover:text-primary-dark mt-1"
+                  className="text-xs text-primary hover:text-primary-dark mt-1 transition-colors"
                 >
                   View thread →
                 </button>

@@ -57,6 +57,10 @@ import { hasServiceRegistry, getServiceRegistry, Services } from '@ownpilot/core
 import type { IAuditService } from '@ownpilot/core';
 import { checkToolPermission } from './tool-permission-service.js';
 import type { ToolExecContext } from './permission-utils.js';
+import { checkPermission, getRequiredPermission, logPermissionDenied } from './extension-permissions.js';
+import { getExtensionSandbox } from './extension-sandbox.js';
+import type { SkillPermission } from './extension-types.js';
+import { extensionsRepo } from '../db/repositories/extensions.js';
 
 const log = getLog('ToolExecutor');
 
@@ -279,6 +283,9 @@ function syncExtensionToolsIntoRegistry(registry: ToolRegistry): void {
     const dynamicRegistry = getCustomToolDynamicRegistry();
     const extToolDefs = service.getToolDefinitions();
 
+    // Set up sandbox callTool handler with permission checking
+    setupSandboxCallToolHandler(registry);
+
     for (const def of extToolDefs) {
       // Register in DynamicToolRegistry for sandbox execution
       if (!dynamicRegistry.has(def.name)) {
@@ -305,9 +312,38 @@ function syncExtensionToolsIntoRegistry(registry: ToolRegistry): void {
         category: def.category,
       };
 
+      // Look up the extension record for runtime/permissions config
+      const extRecord = extensionsRepo.getById(def.extensionId);
+      const useSandbox = extRecord?.manifest?.runtime?.sandbox === 'worker';
+      const grantedPermissions = (extRecord?.settings as Record<string, unknown>)
+        ?.grantedPermissions as SkillPermission[] | undefined;
+
       registry.register(
         toolDef,
         async (args, context) => {
+          // Permission check for the tool being invoked by the LLM (not via utils.callTool)
+          // This is a secondary safeguard — primary permission gate is in the callTool handler
+          if (useSandbox) {
+            const sandbox = getExtensionSandbox();
+            const sandboxResult = await sandbox.execute({
+              extensionId: def.extensionId,
+              toolName: def.name,
+              code: def.extensionTool.code,
+              args: args as Record<string, unknown>,
+              grantedPermissions: grantedPermissions?.map(String),
+              maxMemory: extRecord?.manifest?.runtime?.maxMemory,
+              maxExecutionTime: extRecord?.manifest?.runtime?.maxExecutionTime,
+            });
+
+            return {
+              content: sandboxResult.success
+                ? JSON.stringify(sandboxResult.result)
+                : String(sandboxResult.error ?? 'Sandbox execution failed'),
+              isError: !sandboxResult.success,
+            };
+          }
+
+          // Default: use DynamicToolRegistry (existing behavior)
           const execResult = await dynamicRegistry.execute(
             def.name,
             args as Record<string, unknown>,
@@ -361,6 +397,11 @@ function syncExtensionToolsIntoRegistry(registry: ToolRegistry): void {
               }
             }
 
+            const rec = extensionsRepo.getById(d.extensionId);
+            const sandbox = rec?.manifest?.runtime?.sandbox === 'worker';
+            const perms = (rec?.settings as Record<string, unknown>)
+              ?.grantedPermissions as SkillPermission[] | undefined;
+
             registry.register(
               {
                 name: qn,
@@ -369,6 +410,25 @@ function syncExtensionToolsIntoRegistry(registry: ToolRegistry): void {
                 category: d.category,
               },
               async (args, context) => {
+                if (sandbox) {
+                  const sbx = getExtensionSandbox();
+                  const sbxResult = await sbx.execute({
+                    extensionId: d.extensionId,
+                    toolName: d.name,
+                    code: d.extensionTool.code,
+                    args: args as Record<string, unknown>,
+                    grantedPermissions: perms?.map(String),
+                    maxMemory: rec?.manifest?.runtime?.maxMemory,
+                    maxExecutionTime: rec?.manifest?.runtime?.maxExecutionTime,
+                  });
+                  return {
+                    content: sbxResult.success
+                      ? JSON.stringify(sbxResult.result)
+                      : String(sbxResult.error ?? 'Sandbox execution failed'),
+                    isError: !sbxResult.success,
+                  };
+                }
+
                 const res = await dynamicRegistry.execute(
                   d.name,
                   args as Record<string, unknown>,
@@ -402,6 +462,45 @@ function syncExtensionToolsIntoRegistry(registry: ToolRegistry): void {
   } catch {
     // Extension service not initialized yet
   }
+}
+
+/**
+ * Set up the sandbox callTool handler with permission checking.
+ * When sandboxed extension code calls utils.callTool(), permissions are verified
+ * before the tool is executed in the main thread.
+ */
+function setupSandboxCallToolHandler(registry: ToolRegistry): void {
+  const sandbox = getExtensionSandbox();
+
+  sandbox.setCallToolHandler(async (toolName, args) => {
+    // Special internal command: list tools
+    if (toolName === '__list_tools__') {
+      const allTools = registry.getAllTools();
+      return {
+        success: true,
+        result: allTools.map((t) => ({
+          name: t.definition.name,
+          description: t.definition.description,
+        })),
+      };
+    }
+
+    // Execute the tool via the shared registry
+    const result = await registry.execute(toolName, args, {
+      userId: 'system',
+      conversationId: 'sandbox',
+    });
+
+    if (result.ok) {
+      return {
+        success: !result.value.isError,
+        result: result.value.content,
+        error: result.value.isError ? String(result.value.content) : undefined,
+      };
+    }
+
+    return { success: false, error: result.error.message };
+  });
 }
 
 /**

@@ -77,6 +77,7 @@ import {
   artifactsRoutes,
   voiceRoutes,
   browserRoutes,
+  skillsRoutes,
 } from './routes/index.js';
 import {
   RATE_LIMIT_WINDOW_MS,
@@ -342,6 +343,9 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
   // Browser (headless browser automation)
   app.route('/api/v1/browser', browserRoutes);
 
+  // Skills (npm discovery, install, permissions)
+  app.route('/api/v1/skills', skillsRoutes);
+
   // Root route (API-only mode, when UI is not bundled)
   if (!UI_AVAILABLE) {
     app.get('/', (c) => {
@@ -436,6 +440,8 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
         voice: '/api/v1/voice',
         // Browser (headless browser automation)
         browser: '/api/v1/browser',
+        // Skills (npm discovery, install, permissions)
+        skills: '/api/v1/skills',
         // Webhooks (external service callbacks, no auth required)
         webhooks: '/webhooks/telegram/:secret',
       },

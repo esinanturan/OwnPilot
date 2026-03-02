@@ -56,10 +56,58 @@ export interface ExtensionManifest {
   script_paths?: string[];
   /** Paths to bundled references (relative to extension directory) */
   reference_paths?: string[];
+
+  // -- Skills Platform fields (Phase 6) --
+
+  /** Required and optional permissions (tool-category grants) */
+  permissions?: SkillPermissionSet;
+  /** Runtime sandbox configuration */
+  runtime?: ExtensionRuntime;
+  /** npm package name (if installed from npm registry) */
+  npm_package?: string;
+  /** npm version (if installed from npm registry) */
+  npm_version?: string;
 }
 
 /** Manifest format: 'ownpilot' = native tool bundles, 'agentskills' = open standard (SKILL.md) */
 export type ExtensionFormat = 'ownpilot' | 'agentskills';
+
+// =============================================================================
+// Skill Permissions (Phase 6: Skills Platform)
+// =============================================================================
+
+/** Permission categories mapping to tool namespaces */
+export type SkillPermission =
+  | 'memories'
+  | 'goals'
+  | 'tasks'
+  | 'contacts'
+  | 'calendar'
+  | 'notes'
+  | 'custom-data'
+  | 'triggers'
+  | 'plans'
+  | 'network'
+  | 'browser'
+  | 'config'
+  | 'expenses'
+  | 'bookmarks';
+
+/** Required and optional permissions declared by an extension */
+export interface SkillPermissionSet {
+  required: SkillPermission[];
+  optional: SkillPermission[];
+}
+
+/** Runtime configuration for sandbox execution */
+export interface ExtensionRuntime {
+  /** Sandbox mode: 'worker' (default, isolated worker thread) or 'none' (legacy inline) */
+  sandbox?: 'worker' | 'none';
+  /** Max memory in bytes (default: 128MB) */
+  maxMemory?: number;
+  /** Max execution time in ms (default: 30000) */
+  maxExecutionTime?: number;
+}
 
 export type ExtensionCategory =
   | 'developer'

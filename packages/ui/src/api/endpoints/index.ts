@@ -128,6 +128,16 @@ export type {
   BrowserWorkflow,
   CreateBrowserWorkflowInput,
 } from './browser';
+export { skillsApi } from './skills';
+export type {
+  NpmSearchPackage,
+  NpmSearchResult,
+  NpmPackageInfo,
+  NpmInstallResult,
+  SkillPermissionInfo,
+  SkillPermissionData,
+  SkillUpdateInfo,
+} from './skills';
 export type {
   Artifact,
   ArtifactVersion,

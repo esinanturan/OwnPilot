@@ -60,6 +60,16 @@ import {
   tunnelStop,
   tunnelStatus,
 } from './commands/tunnel.js';
+import {
+  skillList,
+  skillSearch,
+  skillInstall,
+  skillUninstall,
+  skillEnable,
+  skillDisable,
+  skillCheckUpdates,
+  skillAudit,
+} from './commands/skill.js';
 
 // Load environment variables from .env (fallback)
 loadEnv({ quiet: true });
@@ -220,6 +230,48 @@ tunnelStartCmd
 tunnelCmd.command('stop').description('Stop the active tunnel').action(tunnelStop);
 
 tunnelCmd.command('status').description('Show tunnel status').action(tunnelStatus);
+
+// Skill commands for npm-based skill management
+const skillCmd = program
+  .command('skill')
+  .description('Manage skills (install, search, permissions)');
+
+skillCmd.command('list').description('List installed skills').action(skillList);
+
+skillCmd
+  .command('search <query>')
+  .description('Search npm for OwnPilot skills')
+  .action(skillSearch);
+
+skillCmd
+  .command('install <name>')
+  .description('Install a skill from npm or local path')
+  .action(skillInstall);
+
+skillCmd
+  .command('uninstall [id]')
+  .description('Uninstall a skill')
+  .action((id) => skillUninstall(id));
+
+skillCmd
+  .command('enable [id]')
+  .description('Enable a disabled skill')
+  .action((id) => skillEnable(id));
+
+skillCmd
+  .command('disable [id]')
+  .description('Disable a skill')
+  .action((id) => skillDisable(id));
+
+skillCmd
+  .command('update-check')
+  .description('Check for skill updates from npm')
+  .action(skillCheckUpdates);
+
+skillCmd
+  .command('audit [id]')
+  .description('Run security audit on a skill')
+  .action((id) => skillAudit(id));
 
 // Parse arguments
 program.parse();

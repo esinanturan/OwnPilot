@@ -39,33 +39,9 @@
 
 ## Performance Issues
 
-### PERF-001: N+1 Query in Channel Message Processing
-
-**Location**: `packages/gateway/src/channels/service-impl.ts` (inferred)
-
-**Description**: Processing channel messages may trigger individual database queries per message rather than batching.
-
-**Solution**: Implement batch processing with `Promise.all()` or database bulk operations.
-
-**Success Criteria**:
-- [ ] Message processing uses batch queries
-- [ ] 1000 messages process in < 5 seconds
-- [ ] Database query count is O(1) regardless of message count
-
----
-
-### PERF-002: Memory Leak in WebSocket Session Manager
-
-**Location**: `packages/gateway/src/ws/session.ts` (inferred)
-
-**Description**: Session metadata may accumulate without bounds if cleanup doesn't run.
-
-**Solution**: Implement LRU cache with max size for session storage.
-
-**Success Criteria**:
-- [ ] Session manager memory capped at 100MB regardless of connection count
-- [ ] Oldest inactive sessions evicted first
-- [ ] Metrics exposed for session count and memory usage
+> PERF-001 and PERF-002 closed — investigation confirmed both were speculative.
+> PERF-001: Messages are processed one-at-a-time per event, no batch N+1 pattern.
+> PERF-002: `SessionManager.remove()` is thorough (unsubs, WeakMap cleanup, limits enforced).
 
 ---
 
@@ -88,60 +64,15 @@
 
 ## Test Coverage Gaps
 
-### TEST-001: Missing Tests for Subagent Nesting Depth Limit
-
-**Location**: `packages/gateway/src/services/subagent-manager.ts:77-79`
-
-**Description**: The MAX_SUBAGENT_DEPTH check exists but may not have comprehensive tests.
-
-**Success Criteria**:
-- [ ] Test verifies subagent at depth 2 succeeds
-- [ ] Test verifies subagent at depth 3 is rejected
-- [ ] Test verifies depth counter increments correctly
-
----
-
-### TEST-002: Missing Tests for Background Agent Budget Enforcement
-
-**Location**: `packages/gateway/src/services/background-agent-manager.ts:496-502`
-
-**Description**: Budget enforcement logic needs edge case testing.
-
-**Success Criteria**:
-- [ ] Test verifies agent stops at exact budget limit
-- [ ] Test verifies floating-point budget calculations
-- [ ] Test verifies budget persists across restarts
+> TEST-001 closed — tests already exist (depth 0 allowed, depth 1 allowed, depth 3 rejected).
+> TEST-002 resolved — 3 budget enforcement + 1 rate limiting test added (2026-03-02).
 
 ---
 
 ## Tool-Specific Issues
 
-### TOOL-001: Fetch Timeout Not Configurable in Dynamic Tools
-
-**Location**: `packages/core/src/agent/tools/dynamic-tool-executor.ts:50`
-
-**Description**: The `createSafeFetch` doesn't accept timeout options.
-
-**Solution**: Pass timeout configuration from tool permissions or context.
-
----
-
-### TOOL-002: Missing Content-Type Validation in File Download
-
-**Location**: `packages/core/src/agent/tools/file-system.ts:636-646`
-
-**Description**: Downloaded files aren't validated against expected content types.
-
-**Solution**:
-```typescript
-// Validate content type and size
-const contentType = response.headers.get('content-type');
-const contentLength = response.headers.get('content-length');
-
-if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
-  return { content: 'Error: File too large', isError: true };
-}
-```
+> TOOL-001 resolved — Added 30s AbortController timeout to `createSafeFetch` (2026-03-02).
+> TOOL-002 resolved — Added 100MB Content-Length pre-check + post-download size validation to file download (2026-03-02).
 
 ---
 
@@ -183,6 +114,9 @@ log.error('Operation failed', {
 | BUG-013 | Math `log` mapped to wrong implementation | `log` → `Math.log` (natural log), added `log10` → `Math.log10` | 2026-03-02 |
 | BUG-014 | `Math.ln` doesn't exist | `ln` now maps to `Math.log` via function name mapping | 2026-03-02 |
 | SEC-001 | Missing WS auth rate limiting | Added IP-based rate limiter (10 attempts/min/IP) with auto-cleanup | 2026-03-02 |
+| TEST-002 | Missing budget enforcement tests | Added 3 budget + 1 rate limit tests for BackgroundAgentManager | 2026-03-02 |
+| TOOL-001 | Fetch timeout not configurable | Added 30s AbortController timeout to `createSafeFetch` | 2026-03-02 |
+| TOOL-002 | Missing file download size validation | Added 100MB Content-Length pre-check + post-download size guard | 2026-03-02 |
 | BUG-011 | Chat history cache not cleared | Fixed in commit with cache cleanup | 2026-02-18 |
 | - | Grammy middleware ordering | Commands now registered before message handlers | 2026-02-19 |
 | - | CLAUDECODE env var blocking child processes | `delete env.CLAUDECODE` in spawn | 2026-02-25 |
@@ -208,4 +142,4 @@ log.error('Operation failed', {
 ---
 
 *This document is maintained by the development team.*
-*Last updated: 2026-03-02 | Open: 0 P0 + 0 P1 + 0 P2 + 0 P3 + 2 Perf + 1 Sec (partial) + 2 Test + 2 Tool | Resolved: 12 bugs + 1 security*
+*Last updated: 2026-03-02 | Open: 1 Sec (hardening) + 1 Obs | Resolved: 15 bugs + 1 security + 3 speculative closed*

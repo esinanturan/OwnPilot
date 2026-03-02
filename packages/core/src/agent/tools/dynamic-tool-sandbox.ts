@@ -17,6 +17,9 @@ import { isPrivateUrl } from './dynamic-tool-permissions.js';
 /**
  * Create an SSRF-safe fetch wrapper that blocks private/internal URLs.
  */
+/** Default timeout for fetch calls in dynamic tools (30 seconds) */
+const SAFE_FETCH_TIMEOUT_MS = 30_000;
+
 export function createSafeFetch(toolName: string): typeof globalThis.fetch {
   return async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url =
@@ -31,6 +34,18 @@ export function createSafeFetch(toolName: string): typeof globalThis.fetch {
           `Only public URLs are allowed.`
       );
     }
+
+    // Add timeout via AbortController if caller didn't provide a signal
+    if (!init?.signal) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), SAFE_FETCH_TIMEOUT_MS);
+      try {
+        return await globalThis.fetch(input, { ...init, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
     return globalThis.fetch(input, init);
   };
 }

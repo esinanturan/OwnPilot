@@ -121,6 +121,15 @@ describe('BackgroundAgentManager', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    // Reset queued mockResolvedValueOnce values and re-apply default
+    mockRunCycle.mockReset().mockResolvedValue({
+      success: true,
+      toolCalls: [{ tool: 'test', args: {}, result: 'ok', duration: 50 }],
+      outputMessage: 'Done',
+      tokensUsed: { prompt: 100, completion: 50 },
+      durationMs: 500,
+      turns: 1,
+    });
     manager = new BackgroundAgentManager();
   });
 
@@ -296,6 +305,128 @@ describe('BackgroundAgentManager', () => {
 
     it('returns false for unknown agent', () => {
       expect(manager.isRunning('bg-999')).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Budget enforcement
+  // -------------------------------------------------------------------------
+
+  describe('budget enforcement', () => {
+    it('accumulates cost from cycle results', async () => {
+      mockRunCycle.mockResolvedValueOnce({
+        success: true,
+        toolCalls: [],
+        outputMessage: 'Cycle 1',
+        durationMs: 100,
+        turns: 1,
+        costUsd: 0.25,
+      });
+
+      const config = makeConfig({
+        mode: 'continuous',
+        limits: {
+          maxTurnsPerCycle: 10,
+          maxToolCallsPerCycle: 50,
+          maxCyclesPerHour: 60,
+          cycleTimeoutMs: 120000,
+          totalBudgetUsd: 10.0,
+        },
+      });
+
+      await manager.start();
+      await manager.startAgent(config);
+
+      // Trigger cycle
+      await vi.advanceTimersByTimeAsync(600);
+
+      // Agent should still be running with accumulated cost
+      const session = manager.getSession('bg-1');
+      expect(session).not.toBeNull();
+      expect(session!.state).toBe('running');
+      expect(session!.totalCostUsd).toBe(0.25);
+    });
+
+    it('does not run cycle when budget is already exceeded', async () => {
+      const config = makeConfig({
+        mode: 'continuous',
+        limits: {
+          maxTurnsPerCycle: 10,
+          maxToolCallsPerCycle: 50,
+          maxCyclesPerHour: 60,
+          cycleTimeoutMs: 120000,
+          totalBudgetUsd: 0.5,
+        },
+      });
+
+      await manager.start();
+      await manager.startAgent(config);
+
+      // First cycle costs $0.60 (over budget for next cycle)
+      mockRunCycle.mockResolvedValueOnce({
+        success: true,
+        toolCalls: [],
+        outputMessage: 'Cycle 1',
+        durationMs: 100,
+        turns: 1,
+        costUsd: 0.6,
+      });
+
+      // Trigger first cycle
+      await vi.advanceTimersByTimeAsync(600);
+      expect(mockRunCycle).toHaveBeenCalledTimes(1);
+
+      // Second cycle should be blocked by budget check (runner NOT called again)
+      await vi.advanceTimersByTimeAsync(600);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mockRunCycle).toHaveBeenCalledTimes(1); // Still 1 — budget prevented execution
+    });
+
+    it('tracks totalCostUsd as zero when cycle has no cost', async () => {
+      // Default mock has no costUsd field
+      const config = makeConfig({ mode: 'continuous' });
+
+      await manager.start();
+      await manager.startAgent(config);
+
+      // Trigger cycle
+      await vi.advanceTimersByTimeAsync(600);
+
+      const session = manager.getSession('bg-1');
+      expect(session!.totalCostUsd).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Rate limiting
+  // -------------------------------------------------------------------------
+
+  describe('rate limiting', () => {
+    it('delays cycle when maxCyclesPerHour is reached', async () => {
+      // Set maxCyclesPerHour to 1 so second cycle is rate-limited
+      const config = makeConfig({
+        mode: 'continuous',
+        limits: {
+          maxTurnsPerCycle: 10,
+          maxToolCallsPerCycle: 50,
+          maxCyclesPerHour: 1,
+          cycleTimeoutMs: 120000,
+        },
+      });
+
+      await manager.start();
+      await manager.startAgent(config);
+
+      // First cycle completes
+      await vi.advanceTimersByTimeAsync(600);
+      expect(mockRunCycle).toHaveBeenCalledTimes(1);
+
+      // Next scheduled cycle should be rate-limited — runner should NOT be called again
+      await vi.advanceTimersByTimeAsync(600);
+      expect(mockRunCycle).toHaveBeenCalledTimes(1);
+
+      // Agent should still be running (just waiting for rate limit window)
+      expect(manager.getSession('bg-1')).not.toBeNull();
     });
   });
 });

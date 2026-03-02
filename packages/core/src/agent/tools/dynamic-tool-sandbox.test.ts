@@ -43,7 +43,10 @@ describe('createSafeFetch', () => {
     mockIsPrivateUrl.mockReturnValue(false);
     const safeFetch = createSafeFetch('my_tool');
     await safeFetch('https://api.example.com/data');
-    expect(globalThis.fetch).toHaveBeenCalledWith('https://api.example.com/data', undefined);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://api.example.com/data',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 
   it('blocks private URLs with SSRF error', async () => {
@@ -79,7 +82,20 @@ describe('createSafeFetch', () => {
     const safeFetch = createSafeFetch('my_tool');
     const init = { method: 'POST', body: 'data' };
     await safeFetch('https://example.com', init);
-    expect(globalThis.fetch).toHaveBeenCalledWith('https://example.com', init);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://example.com',
+      expect.objectContaining({ method: 'POST', body: 'data', signal: expect.any(AbortSignal) })
+    );
+  });
+
+  it('does not override caller-provided signal', async () => {
+    mockIsPrivateUrl.mockReturnValue(false);
+    const safeFetch = createSafeFetch('my_tool');
+    const controller = new AbortController();
+    await safeFetch('https://example.com', { signal: controller.signal });
+    expect(globalThis.fetch).toHaveBeenCalledWith('https://example.com', {
+      signal: controller.signal,
+    });
   });
 });
 

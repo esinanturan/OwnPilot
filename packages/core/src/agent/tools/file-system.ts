@@ -644,7 +644,8 @@ export const downloadFileExecutor: ToolExecutor = async (
       };
     }
 
-    // Download file
+    // Download file with size limit (100 MB)
+    const MAX_DOWNLOAD_SIZE = 100 * 1024 * 1024;
     const response = await fetch(url);
     if (!response.ok) {
       return {
@@ -653,7 +654,23 @@ export const downloadFileExecutor: ToolExecutor = async (
       };
     }
 
+    // Pre-check Content-Length before buffering
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > MAX_DOWNLOAD_SIZE) {
+      return {
+        content: `Error: File too large (${Math.round(parseInt(contentLength, 10) / 1024 / 1024)}MB). Maximum download size is 100MB.`,
+        isError: true,
+      };
+    }
+
     const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > MAX_DOWNLOAD_SIZE) {
+      return {
+        content: `Error: Downloaded content too large (${Math.round(arrayBuffer.byteLength / 1024 / 1024)}MB). Maximum download size is 100MB.`,
+        isError: true,
+      };
+    }
+
     const buffer = Buffer.from(arrayBuffer);
     await fs.writeFile(filePath, buffer);
 

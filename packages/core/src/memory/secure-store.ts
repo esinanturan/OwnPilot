@@ -650,7 +650,10 @@ export class SecureMemoryStore {
       const content = await fs.readFile(filePath, 'utf-8');
       const data = JSON.parse(content) as EncryptedMemoryEntry[];
       this.entries = new Map(data.map((e) => [e.id, e]));
-    } catch {
+    } catch (error) {
+      // File may not exist on first run - this is expected
+      const log = getLog('SecureStore');
+      log.debug('Failed to load entries, starting with empty store:', error);
       this.entries = new Map();
     }
   }
@@ -671,7 +674,10 @@ export class SecureMemoryStore {
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - this.config.auditRetentionDays);
       this.auditLog = this.auditLog.filter((e) => new Date(e.timestamp) > cutoff);
-    } catch {
+    } catch (error) {
+      // File may not exist on first run - this is expected
+      const log = getLog('SecureStore');
+      log.debug('Failed to load audit log, starting with empty log:', error);
       this.auditLog = [];
     }
   }

@@ -6,7 +6,7 @@
  */
 
 import { readFileSync, readdirSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import {
   getEventBus,
@@ -417,8 +417,14 @@ export class ExtensionService implements IExtensionService {
           else if (ext === 'js' || ext === 'mjs') execTool = 'execute_javascript';
           else continue; // Skip unsupported script types
 
-          const fullPath = join(skillDir, scriptPath).replace(/\\/g, '/');
-          const safeFullPath = JSON.stringify(fullPath);
+          // Path traversal protection: resolve and verify path is within skillDir
+          const fullPath = resolve(skillDir, scriptPath);
+          const resolvedSkillDir = resolve(skillDir);
+          if (!fullPath.startsWith(resolvedSkillDir + '/') && !fullPath.startsWith(resolvedSkillDir + '\\')) {
+            console.warn(`[ExtensionService] Path traversal detected for ${pkg.id}: ${scriptPath}`);
+            continue; // Skip this script
+          }
+          const safeFullPath = JSON.stringify(fullPath.replace(/\\/g, '/'));
           const code = `
             const fs = require('fs');
             const script = fs.readFileSync(${safeFullPath}, 'utf-8');

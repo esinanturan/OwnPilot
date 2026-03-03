@@ -68,6 +68,9 @@ data/
 *.bak
 *.tmp
 
+# Generated dev artifacts
+models-dev-full.json
+
 # Runtime workspace directories
 packages/gateway/workspace/
 

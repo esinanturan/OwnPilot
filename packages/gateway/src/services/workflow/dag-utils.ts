@@ -5,6 +5,21 @@
 import type { WorkflowNode, WorkflowEdge } from '../../db/repositories/workflows.js';
 
 /**
+ * Simple node/edge types for validation (before conversion to WorkflowNode/Edge)
+ */
+export interface ValidationNode {
+  id: string;
+  type: string;
+  data: Record<string, unknown>;
+}
+
+export interface ValidationEdge {
+  source: string;
+  target: string;
+  sourceHandle?: string;
+}
+
+/**
  * Topological sort using Kahn's algorithm.
  * Returns an array of "levels" — each level contains node IDs that can run in parallel.
  * Throws if a cycle is detected.
@@ -129,4 +144,54 @@ export function getForEachBodyNodes(
   }
 
   return { bodyNodes, doneNodes: doneDownstream };
+}
+
+/**
+ * Detect cycles in workflow graph using DFS.
+ * Returns error message if cycle found, null otherwise.
+ * This runs at save time to prevent cycles before execution.
+ */
+export function detectCycle(nodes: ValidationNode[], edges: ValidationEdge[]): string | null {
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  const adjacency = new Map<string, string[]>();
+
+  // Build adjacency list
+  for (const node of nodes) {
+    adjacency.set(node.id, []);
+  }
+  for (const edge of edges) {
+    if (nodeIds.has(edge.source) && nodeIds.has(edge.target)) {
+      adjacency.get(edge.source)!.push(edge.target);
+    }
+  }
+
+  const visited = new Set<string>();
+  const recursionStack = new Set<string>();
+
+  function dfs(nodeId: string): boolean {
+    visited.add(nodeId);
+    recursionStack.add(nodeId);
+
+    for (const neighbor of adjacency.get(nodeId) ?? []) {
+      if (!visited.has(neighbor)) {
+        if (dfs(neighbor)) return true;
+      } else if (recursionStack.has(neighbor)) {
+        // Cycle found
+        return true;
+      }
+    }
+
+    recursionStack.delete(nodeId);
+    return false;
+  }
+
+  for (const node of nodes) {
+    if (!visited.has(node.id)) {
+      if (dfs(node.id)) {
+        return `Workflow contains a cycle involving node "${node.id}"`;
+      }
+    }
+  }
+
+  return null;
 }

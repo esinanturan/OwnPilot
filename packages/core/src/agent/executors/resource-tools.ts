@@ -11,6 +11,7 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import type { ToolExecutor } from '../types.js';
 import { resolveWorkspacePath } from './helpers.js';
+import { safeJsonParseWithDefault } from '../../utils/safe-json.js';
 
 export const RESOURCE_EXECUTORS: Record<string, ToolExecutor> = {
   create_task: async (args) => {
@@ -41,7 +42,8 @@ export const RESOURCE_EXECUTORS: Record<string, ToolExecutor> = {
       const tasksFile = path.join(tasksPath, 'tasks.json');
       let tasks: unknown[] = [];
       if (fs.existsSync(tasksFile)) {
-        tasks = JSON.parse(await fsp.readFile(tasksFile, 'utf-8'));
+        const content = await fsp.readFile(tasksFile, 'utf-8');
+        tasks = safeJsonParseWithDefault<unknown[]>(content, []);
       }
       tasks.push(task);
       await fsp.writeFile(tasksFile, JSON.stringify(tasks, null, 2));
@@ -63,14 +65,17 @@ export const RESOURCE_EXECUTORS: Record<string, ToolExecutor> = {
       return { content: 'No tasks found. Create your first task!' };
     }
 
-    let tasks = JSON.parse(await fsp.readFile(tasksPath, 'utf-8')) as Array<{
-      id: string;
-      title: string;
-      status: string;
-      priority: string;
-      dueDate?: string;
-      tags?: string[];
-    }>;
+    const content = await fsp.readFile(tasksPath, 'utf-8');
+    let tasks = safeJsonParseWithDefault<
+      Array<{
+        id: string;
+        title: string;
+        status: string;
+        priority: string;
+        dueDate?: string;
+        tags?: string[];
+      }>
+    >(content, []);
 
     // Apply filters
     if (filter === 'pending') {
@@ -108,11 +113,14 @@ export const RESOURCE_EXECUTORS: Record<string, ToolExecutor> = {
       return { content: 'Error: No tasks found', isError: true };
     }
 
-    const tasks = JSON.parse(await fsp.readFile(tasksPath, 'utf-8')) as Array<{
-      id: string;
-      title: string;
-      status: string;
-    }>;
+    const content = await fsp.readFile(tasksPath, 'utf-8');
+    const tasks = safeJsonParseWithDefault<
+      Array<{
+        id: string;
+        title: string;
+        status: string;
+      }>
+    >(content, []);
 
     const task = tasks.find((t) => t.id === taskId);
     if (!task) {
@@ -222,7 +230,8 @@ ${content}
       const bookmarksFile = path.join(bookmarksDir, 'bookmarks.json');
       let bookmarks: unknown[] = [];
       if (fs.existsSync(bookmarksFile)) {
-        bookmarks = JSON.parse(await fsp.readFile(bookmarksFile, 'utf-8'));
+        const content = await fsp.readFile(bookmarksFile, 'utf-8');
+        bookmarks = safeJsonParseWithDefault<unknown[]>(content, []);
       }
       bookmarks.push(bookmark);
       await fsp.writeFile(bookmarksFile, JSON.stringify(bookmarks, null, 2));
@@ -244,14 +253,17 @@ ${content}
       return { content: 'No bookmarks found. Create your first bookmark!' };
     }
 
-    let bookmarks = JSON.parse(await fsp.readFile(bookmarksPath, 'utf-8')) as Array<{
-      id: string;
-      url: string;
-      title: string;
-      description?: string;
-      tags?: string[];
-      createdAt: string;
-    }>;
+    const content = await fsp.readFile(bookmarksPath, 'utf-8');
+    let bookmarks = safeJsonParseWithDefault<
+      Array<{
+        id: string;
+        url: string;
+        title: string;
+        description?: string;
+        tags?: string[];
+        createdAt: string;
+      }>
+    >(content, []);
 
     if (tagFilter) {
       bookmarks = bookmarks.filter((b) => b.tags?.includes(tagFilter));

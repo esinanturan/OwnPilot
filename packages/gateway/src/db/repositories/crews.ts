@@ -124,6 +124,10 @@ export class CrewsRepository extends BaseRepository {
     ]);
   }
 
+  async removeAllMembers(crewId: string): Promise<void> {
+    await this.execute(`DELETE FROM agent_crew_members WHERE crew_id = $1`, [crewId]);
+  }
+
   async delete(crewId: string): Promise<boolean> {
     const result = await this.execute(`DELETE FROM agent_crews WHERE id = $1`, [crewId]);
     return result.changes > 0;

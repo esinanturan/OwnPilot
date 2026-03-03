@@ -112,8 +112,12 @@ export function createRateLimitMiddleware(config: RateLimitConfig) {
     if (!entry || entry.resetAt < now) {
       // Prevent unbounded growth from many unique IPs
       if (!entry && store.size >= maxStoreSize) {
-        log.warn(`Rate limit store full (${maxStoreSize} entries), rejecting new client`);
-        return apiError(c, { code: ERROR_CODES.RATE_LIMITED, message: 'Too many requests' }, 429);
+        // Evict oldest entry (first key in insertion order) instead of rejecting
+        const oldestKey = store.keys().next().value;
+        if (oldestKey) {
+          store.delete(oldestKey);
+          log.debug(`[RateLimit] Evicted oldest entry to make room for new client`);
+        }
       }
       entry = {
         count: 0,
@@ -230,8 +234,12 @@ export function createSlidingWindowRateLimiter(config: RateLimitConfig) {
 
     // Prevent unbounded growth from many unique IPs
     if (!timestamps && requests.size >= maxStoreSize) {
-      log.warn(`Sliding window store full (${maxStoreSize} entries), rejecting new client`);
-      return apiError(c, { code: ERROR_CODES.RATE_LIMITED, message: 'Too many requests' }, 429);
+      // Evict oldest entry instead of rejecting
+      const oldestKey = requests.keys().next().value;
+      if (oldestKey) {
+        requests.delete(oldestKey);
+        log.debug(`[RateLimit] Evicted oldest entry in sliding window to make room`);
+      }
     }
 
     // Filter out old timestamps

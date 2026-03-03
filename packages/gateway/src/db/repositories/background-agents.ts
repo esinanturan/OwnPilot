@@ -36,6 +36,7 @@ interface AgentRow {
   provider: string | null;
   model: string | null;
   workspace_id: string | null;
+  skills: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -98,6 +99,7 @@ function rowToConfig(row: AgentRow): BackgroundAgentConfig {
     provider: row.provider ?? undefined,
     model: row.model ?? undefined,
     workspaceId: row.workspace_id ?? undefined,
+    skills: parseJsonField<string[]>(row.skills ?? '[]', []),
     createdBy: row.created_by as BackgroundAgentCreator,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -145,12 +147,13 @@ export class BackgroundAgentsRepository extends BaseRepository {
     stopCondition?: string;
     provider?: string;
     model?: string;
+    skills?: string[];
     createdBy: BackgroundAgentCreator;
   }): Promise<BackgroundAgentConfig> {
     await this.execute(
       `INSERT INTO background_agents
-       (id, user_id, name, mission, mode, allowed_tools, limits, interval_ms, event_filters, auto_start, stop_condition, provider, model, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+       (id, user_id, name, mission, mode, allowed_tools, limits, interval_ms, event_filters, auto_start, stop_condition, provider, model, skills, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
       [
         data.id,
         data.userId,
@@ -165,6 +168,7 @@ export class BackgroundAgentsRepository extends BaseRepository {
         data.stopCondition ?? null,
         data.provider ?? null,
         data.model ?? null,
+        JSON.stringify(data.skills ?? []),
         data.createdBy,
       ]
     );
@@ -213,6 +217,7 @@ export class BackgroundAgentsRepository extends BaseRepository {
       provider: string | null;
       model: string | null;
       workspaceId: string;
+      skills: string[];
     }>
   ): Promise<BackgroundAgentConfig | null> {
     const sets: string[] = [];
@@ -266,6 +271,10 @@ export class BackgroundAgentsRepository extends BaseRepository {
     if (updates.workspaceId !== undefined) {
       sets.push(`workspace_id = $${idx++}`);
       params.push(updates.workspaceId);
+    }
+    if (updates.skills !== undefined) {
+      sets.push(`skills = $${idx++}`);
+      params.push(JSON.stringify(updates.skills));
     }
 
     if (sets.length === 0) return this.getById(id, userId);

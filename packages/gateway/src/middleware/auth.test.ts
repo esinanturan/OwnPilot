@@ -484,26 +484,24 @@ describe('createAuthMiddleware — type: jwt', () => {
     expect(body.payload.tier).toBe('pro');
   });
 
-  it('accepts a JWT signed with HS384 algorithm', async () => {
+  // Security: Only HS256 is allowed to prevent algorithm confusion attacks
+  it('rejects a JWT signed with HS384 algorithm', async () => {
     const token = await buildJWT({ sub: 'user-384' }, JWT_SECRET_LONG, 'HS384');
     const app = makeJwtApp(JWT_SECRET_LONG);
     const res = await app.request('/test', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.userId).toBe('user-384');
+    expect(res.status).toBe(403);
   });
 
-  it('accepts a JWT signed with HS512 algorithm', async () => {
+  // Security: Only HS256 is allowed to prevent algorithm confusion attacks
+  it('rejects a JWT signed with HS512 algorithm', async () => {
     const token = await buildJWT({ sub: 'user-512' }, JWT_SECRET_LONG, 'HS512');
     const app = makeJwtApp(JWT_SECRET_LONG);
     const res = await app.request('/test', {
       headers: { Authorization: `Bearer ${token}` },
     });
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.userId).toBe('user-512');
+    expect(res.status).toBe(403);
   });
 
   it('accepts a JWT with a secret of exactly 32 characters', async () => {

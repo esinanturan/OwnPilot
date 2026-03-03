@@ -106,7 +106,7 @@ export class EmbeddingQueue {
     let hi = this.queue.length;
     while (lo < hi) {
       const mid = (lo + hi) >>> 1;
-      if (this.queue[mid]!.priority <= priority) lo = mid + 1;
+      if (this.queue[mid]!.priority < priority) lo = mid + 1;
       else hi = mid;
     }
     this.queue.splice(lo, 0, item);

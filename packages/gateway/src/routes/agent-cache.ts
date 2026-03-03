@@ -16,8 +16,9 @@ import {
 } from '@ownpilot/core';
 import { localProvidersRepo } from '../db/repositories/index.js';
 import { getApiKey } from './settings.js';
-import { getApprovalManager } from '../autonomy/index.js';
-import type { ActionCategory } from '../autonomy/types.js';
+import { getApprovalManager, checkAutonomy, AutonomyLevel } from '../autonomy/index.js';
+import type { ActionCategory, AutonomyDecision } from '../autonomy/index.js';
+import type { SoulAutonomy } from '@ownpilot/core';
 import {
   MAX_AGENT_CACHE_SIZE,
   MAX_CHAT_AGENT_CACHE_SIZE,
@@ -109,6 +110,76 @@ export function createApprovalCallback(): AgentConfig['requestApproval'] {
     if (result.action.status === 'rejected') return false;
 
     // Non-streaming: no way to prompt user — reject and clean up the pending action
+    approvalMgr.processDecision({
+      actionId: result.action.id,
+      decision: 'reject',
+      reason: 'Auto-rejected: approval not available in non-streaming context',
+    });
+    return false;
+  };
+}
+
+/**
+ * Create a requestApproval callback that enforces SoulAutonomy rules.
+ * This integrates the soul's autonomy level with the approval system.
+ *
+ * AGENT-HIGH-002: Autonomy Level Enforcement
+ * - Level 0 (MANUAL): All actions require approval
+ * - Level 1 (ASSISTED): Only allowedActions bypass approval
+ * - Level 2 (SUPERVISED): Risk-based with explicit lists
+ * - Level 3 (AUTONOMOUS): Allow unless blocked, notify
+ * - Level 4 (FULL): Allow unless blocked, minimal notifications
+ */
+export function createSoulAwareApprovalCallback(
+  agentId: string,
+  agentName: string,
+  autonomy: SoulAutonomy
+): AgentConfig['requestApproval'] {
+  return async (category, actionType, description, params) => {
+    // First check: blocked actions always block
+    if (autonomy.blockedActions.includes(actionType)) {
+      log.warn(`Action blocked by soul configuration`, { agentId, actionType, reason: 'in blockedActions' });
+      return false;
+    }
+
+    // Apply autonomy level rules
+    const decision = checkAutonomy(
+      { autonomy, agentId, agentName },
+      category as ActionCategory,
+      actionType,
+      description
+    );
+
+    // If not allowed and doesn't require approval, it's permanently blocked
+    if (!decision.allowed && !decision.requiresApproval) {
+      log.warn(`Action blocked by autonomy guard`, { agentId, actionType, reason: decision.reason });
+      return false;
+    }
+
+    // If allowed without approval, proceed
+    if (decision.allowed && !decision.requiresApproval) {
+      // Log autonomous actions at higher levels
+      if (autonomy.level >= AutonomyLevel.AUTONOMOUS && decision.notify) {
+        log.info(`Autonomous action executed`, { agentId, actionType, level: autonomy.level });
+      }
+      return true;
+    }
+
+    // Requires approval - delegate to ApprovalManager
+    const approvalMgr = getApprovalManager();
+    const result = await approvalMgr.requestApproval(
+      'default',
+      category as ActionCategory,
+      actionType,
+      description,
+      params,
+      { metadata: { agentId, agentName, autonomyLevel: autonomy.level } }
+    );
+
+    if (!result) return true; // Auto-approved by risk assessment
+    if (result.action.status === 'rejected') return false;
+
+    // Non-streaming: auto-reject
     approvalMgr.processDecision({
       actionId: result.action.id,
       decision: 'reject',

@@ -74,6 +74,7 @@ function memoryRow(overrides: Record<string, unknown> = {}) {
     user_id: 'user-1',
     type: 'fact',
     content: 'The sky is blue',
+    content_hash: null,
     embedding: null,
     source: null,
     source_id: null,
@@ -138,12 +139,12 @@ describe('MemoriesRepository', () => {
       await repo.create({ type: 'fact', content: 'Test' });
 
       const insertParams = mockAdapter.execute.mock.calls[0]![1] as unknown[];
-      // importance defaults to 0.5
-      expect(insertParams[7]).toBe(0.5);
+      // importance defaults to 0.5 (index 8 after adding content_hash at index 4)
+      expect(insertParams[8]).toBe(0.5);
       // tags defaults to '[]'
-      expect(insertParams[8]).toBe('[]');
+      expect(insertParams[9]).toBe('[]');
       // metadata defaults to '{}'
-      expect(insertParams[11]).toBe('{}');
+      expect(insertParams[12]).toBe('{}');
     });
 
     it('serializes embedding as JSON when provided', async () => {
@@ -157,7 +158,8 @@ describe('MemoriesRepository', () => {
       });
 
       const insertParams = mockAdapter.execute.mock.calls[0]![1] as unknown[];
-      expect(insertParams[4]).toBe('[0.1,0.2,0.3]');
+      // content_hash at index 4, embedding at index 5
+      expect(insertParams[5]).toBe('[0.1,0.2,0.3]');
     });
 
     it('emits RESOURCE_CREATED event', async () => {
@@ -1115,16 +1117,18 @@ describe('MemoriesRepository', () => {
       mockAdapter.queryOne.mockResolvedValue(memoryRow());
       await repo.create({ type: 'conversation', content: 'S', source: 'chat', sourceId: 'c1' });
       const p = mockAdapter.execute.mock.calls[0]![1] as unknown[];
-      expect(p[5]).toBe('chat');
-      expect(p[6]).toBe('c1');
+      // content_hash at index 4, source at 6, sourceId at 7
+      expect(p[6]).toBe('chat');
+      expect(p[7]).toBe('c1');
     });
     it('defaults source/sourceId to null', async () => {
       mockAdapter.execute.mockResolvedValue({ changes: 1 });
       mockAdapter.queryOne.mockResolvedValue(memoryRow());
       await repo.create({ type: 'fact', content: 'T' });
       const p = mockAdapter.execute.mock.calls[0]![1] as unknown[];
-      expect(p[5]).toBeNull();
+      // source at 6, sourceId at 7
       expect(p[6]).toBeNull();
+      expect(p[7]).toBeNull();
     });
   });
 

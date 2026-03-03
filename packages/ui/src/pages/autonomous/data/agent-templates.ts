@@ -25,6 +25,8 @@ export interface AgentTemplate {
   personality: string;
   mission: string;
   tools: string[];
+  /** Recommended skills for this agent type */
+  skills: string[];
   heartbeatInterval: string;
   autonomyLevel: number;
   estimatedCost: string;
@@ -32,6 +34,10 @@ export interface AgentTemplate {
   bgMode?: 'continuous' | 'interval' | 'event';
   bgIntervalMs?: number;
   tags: string[];
+  /** Default provider for this agent */
+  provider?: string;
+  /** Default model for this agent */
+  model?: string;
 }
 
 export const TEMPLATE_CATEGORIES: {
@@ -102,6 +108,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'Every morning, compile a personalized briefing: upcoming calendar events, pending tasks, relevant news headlines, and weather. Deliver a clear, scannable summary.',
     tools: ['search_memories', 'search_web', 'create_note'],
+    skills: ['weather', 'news'],
     heartbeatInterval: '0 9 * * *',
     autonomyLevel: 2,
     estimatedCost: '$0.50-$1.50/day',
@@ -125,6 +132,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'Periodically scan incoming messages, classify by urgency, summarize key threads, and flag items that need immediate attention. Draft suggested replies for routine messages.',
     tools: ['search_memories', 'create_note', 'create_memory'],
+    skills: ['email', 'telegram'],
     heartbeatInterval: '0 */6 * * *',
     autonomyLevel: 2,
     estimatedCost: '$1-$3/day',
@@ -148,6 +156,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'Check in twice daily to encourage healthy habits: hydration, movement, breaks, sleep. Log observations as memories. Provide weekly wellness insights based on patterns.',
     tools: ['search_memories', 'create_memory', 'create_note'],
+    skills: [],
     heartbeatInterval: '0 8,20 * * *',
     autonomyLevel: 1,
     estimatedCost: '$0.30-$1/day',
@@ -173,6 +182,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'Every 4 hours, search the web for the latest news on configured topics. Filter out noise, summarize key developments, and store findings as memories for later retrieval.',
     tools: ['search_web', 'read_url', 'create_memory', 'search_memories'],
+    skills: ['news', 'rss'],
     heartbeatInterval: '0 */4 * * *',
     autonomyLevel: 2,
     estimatedCost: '$1-$3/day',
@@ -196,6 +206,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'When triggered, read and analyze the provided research paper or article. Extract key findings, methodology, conclusions, and relevance. Store a structured summary.',
     tools: ['read_url', 'create_memory', 'create_note'],
+    skills: [],
     heartbeatInterval: '',
     autonomyLevel: 2,
     estimatedCost: '$0.10-$0.50/use',
@@ -220,6 +231,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'Daily, scan Product Hunt, Hacker News, GitHub trending, and key tech blogs. Identify emerging patterns, categorize trends, and highlight opportunities. Store findings as searchable memories.',
     tools: ['search_web', 'read_url', 'create_memory', 'search_memories'],
+    skills: ['web_search'],
     heartbeatInterval: '0 10 * * *',
     autonomyLevel: 2,
     estimatedCost: '$0.50-$2/day',
@@ -245,6 +257,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'Daily, review recent notes, bookmarks, and memories. Draft 2-3 social media posts that align with your voice and interests. Save drafts as notes for your review and approval.',
     tools: ['search_memories', 'search_web', 'create_note'],
+    skills: ['social_media'],
     heartbeatInterval: '0 10 * * *',
     autonomyLevel: 1,
     estimatedCost: '$0.30-$1/day',
@@ -268,6 +281,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'When triggered with a topic or note, create a detailed blog post outline: title options, introduction hook, main sections with key points, conclusion, and suggested call-to-action. Save as a note.',
     tools: ['search_memories', 'search_web', 'create_note', 'read_url'],
+    skills: [],
     heartbeatInterval: '',
     autonomyLevel: 1,
     estimatedCost: '$0.10-$0.30/use',
@@ -292,6 +306,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'Every Monday morning, compile the best articles, insights, and links from the past week. Search memories and the web for relevant content. Format as a newsletter draft with categories, summaries, and links.',
     tools: ['search_memories', 'search_web', 'create_note', 'read_url'],
+    skills: ['news', 'rss'],
     heartbeatInterval: '0 9 * * 1',
     autonomyLevel: 2,
     estimatedCost: '$0.50-$1.50/week',
@@ -317,6 +332,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'When triggered, review the given PR or code changes. Summarize what changed, assess risk level, flag potential bugs or security issues, and provide constructive feedback. Store review notes.',
     tools: ['read_url', 'search_web', 'create_note'],
+    skills: ['github'],
     heartbeatInterval: '',
     autonomyLevel: 2,
     estimatedCost: '$0.10-$0.50/review',
@@ -341,6 +357,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'Daily, check project dependencies for new versions, security advisories, and deprecation notices. Prioritize by severity. Create a summary note with recommended actions.',
     tools: ['search_web', 'read_url', 'create_note', 'create_memory'],
+    skills: ['github'],
     heartbeatInterval: '0 8 * * *',
     autonomyLevel: 2,
     estimatedCost: '$0.30-$1/day',
@@ -364,6 +381,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'When triggered with a bug report, classify severity (critical/high/medium/low), identify affected component, estimate impact, suggest assignee, and create a structured triage note.',
     tools: ['search_memories', 'create_note', 'create_memory'],
+    skills: ['github'],
     heartbeatInterval: '',
     autonomyLevel: 2,
     estimatedCost: '$0.05-$0.20/bug',
@@ -390,6 +408,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'When triggered with meeting notes or transcript, extract: key decisions made, action items with owners and deadlines, open questions, and a brief summary. Save as a structured note.',
     tools: ['create_note', 'create_memory', 'search_memories'],
+    skills: [],
     heartbeatInterval: '',
     autonomyLevel: 1,
     estimatedCost: '$0.10-$0.30/meeting',
@@ -414,6 +433,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'Daily, scan configured competitor websites, social accounts, and press for updates. Identify product launches, pricing changes, funding news, and strategic shifts. Store findings as memories and create a summary note.',
     tools: ['search_web', 'read_url', 'create_memory', 'create_note'],
+    skills: ['web_search', 'news'],
     heartbeatInterval: '0 9 * * *',
     autonomyLevel: 2,
     estimatedCost: '$0.50-$2/day',
@@ -439,6 +459,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'Every 15 minutes, check configured URLs for availability and response time. Log results. If a service is down or responding slowly, send an immediate alert with details.',
     tools: ['read_url', 'create_memory'],
+    skills: [],
     heartbeatInterval: '',
     autonomyLevel: 3,
     estimatedCost: '$1-$5/day',
@@ -464,6 +485,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     mission:
       'Every 6 hours, analyze recent error logs. Group similar errors by pattern, identify new vs recurring issues, calculate error rates, and suggest probable root causes. Create a summary with prioritized action items.',
     tools: ['search_memories', 'create_note', 'create_memory'],
+    skills: [],
     heartbeatInterval: '0 */6 * * *',
     autonomyLevel: 2,
     estimatedCost: '$0.50-$2/day',
@@ -476,12 +498,8 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
 // Template → API payload converters
 // =============================================================================
 
-export function templateToSoulPayload(
-  template: AgentTemplate,
-  agentId: string
-): Record<string, unknown> {
+export function templateToSoulPayload(template: AgentTemplate, defaults: { provider: string; model: string }): Record<string, unknown> {
   return {
-    agentId,
     identity: {
       name: template.name,
       emoji: template.emoji,
@@ -496,17 +514,18 @@ export function templateToSoulPayload(
       expertise: template.tags,
       toolPreferences: template.tools,
     },
+    skillAccess: {
+      allowed: template.skills || [],
+      blocked: [],
+    },
     autonomy: {
       level: template.autonomyLevel,
       allowedActions: template.tools,
       blockedActions: ['delete_data', 'execute_code'],
-      requiresApproval: [],
+      requiresApproval: template.autonomyLevel <= 1 ? ['send_message_to_user'] : [],
       maxCostPerCycle: 0.5,
       maxCostPerDay: 5.0,
       maxCostPerMonth: 100.0,
-      pauseOnConsecutiveErrors: 5,
-      pauseOnBudgetExceeded: true,
-      notifyUserOnPause: true,
     },
     heartbeat: {
       enabled: !!template.heartbeatInterval,
@@ -516,28 +535,31 @@ export function templateToSoulPayload(
       maxDurationMs: 120_000,
     },
     evolution: {
-      version: 1,
       evolutionMode: 'supervised',
-      coreTraits: [],
+      coreTraits: [template.personality],
       mutableTraits: [],
-      learnings: [],
-      feedbackLog: [],
     },
     bootSequence: {
       onStart: [],
-      onHeartbeat: [],
+      onHeartbeat: ['read_inbox'],
       onMessage: [],
     },
-    relationships: {},
+    relationships: {
+      delegates: [],
+      peers: [],
+      channels: ['telegram'],
+    },
+    provider: template.provider || defaults.provider,
+    model: template.model || defaults.model,
   };
 }
 
-export function templateToBgPayload(template: AgentTemplate): Record<string, unknown> {
+export function templateToBgPayload(template: AgentTemplate, defaults: { provider: string; model: string }): Record<string, unknown> {
   return {
     name: template.name,
     mission: template.mission,
     mode: template.bgMode || 'interval',
-    allowed_tools: template.tools,
+    allowed_tools: template.tools || [],
     interval_ms: template.bgIntervalMs || 300_000,
     auto_start: false,
     limits: {
@@ -546,5 +568,8 @@ export function templateToBgPayload(template: AgentTemplate): Record<string, unk
       maxCyclesPerHour: 60,
       cycleTimeoutMs: 120_000,
     },
+    provider: template.provider || defaults.provider,
+    model: template.model || defaults.model,
+    skills: template.skills || [],
   };
 }

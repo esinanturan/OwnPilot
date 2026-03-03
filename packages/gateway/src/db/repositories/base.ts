@@ -122,6 +122,7 @@ export abstract class BaseRepository {
    * @param query - Standard query parameters for pagination
    * @param params - Base parameters for both queries
    * @param defaultOrderBy - Default ORDER BY clause if query.orderBy is not set
+   * @param allowedOrderByColumns - Optional set of allowed column names for ORDER BY (security)
    * @returns Rows and total count, ready for buildPaginatedResult
    */
   protected async paginatedQuery<T extends object = Row>(
@@ -129,7 +130,8 @@ export abstract class BaseRepository {
     countSql: string,
     query: StandardQuery = {},
     params: unknown[] = [],
-    defaultOrderBy = 'created_at DESC'
+    defaultOrderBy = 'created_at DESC',
+    allowedOrderByColumns?: Set<string>
   ): Promise<{ rows: T[]; total: number; limit: number; offset: number }> {
     const limit = query.limit ?? 50;
     const offset = query.offset ?? 0;
@@ -138,11 +140,20 @@ export abstract class BaseRepository {
     const countResult = await this.queryOne<{ count: string }>(countSql, params);
     const total = parseInt(countResult?.count ?? '0', 10);
 
-    // Build ORDER BY — validate column name to prevent SQL injection
+    // Build ORDER BY — validate column name against allowlist to prevent SQL injection
     let orderClause: string;
-    if (query.orderBy && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(query.orderBy)) {
-      const dir = query.orderDir === 'asc' ? 'ASC' : 'DESC';
-      orderClause = `${query.orderBy} ${dir}`;
+    if (query.orderBy) {
+      // First check basic identifier format
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(query.orderBy)) {
+        orderClause = defaultOrderBy;
+      } else if (allowedOrderByColumns && !allowedOrderByColumns.has(query.orderBy)) {
+        // Column not in allowlist - use default
+        log.warn(`[SQL Injection Prevention] Blocked orderBy '${query.orderBy}' - not in allowlist`);
+        orderClause = defaultOrderBy;
+      } else {
+        const dir = query.orderDir === 'asc' ? 'ASC' : 'DESC';
+        orderClause = `${query.orderBy} ${dir}`;
+      }
     } else {
       orderClause = defaultOrderBy;
     }

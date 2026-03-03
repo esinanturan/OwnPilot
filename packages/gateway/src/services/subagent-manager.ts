@@ -303,8 +303,9 @@ export class SubagentManager {
           toolCallsUsed: managed.session.toolCallsUsed,
           lastToolName: tc.name,
         });
-      } catch {
-        // Event system may not be available in tests
+      } catch (err) {
+        // Event system may not be available in tests - log but don't fail
+        log.debug('Subagent progress event failed', { subagentId: id, error: getErrorMessage(err) });
       }
     };
 

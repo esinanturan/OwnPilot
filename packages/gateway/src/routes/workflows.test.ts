@@ -43,6 +43,10 @@ vi.mock('../services/workflow-service.js', () => ({
   topologicalSort: vi.fn(), // default: no throw = valid DAG
 }));
 
+vi.mock('../services/workflow/dag-utils.js', () => ({
+  detectCycle: vi.fn(), // default: no cycle detected
+}));
+
 vi.mock('@ownpilot/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@ownpilot/core')>()),
   getServiceRegistry: () => ({
@@ -74,6 +78,7 @@ vi.mock('./workflow-copilot.js', () => ({
 // Import after mocks
 const { workflowRoutes } = await import('./workflows.js');
 const { topologicalSort: mockTopologicalSort } = await import('../services/workflow-service.js');
+const { detectCycle: mockDetectCycle } = await import('../services/workflow/dag-utils.js');
 const { validateBody: mockValidateBody } = await import('../middleware/validation.js');
 
 // ---------------------------------------------------------------------------
@@ -141,6 +146,7 @@ describe('Workflow Routes', () => {
     mockRepo.countLogsForWorkflow.mockResolvedValue(0);
     mockRepo.getLogsForWorkflow.mockResolvedValue([]);
     mockService.isRunning.mockReturnValue(false);
+    mockDetectCycle.mockReturnValue(null); // default: no cycle
     app = createApp();
   });
 

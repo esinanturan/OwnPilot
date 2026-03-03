@@ -91,6 +91,8 @@ export interface BackgroundAgentConfig {
   model?: string;
   /** File workspace ID for isolated file operations (auto-created on start) */
   workspaceId?: string;
+  /** Skill IDs this agent has access to */
+  skills?: string[];
   /** Who created this agent */
   createdBy: BackgroundAgentCreator;
   /** Timestamps */
@@ -112,6 +114,8 @@ export interface CreateBackgroundAgentInput {
   stopCondition?: string;
   provider?: string;
   model?: string;
+  /** Skill IDs this agent has access to */
+  skills?: string[];
   createdBy?: BackgroundAgentCreator;
 }
 
@@ -129,6 +133,8 @@ export interface UpdateBackgroundAgentInput {
   provider?: string | null;
   model?: string | null;
   workspaceId?: string;
+  /** Skill IDs this agent has access to */
+  skills?: string[];
 }
 
 // ============================================================================

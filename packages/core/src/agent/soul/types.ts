@@ -22,6 +22,26 @@ export interface AgentSoul {
   evolution: SoulEvolution;
   bootSequence: SoulBootSequence;
 
+  /** AI Provider configuration */
+  provider?: {
+    /** Primary provider ID */
+    providerId: string;
+    /** Primary model ID */
+    modelId: string;
+    /** Fallback provider if primary fails */
+    fallbackProviderId?: string;
+    /** Fallback model if primary fails */
+    fallbackModelId?: string;
+  };
+
+  /** Skill access configuration */
+  skillAccess?: {
+    /** Skill/extension IDs this agent can access */
+    allowed: string[];
+    /** Skill/extension IDs explicitly blocked */
+    blocked: string[];
+  };
+
   workspaceId?: string;
   createdAt: Date;
   updatedAt: Date;

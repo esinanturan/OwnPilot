@@ -89,32 +89,51 @@ export class PostgresAdapter implements DatabaseAdapter {
     if (!this.pool) throw new Error('Database not initialized');
     const client = await this.pool.connect();
 
+    let timedOut = false;
+    let timeoutCleanupDone = false;
+
     // Set up transaction timeout
     const timeoutId = setTimeout(async () => {
+      timedOut = true;
       log.error('[PostgreSQL] Transaction timeout, forcing rollback');
       try {
         await client.query('ROLLBACK');
       } catch (err) {
-        // Client might already be disconnected
+        // Client might already be disconnected - log but don't throw
+        log.debug('[PostgreSQL] Rollback during timeout cleanup failed:', err);
       }
-      client.release();
+      timeoutCleanupDone = true;
+      // Don't release client here - let finally block handle it
     }, timeoutMs);
 
     try {
       await client.query('BEGIN');
       const result = await fn();
-      await client.query('COMMIT');
+      if (!timedOut) {
+        await client.query('COMMIT');
+      }
       return result;
     } catch (error) {
-      try {
-        await client.query('ROLLBACK');
-      } catch (rollbackError) {
-        log.error('[PostgreSQL] Rollback failed:', rollbackError);
+      // Only rollback if not already rolled back by timeout
+      if (!timedOut) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rollbackError) {
+          log.error('[PostgreSQL] Rollback failed:', rollbackError);
+        }
       }
       throw error;
     } finally {
       clearTimeout(timeoutId);
-      client.release();
+      // Only release client if timeout cleanup didn't already happen
+      if (!timeoutCleanupDone) {
+        try {
+          client.release();
+        } catch (releaseError) {
+          log.error('[PostgreSQL] Client release failed:', releaseError);
+        }
+      }
+      // If timeout cleanup happened, client is already released
     }
   }
 

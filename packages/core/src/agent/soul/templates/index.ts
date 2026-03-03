@@ -9,12 +9,18 @@ import { contentCrewTemplate } from './content-crew.js';
 import { devopsCrewTemplate } from './devops-crew.js';
 import { researchCrewTemplate } from './research-crew.js';
 import { personalOpsCrewTemplate } from './personal-ops-crew.js';
+import { financeCrewTemplate } from './finance-crew.js';
+import { supportCrewTemplate } from './support-crew.js';
+import { dataCrewTemplate } from './data-crew.js';
 
 const CREW_TEMPLATES: ReadonlyMap<string, CrewTemplate> = new Map([
   [contentCrewTemplate.id, contentCrewTemplate],
   [devopsCrewTemplate.id, devopsCrewTemplate],
   [researchCrewTemplate.id, researchCrewTemplate],
   [personalOpsCrewTemplate.id, personalOpsCrewTemplate],
+  [financeCrewTemplate.id, financeCrewTemplate],
+  [supportCrewTemplate.id, supportCrewTemplate],
+  [dataCrewTemplate.id, dataCrewTemplate],
 ]);
 
 /** Get a crew template by ID. Returns null if not found. */

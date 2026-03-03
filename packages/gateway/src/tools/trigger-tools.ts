@@ -229,6 +229,14 @@ export async function executeTriggerTool(
               'Condition triggers require a condition. Available: stale_goals, upcoming_deadline, memory_threshold, low_progress, no_activity.',
           };
         }
+        // Validate condition against allowed values to prevent injection
+        const validConditions = ['stale_goals', 'upcoming_deadline', 'memory_threshold', 'low_progress', 'no_activity'];
+        if (!validConditions.includes(args.condition as string)) {
+          return {
+            success: false,
+            error: `Invalid condition "${args.condition}". Must be one of: ${validConditions.join(', ')}`,
+          };
+        }
         config = {
           condition: args.condition,
           threshold: args.threshold ?? 3,

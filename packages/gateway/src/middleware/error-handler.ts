@@ -36,6 +36,10 @@ function statusToErrorCode(status: number): string {
 
 /**
  * Global error handler
+ *
+ * Note: Hono calls this handler only if no response has been sent yet.
+ * Unlike Express, Hono doesn't have a headersSent property on Context.
+ * If you need to handle errors after response, use try/catch in the route handler.
  */
 export function errorHandler(err: Error, c: Context): Response {
   const requestId = c.get('requestId') ?? 'unknown';

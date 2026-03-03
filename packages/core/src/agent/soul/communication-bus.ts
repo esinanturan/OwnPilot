@@ -3,6 +3,8 @@
  *
  * DB-backed message bus for inter-agent communication.
  * Uses EventBus for real-time notifications.
+ *
+ * AGENT-HIGH-004: Rate limiting added to prevent message flooding.
  */
 
 import type {
@@ -11,6 +13,16 @@ import type {
   IAgentCommunicationBus,
   MessageQueryOptions,
 } from './communication.js';
+
+// Rate limiting constants
+const DEFAULT_MAX_MESSAGES_PER_MINUTE = 30;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+
+/** Rate limit tracking for agents */
+interface RateLimitEntry {
+  count: number;
+  windowStart: number;
+}
 
 /**
  * Repository interface the bus depends on.
@@ -46,13 +58,20 @@ export interface ICommunicationEventBus {
  * Communication bus for inter-agent messaging.
  */
 export class AgentCommunicationBus implements IAgentCommunicationBus {
+  // Rate limiting state (agentId -> rate limit entry)
+  private rateLimits = new Map<string, RateLimitEntry>();
+
   constructor(
     private messageRepo: IAgentMessageRepository,
-    private eventBus: ICommunicationEventBus
+    private eventBus: ICommunicationEventBus,
+    private maxMessagesPerMinute = DEFAULT_MAX_MESSAGES_PER_MINUTE
   ) {}
 
   /** Send a message to another agent. Returns the message ID. */
   async send(msg: Omit<AgentMessage, 'id' | 'status' | 'createdAt'>): Promise<string> {
+    // AGENT-HIGH-004: Rate limiting check
+    this.checkRateLimit(msg.from);
+
     const message: AgentMessage = {
       ...msg,
       id: crypto.randomUUID(),
@@ -114,5 +133,53 @@ export class AgentCommunicationBus implements IAgentCommunicationBus {
   /** Get unread message count for an agent. */
   async getUnreadCount(agentId: string): Promise<number> {
     return this.messageRepo.countUnread(agentId);
+  }
+
+  /**
+   * Check rate limit for an agent.
+   * Throws if rate limit is exceeded.
+   * AGENT-HIGH-004: Rate limiting to prevent message flooding.
+   */
+  private checkRateLimit(agentId: string): void {
+    const now = Date.now();
+    const entry = this.rateLimits.get(agentId);
+
+    if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+      // New window or expired window
+      this.rateLimits.set(agentId, { count: 1, windowStart: now });
+      return;
+    }
+
+    if (entry.count >= this.maxMessagesPerMinute) {
+      throw new Error(
+        `Rate limit exceeded: Agent ${agentId} can only send ${this.maxMessagesPerMinute} messages per minute`
+      );
+    }
+
+    entry.count++;
+  }
+
+  /**
+   * Reset rate limit for an agent (useful for testing or manual reset).
+   */
+  resetRateLimit(agentId: string): void {
+    this.rateLimits.delete(agentId);
+  }
+
+  /**
+   * Get current rate limit status for an agent.
+   */
+  getRateLimitStatus(agentId: string): { count: number; remaining: number; resetInMs: number } | null {
+    const entry = this.rateLimits.get(agentId);
+    if (!entry) return null;
+
+    const now = Date.now();
+    const resetInMs = Math.max(0, RATE_LIMIT_WINDOW_MS - (now - entry.windowStart));
+
+    return {
+      count: entry.count,
+      remaining: Math.max(0, this.maxMessagesPerMinute - entry.count),
+      resetInMs,
+    };
   }
 }

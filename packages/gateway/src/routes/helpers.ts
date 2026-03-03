@@ -4,7 +4,7 @@
  * Shared utilities for Hono route handlers.
  */
 
-import { timingSafeEqual } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { ApiResponse } from '../types/index.js';
@@ -175,10 +175,17 @@ export function apiError(
 
 /**
  * Sanitize a user-provided ID string for safe use in database queries.
- * Strips all characters except word chars and hyphens, then truncates to 100 chars.
+ * Strips all characters except word chars and hyphens.
+ * For IDs longer than 100 chars, uses a hash suffix to prevent collisions.
  */
 export function sanitizeId(id: string): string {
-  return id.replace(/[^\w-]/g, '').slice(0, 100);
+  const sanitized = id.replace(/[^\w-]/g, '');
+  if (sanitized.length > 100) {
+    // Use SHA-256 hash suffix to maintain uniqueness for long IDs
+    const hash = createHash('sha256').update(sanitized).digest('hex').slice(0, 32);
+    return sanitized.slice(0, 67) + '-' + hash; // 67 + 1 + 32 = 99 chars
+  }
+  return sanitized;
 }
 
 /**
@@ -271,6 +278,32 @@ export function validateQueryEnum<T extends string>(
 type Result<T, E = Error> = { success: true; data: T } | { success: false; error: E };
 
 /**
+ * Validate Content-Type header for JSON requests.
+ * Returns true if Content-Type is application/json or application/*+json.
+ */
+export function isJsonContentType(c: Context): boolean {
+  const contentType = c.req.header('content-type');
+  if (!contentType) return false;
+  // Match application/json or application/vnd.api+json, etc.
+  return contentType.startsWith('application/json') || contentType.includes('application/') && contentType.includes('+json');
+}
+
+/**
+ * Require JSON Content-Type header, returning 415 if not present.
+ * Use this in POST/PUT/PATCH handlers that require JSON bodies.
+ */
+export function requireJsonContent(c: Context): Response | null {
+  if (!isJsonContentType(c)) {
+    return apiError(
+      c,
+      { code: ERROR_CODES.INVALID_CONTENT_TYPE, message: 'Content-Type must be application/json' },
+      415
+    );
+  }
+  return null;
+}
+
+/**
  * Parse and optionally validate JSON request body.
  * Returns an error response if parsing fails.
  *
@@ -297,6 +330,12 @@ export async function parseJsonBody<T = unknown>(
   c: Context,
   validator?: (data: unknown) => T
 ): Promise<T | null> {
+  // Validate Content-Type first
+  const contentTypeError = requireJsonContent(c);
+  if (contentTypeError) {
+    return contentTypeError && null;
+  }
+
   try {
     const data = await c.req.json();
 

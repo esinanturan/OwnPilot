@@ -2,6 +2,11 @@
  * Background Agents Routes
  *
  * REST API for managing persistent background agents.
+ *
+ * Route order matters in Hono:
+ * 1. Static routes first (/)
+ * 2. Specific sub-routes (/:id/history, /:id/message, /:id/start, etc.)
+ * 3. Generic dynamic route (/:id) - MUST be last
  */
 
 import { Hono } from 'hono';
@@ -18,10 +23,17 @@ import {
 
 export const backgroundAgentsRoutes = new Hono();
 
+// Debug middleware to log all incoming requests
+backgroundAgentsRoutes.use('*', async (c, next) => {
+  console.log(`[BackgroundAgents] ${c.req.method} ${c.req.path}`);
+  await next();
+});
+
 // =============================================================================
-// GET / - List all background agents
+// 1. STATIC ROUTES (no params)
 // =============================================================================
 
+// GET / - List all background agents
 backgroundAgentsRoutes.get('/', async (c) => {
   try {
     const userId = getUserId(c);
@@ -56,10 +68,7 @@ backgroundAgentsRoutes.get('/', async (c) => {
   }
 });
 
-// =============================================================================
 // POST / - Create a new background agent
-// =============================================================================
-
 backgroundAgentsRoutes.post('/', async (c) => {
   try {
     const userId = getUserId(c);
@@ -77,6 +86,7 @@ backgroundAgentsRoutes.post('/', async (c) => {
       stop_condition,
       provider,
       model,
+      skills,
     } = body as Record<string, unknown>;
 
     if (!name || typeof name !== 'string') {
@@ -117,6 +127,7 @@ backgroundAgentsRoutes.post('/', async (c) => {
       stopCondition: stop_condition as string | undefined,
       provider: provider as string | undefined,
       model: model as string | undefined,
+      skills: (skills as string[]) ?? undefined,
       createdBy: 'user',
     });
 
@@ -127,9 +138,168 @@ backgroundAgentsRoutes.post('/', async (c) => {
 });
 
 // =============================================================================
-// GET /:id - Get agent details + session
+// 2. SPECIFIC SUB-ROUTES (must come BEFORE /:id)
 // =============================================================================
 
+// GET /:id/history - Get cycle history
+backgroundAgentsRoutes.get('/:id/history', async (c) => {
+  try {
+    const userId = getUserId(c);
+    const agentId = c.req.param('id');
+    const { limit, offset } = getPaginationParams(c);
+    const service = getBackgroundAgentService();
+
+    // Verify agent exists and belongs to user
+    const config = await service.getAgent(agentId, userId);
+    if (!config) {
+      return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'Agent not found' }, 404);
+    }
+
+    const { entries, total } = await service.getHistory(agentId, userId, limit, offset);
+
+    return apiResponse(c, {
+      entries,
+      total,
+      limit,
+      offset,
+    });
+  } catch (err) {
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
+  }
+});
+
+// POST /:id/message - Send message to agent inbox
+backgroundAgentsRoutes.post('/:id/message', async (c) => {
+  try {
+    const userId = getUserId(c);
+    const agentId = c.req.param('id');
+    const body = await c.req.json();
+
+    const { message } = body as { message?: string };
+    if (!message || typeof message !== 'string') {
+      return apiError(
+        c,
+        { code: ERROR_CODES.VALIDATION_ERROR, message: 'message is required' },
+        400
+      );
+    }
+
+    const service = getBackgroundAgentService();
+
+    // Verify agent exists
+    const config = await service.getAgent(agentId, userId);
+    if (!config) {
+      return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'Agent not found' }, 404);
+    }
+
+    await service.sendMessage(agentId, userId, message);
+
+    return apiResponse(c, { sent: true });
+  } catch (err) {
+    const msg = getErrorMessage(err);
+    if (msg.includes('not running')) {
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: msg }, 400);
+    }
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: msg }, 500);
+  }
+});
+
+// POST /:id/start - Start agent
+backgroundAgentsRoutes.post('/:id/start', async (c) => {
+  try {
+    const userId = getUserId(c);
+    const agentId = c.req.param('id');
+    const service = getBackgroundAgentService();
+
+    const session = await service.startAgent(agentId, userId);
+    return apiResponse(c, {
+      state: session.state,
+      cyclesCompleted: session.cyclesCompleted,
+      startedAt: session.startedAt,
+    });
+  } catch (err) {
+    const msg = getErrorMessage(err);
+    if (msg.includes('not found')) {
+      return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: msg }, 404);
+    }
+    if (msg.includes('already running')) {
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: msg }, 409);
+    }
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: msg }, 500);
+  }
+});
+
+// POST /:id/pause - Pause agent
+backgroundAgentsRoutes.post('/:id/pause', async (c) => {
+  try {
+    const userId = getUserId(c);
+    const agentId = c.req.param('id');
+    const service = getBackgroundAgentService();
+
+    const paused = await service.pauseAgent(agentId, userId);
+    if (!paused) {
+      return apiError(
+        c,
+        { code: ERROR_CODES.VALIDATION_ERROR, message: 'Agent is not running' },
+        400
+      );
+    }
+
+    return apiResponse(c, { state: 'paused' });
+  } catch (err) {
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
+  }
+});
+
+// POST /:id/resume - Resume agent
+backgroundAgentsRoutes.post('/:id/resume', async (c) => {
+  try {
+    const userId = getUserId(c);
+    const agentId = c.req.param('id');
+    const service = getBackgroundAgentService();
+
+    const resumed = await service.resumeAgent(agentId, userId);
+    if (!resumed) {
+      return apiError(
+        c,
+        { code: ERROR_CODES.VALIDATION_ERROR, message: 'Agent is not paused' },
+        400
+      );
+    }
+
+    return apiResponse(c, { state: 'running' });
+  } catch (err) {
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
+  }
+});
+
+// POST /:id/stop - Stop agent
+backgroundAgentsRoutes.post('/:id/stop', async (c) => {
+  try {
+    const userId = getUserId(c);
+    const agentId = c.req.param('id');
+    const service = getBackgroundAgentService();
+
+    const stopped = await service.stopAgent(agentId, userId);
+    if (!stopped) {
+      return apiError(
+        c,
+        { code: ERROR_CODES.VALIDATION_ERROR, message: 'Agent is not running' },
+        400
+      );
+    }
+
+    return apiResponse(c, { state: 'stopped' });
+  } catch (err) {
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
+  }
+});
+
+// =============================================================================
+// 3. GENERIC DYNAMIC ROUTE (/:id) - MUST be after specific sub-routes
+// =============================================================================
+
+// GET /:id - Get agent details + session
 backgroundAgentsRoutes.get('/:id', async (c) => {
   try {
     const userId = getUserId(c);
@@ -166,10 +336,7 @@ backgroundAgentsRoutes.get('/:id', async (c) => {
   }
 });
 
-// =============================================================================
 // PATCH /:id - Update agent config
-// =============================================================================
-
 backgroundAgentsRoutes.patch('/:id', async (c) => {
   try {
     const userId = getUserId(c);
@@ -202,10 +369,7 @@ backgroundAgentsRoutes.patch('/:id', async (c) => {
   }
 });
 
-// =============================================================================
 // DELETE /:id - Delete agent
-// =============================================================================
-
 backgroundAgentsRoutes.delete('/:id', async (c) => {
   try {
     const userId = getUserId(c);
@@ -223,158 +387,14 @@ backgroundAgentsRoutes.delete('/:id', async (c) => {
   }
 });
 
-// =============================================================================
-// POST /:id/start - Start agent
-// =============================================================================
+// Debug: Log registered routes
+console.log('[BackgroundAgents] Routes registered:', backgroundAgentsRoutes.routes.map((r: unknown) => (r as { method: string; path: string }).method + ' ' + (r as { method: string; path: string }).path).join(', '));
 
-backgroundAgentsRoutes.post('/:id/start', async (c) => {
+// ── GET /:id/logs — stream agent execution logs (NEW) ──────────────────────
+backgroundAgentsRoutes.get('/:id/logs', async (c) => {
   try {
     const userId = getUserId(c);
     const agentId = c.req.param('id');
-    const service = getBackgroundAgentService();
-
-    const session = await service.startAgent(agentId, userId);
-    return apiResponse(c, {
-      state: session.state,
-      cyclesCompleted: session.cyclesCompleted,
-      startedAt: session.startedAt,
-    });
-  } catch (err) {
-    const msg = getErrorMessage(err);
-    if (msg.includes('not found')) {
-      return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: msg }, 404);
-    }
-    if (msg.includes('already running')) {
-      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: msg }, 409);
-    }
-    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: msg }, 500);
-  }
-});
-
-// =============================================================================
-// POST /:id/pause - Pause agent
-// =============================================================================
-
-backgroundAgentsRoutes.post('/:id/pause', async (c) => {
-  try {
-    const userId = getUserId(c);
-    const agentId = c.req.param('id');
-    const service = getBackgroundAgentService();
-
-    const paused = await service.pauseAgent(agentId, userId);
-    if (!paused) {
-      return apiError(
-        c,
-        { code: ERROR_CODES.VALIDATION_ERROR, message: 'Agent is not running' },
-        400
-      );
-    }
-
-    return apiResponse(c, { state: 'paused' });
-  } catch (err) {
-    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
-  }
-});
-
-// =============================================================================
-// POST /:id/resume - Resume agent
-// =============================================================================
-
-backgroundAgentsRoutes.post('/:id/resume', async (c) => {
-  try {
-    const userId = getUserId(c);
-    const agentId = c.req.param('id');
-    const service = getBackgroundAgentService();
-
-    const resumed = await service.resumeAgent(agentId, userId);
-    if (!resumed) {
-      return apiError(
-        c,
-        { code: ERROR_CODES.VALIDATION_ERROR, message: 'Agent is not paused' },
-        400
-      );
-    }
-
-    return apiResponse(c, { state: 'running' });
-  } catch (err) {
-    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
-  }
-});
-
-// =============================================================================
-// POST /:id/stop - Stop agent
-// =============================================================================
-
-backgroundAgentsRoutes.post('/:id/stop', async (c) => {
-  try {
-    const userId = getUserId(c);
-    const agentId = c.req.param('id');
-    const service = getBackgroundAgentService();
-
-    const stopped = await service.stopAgent(agentId, userId);
-    if (!stopped) {
-      return apiError(
-        c,
-        { code: ERROR_CODES.VALIDATION_ERROR, message: 'Agent is not running' },
-        400
-      );
-    }
-
-    return apiResponse(c, { state: 'stopped' });
-  } catch (err) {
-    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
-  }
-});
-
-// =============================================================================
-// GET /:id/history - Get cycle history
-// =============================================================================
-
-backgroundAgentsRoutes.get('/:id/history', async (c) => {
-  try {
-    const userId = getUserId(c);
-    const agentId = c.req.param('id');
-    const { limit, offset } = getPaginationParams(c);
-    const service = getBackgroundAgentService();
-
-    // Verify agent exists and belongs to user
-    const config = await service.getAgent(agentId, userId);
-    if (!config) {
-      return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'Agent not found' }, 404);
-    }
-
-    const { entries, total } = await service.getHistory(agentId, userId, limit, offset);
-
-    return apiResponse(c, {
-      entries,
-      total,
-      limit,
-      offset,
-    });
-  } catch (err) {
-    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
-  }
-});
-
-// =============================================================================
-// POST /:id/message - Send message to agent inbox
-// =============================================================================
-
-backgroundAgentsRoutes.post('/:id/message', async (c) => {
-  try {
-    const userId = getUserId(c);
-    const agentId = c.req.param('id');
-    const body = await c.req.json();
-
-    const { message } = body as { message?: string };
-    if (!message || typeof message !== 'string') {
-      return apiError(
-        c,
-        { code: ERROR_CODES.VALIDATION_ERROR, message: 'message is required' },
-        400
-      );
-    }
-
     const service = getBackgroundAgentService();
 
     // Verify agent exists
@@ -383,14 +403,56 @@ backgroundAgentsRoutes.post('/:id/message', async (c) => {
       return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'Agent not found' }, 404);
     }
 
-    await service.sendMessage(agentId, userId, message);
+    const session = service.getSession(agentId, userId);
 
-    return apiResponse(c, { sent: true });
+    // Get history from repository
+    const { entries } = await service.getHistory(agentId, userId, 20, 0);
+
+    return apiResponse(c, {
+      agentId,
+      logs: entries.map((e) => ({
+        timestamp: e.executedAt.toISOString(),
+        success: e.success,
+        durationMs: e.durationMs,
+        toolCalls: e.toolCalls.length,
+        error: e.error,
+      })),
+      state: session?.state ?? 'stopped',
+      cyclesCompleted: session?.cyclesCompleted ?? 0,
+    });
   } catch (err) {
-    const msg = getErrorMessage(err);
-    if (msg.includes('not running')) {
-      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: msg }, 400);
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
+  }
+});
+
+// ── POST /:id/execute — trigger immediate execution (NEW) ───────────────────
+backgroundAgentsRoutes.post('/:id/execute', async (c) => {
+  try {
+    const userId = getUserId(c);
+    const agentId = c.req.param('id');
+    const service = getBackgroundAgentService();
+
+    // Verify agent exists
+    const config = await service.getAgent(agentId, userId);
+    if (!config) {
+      return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'Agent not found' }, 404);
     }
-    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: msg }, 500);
+
+    const body = await c.req.json<{ task?: string }>();
+
+    // Trigger immediate execution cycle
+    const executed = await service.executeNow(agentId, userId, body.task);
+    if (!executed) {
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: 'Agent is not running' }, 400);
+    }
+
+    return apiResponse(c, {
+      executed: true,
+      agentId,
+      task: body.task ?? 'default cycle',
+      startedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
 });

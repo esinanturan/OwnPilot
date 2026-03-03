@@ -71,3 +71,13 @@ export {
 } from './executor.js';
 
 export { reportPulseResult, type Broadcaster } from './reporter.js';
+
+// Autonomy Guard (Soul Agent Enforcement)
+export {
+  checkAutonomy,
+  isActionBlocked,
+  getAutonomyLevelDescription,
+  formatAutonomySettings,
+  type AutonomyDecision,
+  type AutonomyGuardContext,
+} from './autonomy-guard.js';

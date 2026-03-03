@@ -57,6 +57,7 @@ export class BackgroundAgentServiceImpl implements IBackgroundAgentService {
       stopCondition: input.stopCondition,
       provider: input.provider,
       model: input.model,
+      skills: input.skills,
       createdBy: input.createdBy ?? 'user',
     });
 
@@ -174,6 +175,13 @@ export class BackgroundAgentServiceImpl implements IBackgroundAgentService {
     if (!sent) {
       throw new Error(`Agent ${agentId} is not running`);
     }
+  }
+
+  // ---- Direct Execution ----
+
+  async executeNow(agentId: string, _userId: string, task?: string): Promise<boolean> {
+    // Trigger immediate execution cycle
+    return this.manager.executeNow(agentId, task);
   }
 
   // ---- Service Lifecycle ----

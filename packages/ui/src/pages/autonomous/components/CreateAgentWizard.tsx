@@ -6,11 +6,13 @@ import { useState, useEffect } from 'react';
 import { soulsApi, crewsApi } from '../../../api/endpoints/souls';
 import type { CrewTemplate } from '../../../api/endpoints/souls';
 import { backgroundAgentsApi } from '../../../api/endpoints/background-agents';
+import { settingsApi } from '../../../api/endpoints/settings';
 import { Bot, Repeat, X, ChevronRight, CheckCircle2, BookOpen } from '../../../components/icons';
 import { useToast } from '../../../components/ToastProvider';
 import type { AgentKind } from '../types';
 import type { AgentTemplate } from '../data/agent-templates';
 import { TemplateCatalog } from './TemplateCatalog';
+import { SkillSelector } from './SkillSelector';
 import { cronToHuman } from '../helpers';
 
 interface Props {
@@ -21,7 +23,7 @@ interface Props {
   prefilledTemplate?: AgentTemplate;
 }
 
-type Step = 'type' | 'templates' | 'identity' | 'config' | 'review';
+type Step = 'type' | 'templates' | 'identity' | 'config' | 'skills' | 'review';
 
 export function CreateAgentWizard({
   templates,
@@ -57,6 +59,19 @@ export function CreateAgentWizard({
   );
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
 
+  // Skills selection
+  const [selectedSkills, setSelectedSkills] = useState<string[]>(prefilledTemplate?.skills ?? []);
+
+  // Template-derived fields (tools, autonomy, etc.)
+  const [templateTools, setTemplateTools] = useState<string[]>(prefilledTemplate?.tools ?? []);
+  const [templateAutonomyLevel, setTemplateAutonomyLevel] = useState<number>(
+    prefilledTemplate?.autonomyLevel ?? 2
+  );
+  const [templateProvider, setTemplateProvider] = useState<string | undefined>(
+    prefilledTemplate?.provider
+  );
+  const [templateModel, setTemplateModel] = useState<string | undefined>(prefilledTemplate?.model);
+
   // Background agent fields
   const [bgMission, setBgMission] = useState(prefilledTemplate?.mission ?? '');
   const [bgMode, setBgMode] = useState<'continuous' | 'interval' | 'event'>(
@@ -74,24 +89,47 @@ export function CreateAgentWizard({
     setMission(t.mission);
     setHeartbeatInterval(t.heartbeatInterval);
     setHeartbeatEnabled(true);
+    // Set template-derived fields
+    setTemplateTools(t.tools ?? []);
+    setTemplateAutonomyLevel(t.autonomyLevel ?? 2);
+    setTemplateProvider(t.provider);
+    setTemplateModel(t.model);
     if (t.kind === 'background') {
       setBgMission(t.mission);
       setBgMode(t.bgMode ?? 'interval');
       setBgIntervalMs(t.bgIntervalMs ?? 300000);
     }
+    // Set skills from template
+    setSelectedSkills(t.skills ?? []);
     setCameFromTemplates(true);
     setStep('review');
   };
 
-  const inputClass =
+  // Get default provider/model from settings
+async function getDefaultProviderModel(): Promise<{ provider: string; model: string }> {
+  try {
+    const settings = await settingsApi.get();
+    return {
+      provider: settings.defaultProvider || 'openai',
+      model: settings.defaultModel || 'gpt-4o',
+    };
+  } catch {
+    return { provider: 'openai', model: 'gpt-4o' };
+  }
+}
+
+const inputClass =
     'w-full rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary';
 
   const handleCreateSoul = async () => {
     setIsCreating(true);
     try {
-      const agentId = `agt-${crypto.randomUUID().slice(0, 8)}`;
-      await soulsApi.create({
-        agentId,
+      // Use template provider/model or fetch defaults
+      const defaults = await getDefaultProviderModel();
+      const provider = templateProvider || defaults.provider;
+      const model = templateModel || defaults.model;
+
+      await soulsApi.deploy({
         identity: {
           name,
           emoji,
@@ -104,19 +142,16 @@ export function CreateAgentWizard({
           mission,
           goals: [],
           expertise: [],
-          toolPreferences: [],
+          toolPreferences: templateTools,
         },
         autonomy: {
-          level: 2,
-          allowedActions: ['search_web', 'create_memory', 'search_memories'],
+          level: templateAutonomyLevel,
+          allowedActions: templateTools.length > 0 ? templateTools : ['search_web', 'create_memory', 'search_memories'],
           blockedActions: ['delete_data', 'execute_code'],
-          requiresApproval: ['send_message_to_user'],
+          requiresApproval: templateAutonomyLevel <= 1 ? ['send_message_to_user'] : [],
           maxCostPerCycle: 0.5,
           maxCostPerDay: 5.0,
           maxCostPerMonth: 100.0,
-          pauseOnConsecutiveErrors: 5,
-          pauseOnBudgetExceeded: true,
-          notifyUserOnPause: true,
         },
         heartbeat: {
           enabled: heartbeatEnabled,
@@ -127,14 +162,17 @@ export function CreateAgentWizard({
         },
         relationships: { delegates: [], peers: [], channels: [] },
         evolution: {
-          version: 1,
           evolutionMode: 'supervised',
-          coreTraits: [personality],
+          coreTraits: personality ? [personality] : [],
           mutableTraits: [],
-          learnings: [],
-          feedbackLog: [],
         },
         bootSequence: { onStart: [], onHeartbeat: ['read_inbox'], onMessage: [] },
+        skillAccess: {
+          allowed: selectedSkills,
+          blocked: [],
+        },
+        provider,
+        model,
       });
       toast.success(`Soul agent "${name}" created`);
       onCreated();
@@ -149,12 +187,20 @@ export function CreateAgentWizard({
   const handleCreateBackground = async () => {
     setIsCreating(true);
     try {
+      // Use template provider/model or fetch defaults
+      const defaults = await getDefaultProviderModel();
+      const provider = templateProvider || defaults.provider;
+      const model = templateModel || defaults.model;
+
       await backgroundAgentsApi.create({
         name,
         mission: bgMission,
         mode: bgMode,
         interval_ms: bgMode === 'interval' ? bgIntervalMs : undefined,
         auto_start: false,
+        allowed_tools: templateTools,
+        provider,
+        model,
       });
       toast.success(`Background agent "${name}" created`);
       onCreated();
@@ -515,6 +561,17 @@ export function CreateAgentWizard({
             </>
           )}
 
+          {/* Step: Skills (soul agents only) */}
+          {step === 'skills' && kind === 'soul' && (
+            <>
+              <p className="text-sm text-text-muted dark:text-dark-text-muted mb-3">
+                Choose which installed skills this agent can access. Skills provide additional
+                capabilities like web search, email, weather, and more.
+              </p>
+              <SkillSelector selectedSkills={selectedSkills} onChange={setSelectedSkills} />
+            </>
+          )}
+
           {/* Step: Review */}
           {step === 'review' && (
             <>
@@ -540,6 +597,14 @@ export function CreateAgentWizard({
                       <span className="text-text-muted dark:text-dark-text-muted">Role</span>
                       <span className="text-text-primary dark:text-dark-text-primary">{role}</span>
                     </div>
+                    {personality && (
+                      <div>
+                        <span className="text-text-muted dark:text-dark-text-muted">Personality</span>
+                        <p className="text-text-primary dark:text-dark-text-primary mt-0.5 text-xs line-clamp-2">
+                          {personality}
+                        </p>
+                      </div>
+                    )}
                     {mission && (
                       <div>
                         <span className="text-text-muted dark:text-dark-text-muted">Mission</span>
@@ -549,9 +614,47 @@ export function CreateAgentWizard({
                       </div>
                     )}
                     <div className="flex justify-between">
+                      <span className="text-text-muted dark:text-dark-text-muted">Provider/Model</span>
+                      <span className="text-text-primary dark:text-dark-text-primary text-xs">
+                        {templateProvider || 'default'}/{templateModel || 'default'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-text-muted dark:text-dark-text-muted">Schedule</span>
                       <span className="text-text-primary dark:text-dark-text-primary">
                         {heartbeatEnabled ? cronToHuman(heartbeatInterval) : 'Disabled'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-text-muted dark:text-dark-text-muted">Autonomy</span>
+                      <span className="text-text-primary dark:text-dark-text-primary">
+                        Level {templateAutonomyLevel}/4
+                      </span>
+                    </div>
+                    {templateTools.length > 0 && (
+                      <div>
+                        <span className="text-text-muted dark:text-dark-text-muted">Tools</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {templateTools.slice(0, 5).map((tool) => (
+                            <span
+                              key={tool}
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary dark:bg-dark-bg-tertiary text-text-muted dark:text-dark-text-muted"
+                            >
+                              {tool.replace('core.', '').replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                          {templateTools.length > 5 && (
+                            <span className="text-[10px] text-text-muted dark:text-dark-text-muted">
+                              +{templateTools.length - 5} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-text-muted dark:text-dark-text-muted">Skills</span>
+                      <span className="text-text-primary dark:text-dark-text-primary">
+                        {selectedSkills.length > 0 ? `${selectedSkills.length} selected` : 'None'}
                       </span>
                     </div>
                   </>
@@ -567,6 +670,12 @@ export function CreateAgentWizard({
                       </div>
                     )}
                     <div className="flex justify-between">
+                      <span className="text-text-muted dark:text-dark-text-muted">Provider/Model</span>
+                      <span className="text-text-primary dark:text-dark-text-primary text-xs">
+                        {templateProvider || 'default'}/{templateModel || 'default'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-text-muted dark:text-dark-text-muted">Mode</span>
                       <span className="text-text-primary dark:text-dark-text-primary">
                         {bgMode === 'interval'
@@ -576,6 +685,26 @@ export function CreateAgentWizard({
                             : 'On demand'}
                       </span>
                     </div>
+                    {templateTools.length > 0 && (
+                      <div>
+                        <span className="text-text-muted dark:text-dark-text-muted">Tools</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {templateTools.slice(0, 5).map((tool) => (
+                            <span
+                              key={tool}
+                              className="text-[10px] px-1.5 py-0.5 rounded bg-bg-tertiary dark:bg-dark-bg-tertiary text-text-muted dark:text-dark-text-muted"
+                            >
+                              {tool.replace('core.', '').replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                          {templateTools.length > 5 && (
+                            <span className="text-[10px] text-text-muted dark:text-dark-text-muted">
+                              +{templateTools.length - 5} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -591,12 +720,13 @@ export function CreateAgentWizard({
               else if (step === 'templates') setStep('type');
               else if (step === 'identity') setStep('type');
               else if (step === 'config') setStep('identity');
+              else if (step === 'skills') setStep('config');
               else if (step === 'review') {
                 if (cameFromTemplates) {
                   setCameFromTemplates(false);
                   setStep('templates');
                 } else {
-                  setStep(kind === 'soul' ? 'config' : 'identity');
+                  setStep(kind === 'soul' ? 'skills' : 'identity');
                 }
               }
             }}
@@ -609,7 +739,8 @@ export function CreateAgentWizard({
               onClick={() => {
                 if (step === 'identity' && kind === 'soul') setStep('config');
                 else if (step === 'identity' && kind === 'background') setStep('review');
-                else if (step === 'config') setStep('review');
+                else if (step === 'config') setStep('skills');
+                else if (step === 'skills') setStep('review');
                 else if (step === 'review') {
                   if (kind === 'soul') handleCreateSoul();
                   else handleCreateBackground();

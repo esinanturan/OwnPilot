@@ -31,3 +31,4 @@ export {
   SOUL_COMMUNICATION_TOOLS,
   executeSoulCommunicationTool,
 } from './soul-communication-tools.js';
+export { SKILL_TOOLS, executeSkillTool } from './skill-tools.js';

@@ -8,7 +8,7 @@
 import { Hono } from 'hono';
 import { getChannelVerificationService } from '../channels/auth/verification.js';
 import { channelUsersRepo } from '../db/repositories/channel-users.js';
-import { getPaginationParams, apiResponse, apiError, ERROR_CODES } from './helpers.js';
+import { getPaginationParams, apiResponse, apiError, ERROR_CODES, getUserId } from './helpers.js';
 import { wsGateway } from '../ws/server.js';
 
 export const channelAuthRoutes = new Hono();
@@ -16,17 +16,18 @@ export const channelAuthRoutes = new Hono();
 /**
  * POST /channels/auth/generate-token
  * Generate a verification PIN/token for linking a channel account.
+ * Uses the authenticated user's ID from context (security: prevents generating tokens for other users).
  */
 channelAuthRoutes.post('/generate-token', async (c) => {
+  const userId = getUserId(c);
   const body = await c.req.json<{
-    userId?: string;
     platform?: string;
     ttlMinutes?: number;
     type?: 'pin' | 'token';
   }>();
 
   const service = getChannelVerificationService();
-  const result = await service.generateToken(body.userId ?? 'default', {
+  const result = await service.generateToken(userId, {
     platform: body.platform,
     ttlMinutes: body.ttlMinutes,
     type: body.type,

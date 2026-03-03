@@ -43,6 +43,8 @@ import {
   executeBrowserTool,
   EDGE_TOOLS,
   executeEdgeTool,
+  SKILL_TOOLS,
+  executeSkillTool,
 } from '../../tools/index.js';
 import { CONFIG_TOOLS, executeConfigTool } from '../config-tools.js';
 import { getErrorMessage } from '../../routes/helpers.js';
@@ -424,6 +426,20 @@ export function createSoulCommunicationToolProvider(userId: string): ToolProvide
       SOUL_COMMUNICATION_TOOLS.map((def) => ({
         definition: def,
         executor: wrapGatewayExecutor(def, executeSoulCommunicationTool, userId),
+      })),
+  };
+}
+
+/**
+ * Create a provider for skill management tools (requires userId).
+ */
+export function createSkillToolProvider(userId: string): ToolProvider {
+  return {
+    name: 'skill',
+    getTools: () =>
+      SKILL_TOOLS.map((def) => ({
+        definition: def,
+        executor: wrapGatewayExecutor(def, executeSkillTool, userId),
       })),
   };
 }

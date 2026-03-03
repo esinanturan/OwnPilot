@@ -69,6 +69,7 @@ interface MemoryRow {
   user_id: string;
   type: string;
   content: string;
+  content_hash: string | null;
   embedding: number[] | string | null;
   search_vector: string | null; // tsvector — populated by trigger, not read in app
   source: string | null;
@@ -95,6 +96,29 @@ function parseEmbedding(value: number[] | string | null): number[] | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Compute a content hash for deduplication purposes.
+ * Uses simple string normalization + hash for cross-platform compatibility.
+ * AGENT-HIGH-003: Memory Deduplication - Content hash fallback for embedding gap
+ */
+function computeContentHash(content: string): string {
+  // Normalize: lowercase, trim, collapse whitespace
+  const normalized = content
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+
+  // Simple hash function (FNV-1a variant)
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < normalized.length; i++) {
+    hash ^= normalized.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  // Convert to hex string (8 chars)
+  return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
 function rowToMemory(row: MemoryRow): Memory {
@@ -137,17 +161,19 @@ export class MemoriesRepository extends BaseRepository {
   async create(input: CreateMemoryInput): Promise<Memory> {
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
+    const contentHash = computeContentHash(input.content);
 
     await this.execute(
       `
-      INSERT INTO memories (id, user_id, type, content, embedding, source, source_id, importance, tags, accessed_count, created_at, updated_at, metadata)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, $10, $11, $12)
+      INSERT INTO memories (id, user_id, type, content, content_hash, embedding, source, source_id, importance, tags, accessed_count, created_at, updated_at, metadata)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $11, $12, $13)
     `,
       [
         id,
         this.userId,
         input.type,
         input.content,
+        contentHash,
         input.embedding ? JSON.stringify(input.embedding) : null,
         input.source ?? null,
         input.sourceId ?? null,
@@ -604,7 +630,23 @@ export class MemoriesRepository extends BaseRepository {
       }
     }
 
-    // Fallback: exact text match
+    // AGENT-HIGH-003: Content hash fallback for embedding gap
+    // Compute content hash and check for duplicates before embedding is generated
+    const contentHash = computeContentHash(content);
+    const hashSql = `
+      SELECT * FROM memories
+      WHERE user_id = $1
+        AND content_hash = $2
+        ${type ? 'AND type = $3' : ''}
+      LIMIT 1
+    `;
+    const hashParams: unknown[] = [this.userId, contentHash];
+    if (type) hashParams.push(type);
+
+    const hashRow = await this.queryOne<MemoryRow>(hashSql, hashParams);
+    if (hashRow) return rowToMemory(hashRow);
+
+    // Final fallback: exact text match (for backwards compatibility with old memories)
     let sql = `
       SELECT * FROM memories
       WHERE user_id = $1

@@ -16,6 +16,7 @@ import {
   Sparkles,
   BookOpen,
   Search,
+  Info,
 } from '../../components/icons';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { crewsApi } from '../../api/endpoints/souls';
@@ -36,6 +37,7 @@ import { CommsPanel } from './components/CommsPanel';
 import { ActivityFeed } from './components/ActivityFeed';
 import { CreateAgentWizard } from './components/CreateAgentWizard';
 import { AIChatCreator } from './components/AIChatCreator';
+import { HelpPanel } from './components/HelpPanel';
 
 const TABS: { key: HubTab; label: string; icon: typeof Bot }[] = [
   { key: 'agents', label: 'Agents', icon: Bot },
@@ -51,7 +53,9 @@ export function AutonomousHubPage() {
   const [showWizard, setShowWizard] = useState(false);
   const [wizardInitialStep, setWizardInitialStep] = useState<'type' | 'templates'>('type');
   const [showAICreator, setShowAICreator] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [templates, setTemplates] = useState<CrewTemplate[]>([]);
+  const [activityRefreshTrigger, setActivityRefreshTrigger] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [kindFilter, setKindFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -164,6 +168,27 @@ export function AutonomousHubPage() {
     [agents, confirm, toast, refresh]
   );
 
+  const handleTestRun = useCallback(
+    async (agentId: string) => {
+      const agent = agents.find((a) => a.id === agentId);
+      if (!agent) return;
+      if (!agent.heartbeatEnabled) {
+        toast.warning('Agent is paused. Resume before testing.');
+        return;
+      }
+      try {
+        const result = await soulsApi.runTest(agentId);
+        toast.success(result.message);
+        // Refresh agent list and activity feed immediately (run already completed server-side)
+        refresh();
+        setActivityRefreshTrigger((n) => n + 1);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Test run failed');
+      }
+    },
+    [agents, toast, refresh]
+  );
+
   // Filtered agents
   const filteredAgents = agents.filter((a) => {
     if (statusFilter !== 'all' && a.status !== statusFilter) return false;
@@ -216,6 +241,13 @@ export function AutonomousHubPage() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
+            onClick={() => setShowHelp(true)}
+            className="flex items-center gap-2 px-3 py-2 text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary rounded-lg transition-colors"
+            title="Help & Documentation"
+          >
+            <Info className="w-5 h-5" />
+          </button>
+          <button
             onClick={() => setShowAICreator(true)}
             className="flex items-center gap-2 px-4 py-2 border border-primary text-primary hover:bg-primary/10 rounded-lg transition-colors"
           >
@@ -266,7 +298,7 @@ export function AutonomousHubPage() {
 
       {/* Tab content */}
       {activeTab === 'agents' && (
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-[800px]">
           {/* Search + Filters */}
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -383,6 +415,7 @@ export function AutonomousHubPage() {
                   onPause={handlePause}
                   onResume={handleResume}
                   onDelete={handleDelete}
+                  onTestRun={handleTestRun}
                 />
               ))}
             </div>
@@ -391,12 +424,22 @@ export function AutonomousHubPage() {
       )}
 
       {activeTab === 'crews' && (
-        <CrewSection crews={crews} templates={templates} onRefresh={refresh} />
+        <div className="w-full min-h-[400px] min-w-[800px]">
+          <CrewSection crews={crews} templates={templates} onRefresh={refresh} />
+        </div>
       )}
 
-      {activeTab === 'messages' && <CommsPanel agents={agents} />}
+      {activeTab === 'messages' && (
+        <div className="w-full min-h-[400px] min-w-[800px]">
+          <CommsPanel agents={agents} />
+        </div>
+      )}
 
-      {activeTab === 'activity' && <ActivityFeed agents={agents} />}
+      {activeTab === 'activity' && (
+        <div className="w-full min-h-[400px] min-w-[800px]">
+          <ActivityFeed agents={agents} refreshTrigger={activityRefreshTrigger} />
+        </div>
+      )}
 
       {/* Create wizard modal */}
       {showWizard && (
@@ -418,6 +461,9 @@ export function AutonomousHubPage() {
           }}
         />
       )}
+
+      {/* Help panel */}
+      {showHelp && <HelpPanel onClose={() => setShowHelp(false)} />}
     </div>
   );
 }

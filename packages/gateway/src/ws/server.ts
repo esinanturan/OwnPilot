@@ -28,6 +28,16 @@ import {
   WS_MAX_CONNECTIONS,
   WS_READY_STATE_OPEN,
 } from '../config/defaults.js';
+
+// Simple HTML escape to prevent XSS in demo responses
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 import { getOrCreateDefaultAgent, isDemoMode } from '../routes/agents.js';
 import { getErrorMessage } from '../routes/helpers.js';
 import { getLog } from '../services/log.js';
@@ -591,7 +601,8 @@ export class WSGateway {
         // Check demo mode
         if (await isDemoMode()) {
           // Demo mode: send simulated response
-          const demoResponse = `This is a demo response. In production, configure an API key (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.) to get real AI responses.\n\nYour message: "${data.content}"`;
+          const safeContent = escapeHtml(String(data.content ?? '').slice(0, 500));
+          const demoResponse = `This is a demo response. In production, configure an API key (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.) to get real AI responses.\n\nYour message: "${safeContent}"`;
 
           if (sessionId) {
             // Send chunks for demo

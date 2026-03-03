@@ -84,9 +84,21 @@ export interface AgentSoul {
     contextFiles?: string[];
     warmupPrompt?: string;
   };
+  /** AI Provider configuration with fallback support */
+  provider?: {
+    providerId: string;
+    modelId: string;
+    fallbackProviderId?: string;
+    fallbackModelId?: string;
+  };
   workspaceId?: string;
   createdAt: string;
   updatedAt: string;
+  /** Skills this agent has access to */
+  skillAccess?: {
+    allowed: string[]; // skill/extension IDs
+    blocked: string[];
+  };
 }
 
 export interface HeartbeatTask {
@@ -208,6 +220,122 @@ export interface CrewTemplate {
 // Souls API
 // =============================================================================
 
+export interface DeploySoulInput {
+  identity: {
+    name: string;
+    emoji?: string;
+    role?: string;
+    personality?: string;
+    voice?: { tone?: string; language?: string; quirks?: string[] };
+    boundaries?: string[];
+  };
+  purpose?: {
+    mission?: string;
+    goals?: string[];
+    expertise?: string[];
+    toolPreferences?: string[];
+  };
+  autonomy?: {
+    level?: number;
+    allowedActions?: string[];
+    blockedActions?: string[];
+    requiresApproval?: string[];
+    maxCostPerCycle?: number;
+    maxCostPerDay?: number;
+    maxCostPerMonth?: number;
+  };
+  heartbeat?: {
+    enabled?: boolean;
+    interval?: string;
+    checklist?: HeartbeatTask[];
+    quietHours?: { start: string; end: string; timezone: string };
+    selfHealingEnabled?: boolean;
+    maxDurationMs?: number;
+  };
+  relationships?: {
+    delegates?: string[];
+    peers?: string[];
+    channels?: string[];
+  };
+  evolution?: {
+    evolutionMode?: 'manual' | 'supervised' | 'autonomous';
+    coreTraits?: string[];
+    mutableTraits?: string[];
+  };
+  bootSequence?: {
+    onStart?: string[];
+    onHeartbeat?: string[];
+    onMessage?: string[];
+  };
+  provider?: string;
+  model?: string;
+  /** Skills this agent should have access to */
+  skillAccess?: {
+    allowed: string[];
+    blocked?: string[];
+  };
+}
+
+export interface DeploySoulResponse {
+  agentId: string;
+  soul: AgentSoul;
+  provider: string;
+  model: string;
+  triggerCreated: boolean;
+}
+
+export interface ToolInfo {
+  name: string;
+  description?: string;
+  category: string;
+  status: 'allowed' | 'blocked' | 'neutral';
+  provider?: string;
+}
+
+export interface ToolsResponse {
+  tools: ToolInfo[];
+  allowed: string[];
+  blocked: string[];
+  summary: {
+    total: number;
+    allowed: number;
+    blocked: number;
+    neutral: number;
+  };
+}
+
+export interface CommandResponse {
+  command: {
+    id: string;
+    timestamp: string;
+    command: string;
+    params: Record<string, unknown>;
+    status: string;
+  };
+  result: unknown;
+  agentId: string;
+}
+
+export interface AgentStatsResponse {
+  agentId: string;
+  soulVersion: number;
+  heartbeat: {
+    enabled: boolean;
+    interval: string;
+    lastRunAt: string | null;
+  };
+  stats: {
+    totalCycles: number;
+    totalCost: number;
+    avgDurationMs: number;
+    failureRate: number;
+  };
+  budget: {
+    maxCostPerDay: number;
+    maxCostPerMonth: number;
+  };
+}
+
 export const soulsApi = {
   list: async () => {
     const data = await apiClient.get<{ items: AgentSoul[]; total: number }>('/souls');
@@ -216,6 +344,8 @@ export const soulsApi = {
   get: (agentId: string) => apiClient.get<AgentSoul>(`/souls/${agentId}`),
   create: (soul: Partial<AgentSoul> | Record<string, unknown>) =>
     apiClient.post<AgentSoul>('/souls', soul as Record<string, unknown>),
+  /** Deploy a complete soul agent (creates agent + soul + trigger in one call) */
+  deploy: (input: DeploySoulInput) => apiClient.post<DeploySoulResponse>('/souls/deploy', input),
   update: (agentId: string, data: Partial<AgentSoul> | Record<string, unknown>) =>
     apiClient.put<AgentSoul>(`/souls/${agentId}`, data as Record<string, unknown>),
   delete: (agentId: string) => apiClient.delete<void>(`/souls/${agentId}`),
@@ -224,6 +354,40 @@ export const soulsApi = {
     apiClient.get<SoulVersion>(`/souls/${agentId}/versions/${version}`),
   feedback: (agentId: string, feedback: { type: string; content: string }) =>
     apiClient.post<AgentSoul>(`/souls/${agentId}/feedback`, feedback),
+  /** Get all available tools with their permission status for this agent */
+  getTools: (agentId: string) => apiClient.get<ToolsResponse>(`/souls/${agentId}/tools`),
+  /** Update tool permissions (allowed/blocked lists) */
+  updateTools: (agentId: string, tools: { allowed?: string[]; blocked?: string[] }) =>
+    apiClient.put<ToolsResponse>(`/souls/${agentId}/tools`, tools),
+  /** Send a command to the agent (run_heartbeat, pause, resume, reset_budget) */
+  sendCommand: (agentId: string, command: string, params?: Record<string, unknown>) =>
+    apiClient.post<CommandResponse>(`/souls/${agentId}/command`, { command, params }),
+  /** Get agent statistics (cycles, cost, budget usage) */
+  getStats: (agentId: string) => apiClient.get<AgentStatsResponse>(`/souls/${agentId}/stats`),
+  /** Run immediate test (trigger heartbeat without waiting for schedule) */
+  runTest: (agentId: string) =>
+    apiClient.post<{ success: boolean; message: string; agentId: string; startedAt: string }>(
+      `/souls/${agentId}/test`
+    ),
+  /** Get agent execution logs (heartbeats) */
+  getLogs: (agentId: string, limit = 20, offset = 0) =>
+    apiClient.get<{
+      agentId: string;
+      logs: Array<{
+        id: string;
+        timestamp: string;
+        durationMs: number;
+        cost: number;
+        tasksRun: number;
+        tasksFailed: number;
+      }>;
+      stats: {
+        totalCycles: number;
+        successRate: number;
+        avgCost: number;
+        avgDurationMs: number;
+      };
+    }>(`/souls/${agentId}/logs?limit=${limit}&offset=${offset}`),
 };
 
 // =============================================================================

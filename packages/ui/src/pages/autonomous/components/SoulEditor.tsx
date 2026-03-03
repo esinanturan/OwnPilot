@@ -14,12 +14,13 @@ import { soulsApi } from '../../../api/endpoints/souls';
 import type { AgentSoul, SoulVersion } from '../../../api/endpoints/souls';
 import { Save, X, History, Star } from '../../../components/icons';
 import { useToast } from '../../../components/ToastProvider';
+import { SkillSelector } from './SkillSelector';
 
 interface Props {
   agentId: string;
 }
 
-type TabId = 'identity' | 'purpose' | 'autonomy' | 'heartbeat' | 'relationships' | 'evolution';
+type TabId = 'identity' | 'purpose' | 'autonomy' | 'heartbeat' | 'relationships' | 'evolution' | 'skills';
 
 const soulTabs: { id: TabId; label: string }[] = [
   { id: 'identity', label: 'Identity' },
@@ -28,6 +29,7 @@ const soulTabs: { id: TabId; label: string }[] = [
   { id: 'heartbeat', label: 'Heartbeat' },
   { id: 'relationships', label: 'Relationships' },
   { id: 'evolution', label: 'Evolution' },
+  { id: 'skills', label: 'Skills' },
 ];
 
 const inputClass =
@@ -138,7 +140,7 @@ export function SoulEditor({ agentId }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full min-w-[800px] max-w-4xl">
       {/* Dirty state bar */}
       {isDirty && (
         <div className="flex items-center gap-3 p-3 bg-warning/10 border border-warning/30 rounded-lg">
@@ -524,6 +526,42 @@ export function SoulEditor({ agentId }: Props) {
                   <li key={i}>• {l}</li>
                 ))}
               </ul>
+            </FieldGroup>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'skills' && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium text-text-primary dark:text-dark-text-primary">
+              Skill Access
+            </h4>
+            <span className="text-xs text-text-muted dark:text-dark-text-muted">
+              {(edited.skillAccess?.allowed?.length || 0)} skills enabled
+            </span>
+          </div>
+          <p className="text-xs text-text-muted dark:text-dark-text-muted">
+            Select which skills this agent can access. Skills provide additional tools and capabilities.
+          </p>
+          <SkillSelector
+            selectedSkills={edited.skillAccess?.allowed || []}
+            onChange={(skillIds) =>
+              updateField('skillAccess', 'allowed', skillIds)
+            }
+          />
+          {edited.skillAccess?.blocked && edited.skillAccess.blocked.length > 0 && (
+            <FieldGroup label="Blocked Skills">
+              <div className="flex flex-wrap gap-1">
+                {edited.skillAccess.blocked.map((skillId) => (
+                  <span
+                    key={skillId}
+                    className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-danger/10 text-danger"
+                  >
+                    {skillId}
+                  </span>
+                ))}
+              </div>
             </FieldGroup>
           )}
         </div>

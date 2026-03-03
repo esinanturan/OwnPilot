@@ -83,6 +83,7 @@ import {
   crewRoutes,
   agentMessageRoutes,
   heartbeatLogRoutes,
+  agentCommandCenterRoutes,
 } from './routes/index.js';
 import {
   RATE_LIMIT_WINDOW_MS,
@@ -138,13 +139,76 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
 
   const app = new Hono();
 
-  // Security headers (includes HSTS for HTTPS deployments)
+  // Security headers (comprehensive protection against common attacks)
   app.use(
     '*',
     secureHeaders({
+      // HSTS - force HTTPS for 2 years, include subdomains, preload eligible
       strictTransportSecurity: 'max-age=63072000; includeSubDomains; preload',
+      // Prevent MIME type sniffing
+      xContentTypeOptions: 'nosniff',
+      // Prevent clickjacking - only allow same origin framing
+      xFrameOptions: 'SAMEORIGIN',
+      // XSS protection for legacy browsers
+      xXssProtection: '1; mode=block',
+      // Control referrer information - only send origin to cross-origin
+      referrerPolicy: 'strict-origin-when-cross-origin',
+      // Permissions Policy - restrict browser features
+      permissionsPolicy: {
+        camera: [],
+        microphone: [],
+        geolocation: [],
+        payment: [],
+        usb: [],
+        magnetometer: [],
+        gyroscope: [],
+      },
+      // Content Security Policy for API (restrictive default)
+      contentSecurityPolicy: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'blob:'],
+        fontSrc: ["'self'"],
+        connectSrc: ["'self'"],
+        mediaSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
     })
   );
+
+  // Relaxed CSP for API routes that serve no HTML content
+  app.use('/api/*', async (c, next) => {
+    // API endpoints don't serve HTML, so we use a very restrictive CSP
+    c.header(
+      'Content-Security-Policy',
+      "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+    );
+    await next();
+  });
+
+  // Remove server fingerprinting headers
+  app.use('*', async (c, next) => {
+    await next();
+    // Remove headers that reveal server information
+    c.header('X-Powered-By', '');
+    c.header('Server', '');
+  });
+
+  // Prevent caching of sensitive API responses
+  app.use('/api/v1/*', async (c, next) => {
+    await next();
+    // Only add cache control if not already set
+    if (!c.res.headers.get('Cache-Control')) {
+      // Default: no cache for API responses
+      c.header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      c.header('Pragma', 'no-cache');
+      c.header('Expires', '0');
+    }
+  });
 
   // CORS - Never default to wildcard for security
   app.use(
@@ -204,6 +268,12 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
   if (fullConfig.rateLimit) {
     app.use('/api/*', createRateLimitMiddleware(fullConfig.rateLimit));
   }
+
+  // ORDER MATTERS - Authentication middleware sequence:
+  // 1. UI session (bypasses API auth for logged-in web UI users)
+  // 2. API auth (api-key/jwt - skipped if session authenticated)
+  // 3. Audit (logs all authenticated requests)
+  // Do not reorder - session auth must come before API auth to enable bypass
 
   // UI session authentication (before API auth — valid session bypasses api-key/jwt)
   app.use('/api/v1/*', uiSessionMiddleware);
@@ -359,6 +429,9 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
   app.route('/api/v1/crews', crewRoutes);
   app.route('/api/v1/agent-messages', agentMessageRoutes);
   app.route('/api/v1/heartbeat-logs', heartbeatLogRoutes);
+
+  // Agent Command Center (unified control for all agents)
+  app.route('/api/v1/agent-command', agentCommandCenterRoutes);
 
   // Root route (API-only mode, when UI is not bundled)
   if (!UI_AVAILABLE) {

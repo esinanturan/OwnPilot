@@ -159,11 +159,12 @@ export function getHeartbeatRunner(): HeartbeatRunner {
  * Called by the trigger engine's 'run_heartbeat' action handler.
  */
 export async function runAgentHeartbeat(
-  agentId: string
+  agentId: string,
+  force = false
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const hbRunner = getHeartbeatRunner();
-    const result = await hbRunner.runHeartbeat(agentId);
+    const result = await hbRunner.runHeartbeat(agentId, force);
     if (result.ok) {
       log.info(`Heartbeat completed for agent ${agentId}`, {
         tasksRun: result.value.tasks.length,

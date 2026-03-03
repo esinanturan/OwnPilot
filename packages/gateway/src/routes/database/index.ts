@@ -19,8 +19,9 @@ export const databaseRoutes = new Hono();
 // Read-only GET routes (status, stats) are allowed with standard auth only.
 databaseRoutes.use('*', async (c, next) => {
   // Allow read-only GET requests (status, stats) — but NOT export
-  const path = new URL(c.req.url).pathname;
-  if (c.req.method === 'GET' && !path.endsWith('/export')) {
+  // Use includes() to prevent bypass attempts like /export?foo=bar or /export/
+  const pathname = new URL(c.req.url).pathname;
+  if (c.req.method === 'GET' && !pathname.includes('/export')) {
     return next();
   }
   // Destructive operations (POST, DELETE) and export require admin key

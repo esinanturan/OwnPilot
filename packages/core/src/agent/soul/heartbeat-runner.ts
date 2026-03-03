@@ -52,8 +52,9 @@ export class HeartbeatRunner {
 
   /**
    * Run a full heartbeat cycle for the given agent.
+   * @param force - When true, bypasses task scheduling and runs all tasks immediately (used for manual test runs)
    */
-  async runHeartbeat(agentId: string): Promise<Result<HeartbeatResult, Error>> {
+  async runHeartbeat(agentId: string, force = false): Promise<Result<HeartbeatResult, Error>> {
     const soul = await this.soulRepo.getByAgentId(agentId);
     if (!soul || !soul.heartbeat.enabled) {
       return {
@@ -62,8 +63,8 @@ export class HeartbeatRunner {
       };
     }
 
-    // Quiet hours check
-    if (this.isQuietHours(soul)) {
+    // Quiet hours check (bypassed when force=true for manual test runs)
+    if (!force && this.isQuietHours(soul)) {
       return {
         ok: true,
         value: this.createSkippedResult(agentId, soul, 'quiet_hours'),
@@ -88,8 +89,8 @@ export class HeartbeatRunner {
       totalCost: 0,
     };
 
-    // Filter tasks that should run this cycle
-    const tasksToRun = this.filterTasksToRun(soul.heartbeat.checklist);
+    // Filter tasks that should run this cycle (force=true runs all tasks regardless of schedule)
+    const tasksToRun = this.filterTasksToRun(soul.heartbeat.checklist, force);
 
     for (const task of tasksToRun) {
       // Per-cycle budget check
@@ -148,7 +149,9 @@ export class HeartbeatRunner {
       cost: result.totalCost,
     });
 
-    await this.budgetTracker.recordSpend(agentId, result.totalCost);
+    // AGENT-HIGH-003: Cost is recorded in heartbeat_log above.
+    // BudgetTracker reads from heartbeat_log, so no need to record separately.
+    // await this.budgetTracker.recordSpend(agentId, result.totalCost);
 
     // Emit event
     this.eventBus?.emit('soul.heartbeat.completed', {
@@ -213,8 +216,10 @@ Be concise and focused. Report your findings clearly.`.trim();
 
   /**
    * Filter tasks that should run this heartbeat cycle.
+   * When force=true, all tasks run regardless of schedule (used for manual test runs).
    */
-  private filterTasksToRun(checklist: HeartbeatTask[]): HeartbeatTask[] {
+  private filterTasksToRun(checklist: HeartbeatTask[], force = false): HeartbeatTask[] {
+    if (force) return checklist;
     const now = new Date();
     return checklist.filter((task) => {
       if (task.schedule === 'every') return true;
@@ -297,10 +302,20 @@ Be concise and focused. Report your findings clearly.`.trim();
 
   private isQuietHours(soul: AgentSoul): boolean {
     if (!soul.heartbeat.quietHours) return false;
-    const currentHour = new Date().getHours();
-    const startHour = parseInt(soul.heartbeat.quietHours.start.split(':')[0]!, 10);
-    const endHour = parseInt(soul.heartbeat.quietHours.end.split(':')[0]!, 10);
+
+    const { start, end, timezone } = soul.heartbeat.quietHours;
+    const now = new Date();
+
+    // Get current hour in the configured timezone
+    const currentHour = timezone
+      ? parseInt(now.toLocaleString('en-US', { timeZone: timezone, hour: 'numeric', hour12: false }), 10)
+      : now.getHours();
+
+    const startHour = parseInt(start.split(':')[0]!, 10);
+    const endHour = parseInt(end.split(':')[0]!, 10);
+
     if (startHour > endHour) {
+      // Spanning midnight (e.g., 22:00 - 06:00)
       return currentHour >= startHour || currentHour < endHour;
     }
     return currentHour >= startHour && currentHour < endHour;

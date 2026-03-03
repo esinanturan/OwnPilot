@@ -371,6 +371,29 @@ export class BackgroundAgentManager {
     return managed !== undefined && managed.session.state !== 'stopped';
   }
 
+  /** Execute a cycle immediately (for manual trigger) */
+  async executeNow(agentId: string, _task?: string): Promise<boolean> {
+    const managed = this.agents.get(agentId);
+    if (!managed || managed.session.state !== 'running') {
+      return false;
+    }
+
+    // Clear any pending timer
+    if (managed.timer) {
+      clearTimeout(managed.timer);
+      managed.timer = null;
+    }
+
+    // Execute cycle immediately
+    try {
+      await this.executeCycle(agentId);
+      return true;
+    } catch (err) {
+      log.error('Immediate execution failed', { agentId, error: getErrorMessage(err) });
+      return false;
+    }
+  }
+
   // ============================================================================
   // Scheduling
   // ============================================================================

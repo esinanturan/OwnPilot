@@ -71,6 +71,7 @@ import {
   pendingChatAgents,
   lruGet,
   createApprovalCallback,
+  createSoulAwareApprovalCallback,
   getProviderApiKey,
   loadProviderConfig,
   resolveContextWindow,
@@ -208,11 +209,13 @@ async function createAgentFromRecord(record: AgentRecord): Promise<Agent> {
   // ── Soul prompt injection ──
   // If this agent has a soul, prepend the soul prompt to the base system prompt.
   let soulSection = '';
+  let soulAutonomy = null;
   try {
     const soul = await getSoulsRepository().getByAgentId(record.id);
     if (soul) {
       const pendingInbox = await getAgentMessagesRepository().countUnread(record.id);
       soulSection = buildSoulPrompt(soul, [], pendingInbox);
+      soulAutonomy = soul.autonomy;
     }
   } catch {
     // Soul lookup failure is non-fatal — agent works without a soul
@@ -235,6 +238,12 @@ async function createAgentFromRecord(record: AgentRecord): Promise<Agent> {
 
   const metaToolFilter = AI_META_TOOL_NAMES.map((n) => unsafeToolId(n));
 
+  // ── Autonomy Level Enforcement (AGENT-HIGH-002) ──
+  // Use soul-aware approval callback if this agent has a soul with autonomy config
+  const approvalCallback = soulAutonomy
+    ? createSoulAwareApprovalCallback(record.id, record.name, soulAutonomy)
+    : createApprovalCallback();
+
   const config: AgentConfig = {
     name: record.name,
     systemPrompt: enhancedPrompt,
@@ -252,7 +261,7 @@ async function createAgentFromRecord(record: AgentRecord): Promise<Agent> {
     maxTurns: (record.config.maxTurns as number) ?? AGENT_DEFAULT_MAX_TURNS,
     maxToolCalls: (record.config.maxToolCalls as number) ?? AGENT_DEFAULT_MAX_TOOL_CALLS,
     tools: metaToolFilter,
-    requestApproval: createApprovalCallback(),
+    requestApproval: approvalCallback,
   };
 
   const agent = createAgent(config, { tools });

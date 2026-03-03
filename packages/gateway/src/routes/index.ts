@@ -60,3 +60,4 @@ export { soulRoutes } from './souls.js';
 export { crewRoutes } from './crews.js';
 export { agentMessageRoutes } from './agent-messages.js';
 export { heartbeatLogRoutes } from './heartbeat-logs.js';
+export { agentCommandCenterRoutes } from './agent-command-center.js';

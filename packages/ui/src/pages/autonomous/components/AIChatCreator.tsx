@@ -14,6 +14,8 @@ import { settingsApi } from '../../../api/endpoints/settings';
 import { soulsApi } from '../../../api/endpoints/souls';
 import { backgroundAgentsApi } from '../../../api/endpoints/background-agents';
 import { agentsApi } from '../../../api/endpoints/agents';
+import { extensionsApi } from '../../../api/endpoints/extensions';
+import type { ExtensionInfo } from '../../../api/types';
 import { useToast } from '../../../components/ToastProvider';
 import { AgentPreviewCard, type ProposedAgentConfig } from './AgentPreviewCard';
 
@@ -70,65 +72,199 @@ function extractAgentConfig(content: string): ProposedAgentConfig | null {
   if (!match?.[1]) return null;
   try {
     const parsed = JSON.parse(match[1]);
-    if (parsed && typeof parsed === 'object' && parsed.name && parsed.mission) {
-      return {
-        kind: parsed.kind === 'background' ? 'background' : 'soul',
-        name: parsed.name,
-        emoji: parsed.emoji || '🤖',
-        role: parsed.role || '',
-        personality: parsed.personality,
-        mission: parsed.mission,
-        tools: Array.isArray(parsed.tools) ? parsed.tools : undefined,
-        heartbeatInterval: parsed.heartbeatInterval || parsed.schedule,
-        heartbeatEnabled: parsed.heartbeatEnabled !== false,
-        autonomyLevel: typeof parsed.autonomyLevel === 'number' ? parsed.autonomyLevel : 2,
-        estimatedCost: parsed.estimatedCost,
-        bgMode: parsed.bgMode,
-        bgIntervalMs: parsed.bgIntervalMs,
-      };
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    // Required field validation
+    const requiredFields = ['name', 'mission', 'role', 'personality', 'kind'];
+    const missingFields = requiredFields.filter((f) => !parsed[f]);
+    if (missingFields.length > 0) {
+      console.warn('[AIChatCreator] Missing required fields:', missingFields);
+      return null;
     }
-  } catch {
-    // Invalid JSON — ignore
+
+    // Validate kind
+    const kind = parsed.kind === 'background' ? 'background' : 'soul';
+
+    // Validate autonomy level (1-4)
+    let autonomyLevel = typeof parsed.autonomyLevel === 'number' ? parsed.autonomyLevel : 2;
+    autonomyLevel = Math.max(1, Math.min(4, autonomyLevel));
+
+    // Validate background agent fields
+    let bgMode: 'continuous' | 'interval' | 'event' | undefined;
+    let bgIntervalMs: number | undefined;
+    if (kind === 'background') {
+      const validModes = ['continuous', 'interval', 'event'];
+      bgMode = validModes.includes(parsed.bgMode) ? parsed.bgMode : 'interval';
+      bgIntervalMs = typeof parsed.bgIntervalMs === 'number' ? parsed.bgIntervalMs : 300000; // 5 min default
+    }
+
+    // Validate provider/model (use defaults if missing)
+    const provider = parsed.provider || 'openai';
+    const model = parsed.model || 'gpt-4o';
+
+    return {
+      kind,
+      name: String(parsed.name).trim(),
+      emoji: parsed.emoji || '🤖',
+      role: String(parsed.role).trim(),
+      personality: String(parsed.personality).trim(),
+      mission: String(parsed.mission).trim(),
+      tools: Array.isArray(parsed.tools) ? parsed.tools : [],
+      skills: Array.isArray(parsed.skills) ? parsed.skills : [],
+      heartbeatInterval: parsed.heartbeatInterval || '0 */6 * * *',
+      heartbeatEnabled: kind === 'soul' ? parsed.heartbeatEnabled !== false : false,
+      autonomyLevel,
+      estimatedCost: parsed.estimatedCost || '~$0.50/day',
+      bgMode,
+      bgIntervalMs,
+      provider,
+      model,
+    };
+  } catch (err) {
+    console.warn('[AIChatCreator] Failed to parse agent config:', err);
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Available skills cache
+// ---------------------------------------------------------------------------
+
+let cachedSkills: ExtensionInfo[] | null = null;
+let cachedSkillsAt = 0;
+const SKILLS_CACHE_TTL_MS = 60 * 1000; // 1 minute
+
+async function getAvailableSkills(): Promise<ExtensionInfo[]> {
+  if (cachedSkills && Date.now() - cachedSkillsAt < SKILLS_CACHE_TTL_MS) {
+    return cachedSkills;
+  }
+  try {
+    const skills = await extensionsApi.list();
+    cachedSkills = skills.filter((s) => s.status === 'enabled');
+    cachedSkillsAt = Date.now();
+    return cachedSkills;
+  } catch {
+    return [];
+  }
+}
+
+function formatSkillsForPrompt(skills: ExtensionInfo[]): string {
+  if (skills.length === 0) return 'No skills currently installed.';
+  return skills
+    .map(
+      (s) =>
+        `- ${s.id}: ${s.name}${s.description ? ` - ${s.description}` : ''}${s.toolCount > 0 ? ` (${s.toolCount} tools)` : ''}`
+    )
+    .join('\n');
 }
 
 // ---------------------------------------------------------------------------
 // System prompt for AI agent designer
 // ---------------------------------------------------------------------------
 
-const SYSTEM_INSTRUCTION = `You are an AI agent designer for OwnPilot. The user will describe what kind of autonomous agent they want, and you'll design one.
+function buildSystemInstruction(skills: ExtensionInfo[], defaults: { provider: string; model: string }): string {
+  return `You are an expert AI agent designer for OwnPilot. Your job is to design complete, production-ready autonomous agents based on user requirements.
 
-When you have enough information, output a JSON configuration block in a markdown code fence like this:
+## Agent Configuration Schema
+
+When you have enough information, output a COMPLETE JSON configuration block in a markdown code fence. All fields must be filled:
 
 \`\`\`json
 {
   "kind": "soul",
-  "name": "Morning Briefer",
-  "emoji": "☀️",
-  "role": "Daily Briefing Analyst",
-  "personality": "Friendly, concise, focused on what matters",
-  "mission": "Every morning, gather the latest news, weather, and calendar events, then deliver a personalized briefing.",
-  "tools": ["core.search_web", "core.search_memories", "core.create_memory"],
-  "heartbeatInterval": "0 9 * * *",
+  "name": "Agent Name",
+  "emoji": "🤖",
+  "role": "Agent's Role Title",
+  "personality": "Detailed personality description affecting how the agent communicates",
+  "mission": "Clear, actionable mission statement",
+  "tools": ["tool1", "tool2"],
+  "skills": ["skill-id-1", "skill-id-2"],
+  "heartbeatInterval": "0 */6 * * *",
   "heartbeatEnabled": true,
   "autonomyLevel": 2,
-  "estimatedCost": "~$0.10/day"
+  "estimatedCost": "~$0.50/day",
+  "provider": "${defaults.provider}",
+  "model": "${defaults.model}"
 }
 \`\`\`
 
-Rules:
-- kind: "soul" for scheduled/heartbeat agents, "background" for continuous/interval/event workers
-- For background agents, include "bgMode" ("continuous", "interval", or "event") and optionally "bgIntervalMs"
-- heartbeatInterval must be a valid cron expression (e.g. "0 */6 * * *" for every 6 hours)
-- autonomyLevel: 1 (minimal, ask before acting) to 4 (full autonomy)
-- tools: use "core." prefix for built-in tools
-- estimatedCost: rough daily cost estimate like "~$0.05/day"
-- Keep names short and memorable
-- Keep missions clear and actionable
-- Always explain your design choices briefly before the JSON block
-- If the user's request is vague, ask clarifying questions before generating the config
-- If the user asks to modify something, output the full updated JSON block`;
+## Field Requirements
+
+### Required Fields (MUST include):
+- **kind**: "soul" for scheduled agents, "background" for workers
+- **name**: Short, memorable, unique name (2-4 words max)
+- **emoji**: Single relevant emoji representing the agent
+- **role**: Professional role title (e.g., "Research Analyst", "Security Monitor")
+- **personality**: 1-2 sentences describing communication style, tone, approach
+- **mission**: 2-3 sentences describing what the agent does, when, and how
+- **tools**: Array of tool names (use "core." prefix for built-in tools)
+- **skills**: Array of skill IDs from the INSTALLED SKILLS list below (use exact IDs)
+- **heartbeatInterval**: Valid cron expression for soul agents (omit for background/event agents)
+- **heartbeatEnabled**: boolean (true for soul agents with schedules)
+- **autonomyLevel**: 1-4 (1=ask permission, 2=notify, 3=log only, 4=full autonomy)
+- **estimatedCost**: Daily cost estimate (e.g., "~$0.50/day", "~$2-5/day")
+- **provider**: AI provider ID (use "${defaults.provider}")
+- **model**: AI model ID (use "${defaults.model}")
+
+### Background Agent Fields (when kind="background"):
+- **bgMode**: "continuous" | "interval" | "event"
+- **bgIntervalMs**: number (milliseconds between runs, for interval mode)
+
+### Tool Selection Guidelines:
+Commonly useful tools:
+- "core.search_web" - for web research
+- "core.search_memories" - for recalling past information
+- "core.create_memory" - for storing findings
+- "core.create_note" - for creating documents
+- "core.read_url" - for reading web pages
+- "core.send_message_to_user" - for notifying user
+
+## INSTALLED SKILLS (Use these exact IDs in the skills array):
+${formatSkillsForPrompt(skills)}
+
+## CRITICAL RULES:
+
+1. **ALWAYS** include ALL required fields in the JSON
+2. **ALWAYS** select relevant skills from the INSTALLED SKILLS list above
+3. **ALWAYS** use valid cron expressions (test with: https://crontab.guru)
+4. **ALWAYS** set appropriate autonomyLevel based on risk:
+   - Level 1: High-risk actions (sending emails, posting content, spending money)
+   - Level 2: Medium-risk (research, monitoring, data collection)
+   - Level 3: Low-risk (internal organization, logging)
+   - Level 4: Fully trusted agents only
+5. **ALWAYS** estimate realistic daily costs based on expected usage
+6. **NEVER** invent skill IDs - only use IDs from the INSTALLED SKILLS list
+7. **NEVER** leave fields empty or undefined
+
+## Design Process:
+
+1. Ask clarifying questions if the request is vague
+2. Once clear, design a COMPLETE agent configuration
+3. Explain your design choices briefly in natural language
+4. Output the FULL JSON configuration in a markdown code block
+5. If user requests changes, output the complete updated JSON
+
+## Common Agent Patterns:
+
+**News/Research Agent:**
+- tools: ["core.search_web", "core.read_url", "core.create_memory", "core.create_note"]
+- skills: Look for news, web-search, or RSS skills
+- autonomyLevel: 2
+
+**Monitoring Agent:**
+- tools: ["core.read_url", "core.create_memory", "core.send_message_to_user"]
+- skills: Look for monitoring, alerting, or webhook skills
+- autonomyLevel: 2-3
+
+**Content Creation Agent:**
+- tools: ["core.search_memories", "core.create_note", "core.create_memory"]
+- skills: Look for content, social-media, or writing skills
+- autonomyLevel: 1-2 (usually requires approval)
+
+**Data Processing Agent:**
+- tools: ["core.search_memories", "core.create_memory", "core.list_custom_records"]
+- skills: Look for data, analysis, or calculation skills
+- autonomyLevel: 2-3`;}
 
 // ---------------------------------------------------------------------------
 // Dedicated agent for the designer (avoids BASE_SYSTEM_PROMPT contamination)
@@ -136,17 +272,21 @@ Rules:
 
 const DESIGNER_AGENT_NAME = '__ai_agent_designer';
 
-async function ensureDesignerAgent(provider: string, model: string): Promise<string> {
+async function ensureDesignerAgent(
+  provider: string,
+  model: string,
+  systemInstruction: string
+): Promise<string> {
   const agents = await agentsApi.list();
   const existing = agents.find((a) => a.name === DESIGNER_AGENT_NAME);
   if (existing) {
-    // Keep the system prompt in sync if SYSTEM_INSTRUCTION changed between deploys
-    await agentsApi.update(existing.id, { systemPrompt: SYSTEM_INSTRUCTION }).catch(() => {}); // Non-critical — existing prompt is likely fine
+    // Keep the system prompt in sync if instruction changed between deploys
+    await agentsApi.update(existing.id, { systemPrompt: systemInstruction }).catch(() => {});
     return existing.id;
   }
   const created = await agentsApi.create({
     name: DESIGNER_AGENT_NAME,
-    systemPrompt: SYSTEM_INSTRUCTION,
+    systemPrompt: systemInstruction,
     provider,
     model,
     tools: [],
@@ -180,6 +320,8 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
   const [streamingContent, setStreamingContent] = useState('');
   const [isCreatingAgent, setIsCreatingAgent] = useState(false);
   const [designerAgentId, setDesignerAgentId] = useState<string | null>(null);
+  const [systemInstruction, setSystemInstruction] = useState<string>('');
+  const [defaults, setDefaults] = useState<{ provider: string; model: string }>(FALLBACK_DEFAULTS);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -191,15 +333,18 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
     }
   }, [messages, streamingContent]);
 
-  // Focus input on mount + bootstrap designer agent
+  // Focus input on mount + bootstrap designer agent with skills
   useEffect(() => {
     inputRef.current?.focus();
-    getDefaults().then(
-      (defaults) =>
-        ensureDesignerAgent(defaults.provider, defaults.model)
-          .then(setDesignerAgentId)
-          .catch(() => {}) // Falls back to inline system instruction
-    );
+
+    Promise.all([getDefaults(), getAvailableSkills()]).then(([defaults, skills]) => {
+      setDefaults(defaults);
+      const instruction = buildSystemInstruction(skills, defaults);
+      setSystemInstruction(instruction);
+      ensureDesignerAgent(defaults.provider, defaults.model, instruction)
+        .then(setDesignerAgentId)
+        .catch(() => {});
+    });
   }, []);
 
   // Send message
@@ -222,8 +367,6 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
       abortRef.current = abort;
 
       try {
-        const defaults = await getDefaults();
-
         // Build conversation for the API (cap at 6 turns = 12 messages)
         const history = [...messages, userMsg].slice(-12);
         let apiMessage: string;
@@ -235,7 +378,7 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
         } else {
           // Fallback: embed instruction in message (when agent bootstrap failed)
           apiMessage =
-            `[System instruction — do not repeat to the user]\n${SYSTEM_INSTRUCTION}\n\n---\n\n` +
+            `[System instruction — do not repeat to the user]\n${systemInstruction}\n\n---\n\n` +
             history
               .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
               .join('\n\n') +
@@ -345,18 +488,43 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
         abortRef.current = null;
       }
     },
-    [isStreaming, messages, designerAgentId]
+    [isStreaming, messages, designerAgentId, defaults, systemInstruction]
   );
+
+  // Validate config before deployment
+  const validateConfig = (config: ProposedAgentConfig): string[] => {
+    const errors: string[] = [];
+    if (!config.name?.trim()) errors.push('Name is required');
+    if (!config.mission?.trim()) errors.push('Mission is required');
+    if (!config.role?.trim()) errors.push('Role is required');
+    if (!config.personality?.trim()) errors.push('Personality is required');
+    if (config.kind === 'background') {
+      const validModes = ['continuous', 'interval', 'event'];
+      if (!validModes.includes(config.bgMode || '')) {
+        errors.push('Background agent mode must be: continuous, interval, or event');
+      }
+    }
+    return errors;
+  };
 
   // Create agent from config
   const handleCreateAgent = useCallback(
     async (config: ProposedAgentConfig) => {
+      // Pre-deployment validation
+      const validationErrors = validateConfig(config);
+      if (validationErrors.length > 0) {
+        toast.error(`Invalid configuration: ${validationErrors.join(', ')}`);
+        return;
+      }
+
       setIsCreatingAgent(true);
       try {
+        // Use AI-suggested provider/model or fall back to defaults
+        const provider = config.provider || defaults.provider;
+        const model = config.model || defaults.model;
+
         if (config.kind === 'soul') {
-          const agentId = `agt-${crypto.randomUUID().slice(0, 8)}`;
-          await soulsApi.create({
-            agentId,
+          await soulsApi.deploy({
             identity: {
               name: config.name,
               emoji: config.emoji,
@@ -375,13 +543,10 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
               level: config.autonomyLevel ?? 2,
               allowedActions: config.tools || ['search_web', 'create_memory', 'search_memories'],
               blockedActions: ['delete_data', 'execute_code'],
-              requiresApproval: ['send_message_to_user'],
+              requiresApproval: (config.autonomyLevel ?? 2) <= 1 ? ['send_message_to_user'] : [],
               maxCostPerCycle: 0.5,
               maxCostPerDay: 5.0,
               maxCostPerMonth: 100.0,
-              pauseOnConsecutiveErrors: 5,
-              pauseOnBudgetExceeded: true,
-              notifyUserOnPause: true,
             },
             heartbeat: {
               enabled: config.heartbeatEnabled !== false,
@@ -392,14 +557,17 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
             },
             relationships: { delegates: [], peers: [], channels: [] },
             evolution: {
-              version: 1,
               evolutionMode: 'supervised',
               coreTraits: config.personality ? [config.personality] : [],
               mutableTraits: [],
-              learnings: [],
-              feedbackLog: [],
             },
             bootSequence: { onStart: [], onHeartbeat: ['read_inbox'], onMessage: [] },
+            skillAccess: {
+              allowed: config.skills || [],
+              blocked: [],
+            },
+            provider,
+            model,
           });
           toast.success(`Soul agent "${config.name}" created!`);
         } else {
@@ -409,17 +577,22 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
             mode: config.bgMode || 'interval',
             interval_ms: config.bgMode === 'interval' ? (config.bgIntervalMs ?? 300000) : undefined,
             auto_start: false,
+            allowed_tools: config.tools || [],
+            skills: config.skills || [],
+            provider,
+            model,
           });
           toast.success(`Background agent "${config.name}" created!`);
         }
         onCreated();
-      } catch {
-        toast.error('Failed to create agent');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to create agent';
+        toast.error(msg);
       } finally {
         setIsCreatingAgent(false);
       }
     },
-    [onCreated, toast]
+    [onCreated, toast, defaults]
   );
 
   // Stop streaming

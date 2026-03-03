@@ -19,6 +19,7 @@ import { buildEnhancedSystemPrompt } from '../../assistant/index.js';
 import { getErrorMessage } from '../../routes/helpers.js';
 import type { RequestRouting } from './request-preprocessor.js';
 import { getLog } from '../log.js';
+import { SoulsRepository } from '../../db/repositories/souls.js';
 
 const log = getLog('Middleware:ContextInjection');
 
@@ -77,6 +78,9 @@ export function createContextInjectionMiddleware(): MessageMiddleware {
       // 2. Build extension sections based on routing (per-request)
       const extensionSuffix = buildExtensionSections(ctx);
 
+      // 2b. Build soul skills section (per-request, based on agent's soul skillAccess)
+      const skillsSuffix = await buildSoulSkillsSection(agentId);
+
       // 3. Build orchestrator sections (memories, goals, resources, autonomy) — cached
       let orchestratorSuffix: string;
       let stats: { memoriesUsed: number; goalsUsed: number };
@@ -129,10 +133,11 @@ export function createContextInjectionMiddleware(): MessageMiddleware {
         ? `\n---\n## Request Focus\n${routing.intentHint}`
         : '';
 
-      // 6. Combine: base + extensions + tool suggestions + data hints + orchestrator + focus
+      // 6. Combine: base + extensions + skills + tool suggestions + data hints + orchestrator + focus
       const finalPrompt =
         basePrompt +
         extensionSuffix +
+        skillsSuffix +
         toolSuggestionSuffix +
         dataHintSuffix +
         orchestratorSuffix +
@@ -179,6 +184,57 @@ function buildExtensionSections(ctx: { get<T>(key: string): T | undefined }): st
     return '\n\n' + sections.join('\n\n');
   } catch {
     // Extension service not available
+    return '';
+  }
+}
+
+/**
+ * Build a "## Your Available Skills" section from soul skill access.
+ * Informs the agent which skills it has access to and can use.
+ */
+async function buildSoulSkillsSection(agentId: string): Promise<string> {
+  try {
+    const soulsRepo = new SoulsRepository();
+    const soul = await soulsRepo.getByAgentId(agentId);
+
+    if (!soul?.skillAccess?.allowed?.length) {
+      return '';
+    }
+
+    const extService = getServiceRegistry().get(Services.Extension) as IExtensionService & {
+      getExtensionById?(id: string): { name: string; description?: string; manifest?: { tools?: { name: string; description?: string }[] } } | undefined;
+    };
+
+    const lines: string[] = [];
+    lines.push('## Your Available Skills');
+    lines.push('You have been granted access to the following skills. Use them proactively when relevant:\n');
+
+    for (const skillId of soul.skillAccess.allowed) {
+      // Try to get extension details
+      let skillInfo: { name: string; description?: string; manifest?: { tools?: { name: string; description?: string }[] } } | undefined;
+
+      if (extService?.getExtensionById) {
+        skillInfo = extService.getExtensionById(skillId);
+      }
+
+      if (skillInfo) {
+        lines.push(`**${skillInfo.name}** (${skillId})`);
+        if (skillInfo.description) {
+          lines.push(`  Description: ${skillInfo.description}`);
+        }
+        if (skillInfo.manifest?.tools?.length) {
+          const toolNames = skillInfo.manifest.tools.map((t) => t.name).join(', ');
+          lines.push(`  Tools: ${toolNames}`);
+        }
+      } else {
+        lines.push(`**${skillId}**`);
+      }
+      lines.push('');
+    }
+
+    lines.push('To use a skill tool: use_tool("tool_name", {args})');
+    return '\n\n' + lines.join('\n');
+  } catch {
     return '';
   }
 }
@@ -236,6 +292,8 @@ function stripInjectedSections(prompt: string): string {
     // Extension sections (injected by context-injection or agent-service at creation)
     '\n\n## Extension:',
     '\n\n## Skill:',
+    // Soul skills section (injected by context-injection)
+    '\n\n## Your Available Skills',
     // Tool suggestions and data hints (from preprocessor routing)
     '\n\n## Suggested Tools',
     '\n\n## Available Data',

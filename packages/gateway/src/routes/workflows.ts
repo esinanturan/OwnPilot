@@ -22,6 +22,8 @@ import { ERROR_CODES } from './error-codes.js';
 import { createWorkflowsRepository } from '../db/repositories/workflows.js';
 import { createWorkflowApprovalsRepository } from '../db/repositories/workflow-approvals.js';
 import { topologicalSort } from '../services/workflow-service.js';
+import { detectCycle, type ValidationNode, type ValidationEdge } from '../services/workflow/dag-utils.js';
+
 import { wsGateway } from '../ws/server.js';
 import { validateBody } from '../middleware/validation.js';
 import { createWorkflowSchema, updateWorkflowSchema } from '../middleware/validation.js';
@@ -32,16 +34,9 @@ import { pagination } from '../middleware/pagination.js';
 // Semantic Validation (beyond Zod shape checks)
 // ============================================================================
 
-interface WfNode {
-  id: string;
-  type: string;
-  data: Record<string, unknown>;
-}
-interface WfEdge {
-  source: string;
-  target: string;
-  sourceHandle?: string;
-}
+// Use types from dag-utils for consistency
+type WfNode = ValidationNode;
+type WfEdge = ValidationEdge;
 
 /**
  * Validate workflow-level semantic constraints that Zod can't express.
@@ -209,6 +204,12 @@ function validateWorkflowSemantics(nodes: WfNode[], edges: WfEdge[]): string[] {
     } else {
       aliasMap.set(a, node.id);
     }
+  }
+
+  // ── Cycle detection ──
+  const cycleError = detectCycle(nodes, edges);
+  if (cycleError) {
+    errors.push(cycleError);
   }
 
   return errors;

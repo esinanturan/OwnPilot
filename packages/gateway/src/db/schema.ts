@@ -374,6 +374,7 @@ CREATE TABLE IF NOT EXISTS memories (
   user_id TEXT NOT NULL DEFAULT 'default',
   type TEXT NOT NULL CHECK(type IN ('fact', 'preference', 'conversation', 'event', 'skill')),
   content TEXT NOT NULL,
+  content_hash TEXT,
   embedding vector(1536),
   source TEXT,
   source_id TEXT,
@@ -914,6 +915,9 @@ CREATE TABLE IF NOT EXISTS background_agents (
   event_filters JSONB,
   auto_start BOOLEAN NOT NULL DEFAULT false,
   stop_condition TEXT,
+  provider TEXT,
+  model TEXT,
+  skills JSONB DEFAULT '[]'::jsonb,
   created_by TEXT NOT NULL DEFAULT 'user' CHECK (created_by IN ('user', 'ai')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -1629,6 +1633,33 @@ CREATE INDEX IF NOT EXISTS idx_channel_bridges_source
 CREATE INDEX IF NOT EXISTS idx_channel_bridges_target
   ON channel_bridges(target_channel_id)
   WHERE enabled = true;
+
+--- AGENT_SOULS: Add provider column for storing primary/fallback provider config
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agent_souls' AND column_name = 'provider') THEN
+    ALTER TABLE agent_souls ADD COLUMN provider JSONB DEFAULT NULL;
+  END IF;
+END $$;
+
+--- Create index for provider queries
+CREATE INDEX IF NOT EXISTS idx_agent_souls_provider ON agent_souls USING GIN (provider);
+
+--- AGENT_SOULS: Add skill_access column for storing agent skill permissions
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'agent_souls' AND column_name = 'skill_access') THEN
+    ALTER TABLE agent_souls ADD COLUMN skill_access JSONB DEFAULT NULL;
+  END IF;
+END $$;
+
+--- Create index for skill_access queries
+CREATE INDEX IF NOT EXISTS idx_agent_souls_skill_access ON agent_souls USING GIN (skill_access);
+
+--- MEMORIES: Add content_hash column for deduplication
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'memories' AND column_name = 'content_hash') THEN
+    ALTER TABLE memories ADD COLUMN content_hash TEXT;
+  END IF;
+END $$;
 `;
 
 export const INDEXES_SQL = `
@@ -1697,6 +1728,7 @@ CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(type);
 CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_accessed ON memories(accessed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memories_content_hash ON memories(content_hash) WHERE content_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id);
 CREATE INDEX IF NOT EXISTS idx_goals_status ON goals(status);
 CREATE INDEX IF NOT EXISTS idx_goals_priority ON goals(priority DESC);
@@ -1945,6 +1977,8 @@ CREATE TABLE IF NOT EXISTS agent_souls (
   relationships JSONB DEFAULT '{}',
   evolution JSONB NOT NULL,
   boot_sequence JSONB DEFAULT '{}',
+  provider JSONB DEFAULT NULL,
+  skill_access JSONB DEFAULT NULL,
   workspace_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -1965,6 +1999,23 @@ CREATE TABLE IF NOT EXISTS agent_soul_versions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_soul_versions_soul ON agent_soul_versions(soul_id, version DESC);
+
+-- Skill Usage — track when agents use/learn from skills
+CREATE TABLE IF NOT EXISTS skill_usage (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id TEXT NOT NULL,
+  skill_id TEXT NOT NULL,
+  skill_name TEXT NOT NULL,
+  usage_type VARCHAR(20) NOT NULL CHECK(usage_type IN ('learned', 'referenced', 'executed', 'adapted')),
+  content TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_usage_agent ON skill_usage(agent_id);
+CREATE INDEX IF NOT EXISTS idx_skill_usage_skill ON skill_usage(skill_id);
+CREATE INDEX IF NOT EXISTS idx_skill_usage_type ON skill_usage(usage_type);
+CREATE INDEX IF NOT EXISTS idx_skill_usage_created ON skill_usage(created_at);
 
 -- Agent Messages — inter-agent communication
 CREATE TABLE IF NOT EXISTS agent_messages (

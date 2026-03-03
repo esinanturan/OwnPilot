@@ -43,7 +43,7 @@ export interface UnifiedAgent {
 }
 
 export type HubTab = 'agents' | 'crews' | 'messages' | 'activity';
-export type ProfileTab = 'overview' | 'soul' | 'messages' | 'activity' | 'budget';
+export type ProfileTab = 'overview' | 'soul' | 'tools' | 'messages' | 'activity' | 'budget';
 
 /** Map background agent state to unified agent status */
 export function mapBackgroundState(state: BackgroundAgentState): AgentStatus {

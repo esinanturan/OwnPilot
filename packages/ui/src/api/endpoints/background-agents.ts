@@ -94,6 +94,8 @@ export interface CreateBackgroundAgentInput {
   stop_condition?: string;
   provider?: string;
   model?: string;
+  /** Skill IDs this agent can access */
+  skills?: string[];
 }
 
 // =============================================================================

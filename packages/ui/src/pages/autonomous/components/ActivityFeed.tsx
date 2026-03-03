@@ -32,9 +32,10 @@ interface ActivityItem {
 
 interface Props {
   agents: UnifiedAgent[];
+  refreshTrigger?: number;
 }
 
-export function ActivityFeed({ agents }: Props) {
+export function ActivityFeed({ agents, refreshTrigger }: Props) {
   const [heartbeats, setHeartbeats] = useState<HeartbeatLog[]>([]);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [stats, setStats] = useState<HeartbeatStats | null>(null);
@@ -68,7 +69,7 @@ export function ActivityFeed({ agents }: Props) {
 
   useEffect(() => {
     fetchAll();
-  }, [fetchAll]);
+  }, [fetchAll, refreshTrigger]);
 
   const getAgentName = (id: string): string => {
     const agent = agents.find((a) => a.id === id);

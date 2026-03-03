@@ -27,6 +27,8 @@ interface SoulRow {
   relationships: string;
   evolution: string;
   boot_sequence: string;
+  provider: string | null;
+  skill_access: string | null;
   workspace_id: string | null;
   created_at: string;
   updated_at: string;
@@ -99,6 +101,8 @@ function rowToSoul(row: SoulRow): AgentSoul {
       onHeartbeat: [],
       onMessage: [],
     }),
+    provider: row.provider ? parseJsonField(row.provider, undefined) : undefined,
+    skillAccess: row.skill_access ? parseJsonField(row.skill_access, undefined) : undefined,
     workspaceId: row.workspace_id ?? undefined,
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
@@ -124,8 +128,8 @@ export class SoulsRepository extends BaseRepository {
 
   async create(data: Omit<AgentSoul, 'id' | 'createdAt' | 'updatedAt'>): Promise<AgentSoul> {
     await this.execute(
-      `INSERT INTO agent_souls (agent_id, identity, purpose, autonomy, heartbeat, relationships, evolution, boot_sequence, workspace_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      `INSERT INTO agent_souls (agent_id, identity, purpose, autonomy, heartbeat, relationships, evolution, boot_sequence, provider, skill_access, workspace_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         data.agentId,
         JSON.stringify(data.identity),
@@ -135,6 +139,8 @@ export class SoulsRepository extends BaseRepository {
         JSON.stringify(data.relationships),
         JSON.stringify(data.evolution),
         JSON.stringify(data.bootSequence),
+        data.provider ? JSON.stringify(data.provider) : null,
+        data.skillAccess ? JSON.stringify(data.skillAccess) : null,
         data.workspaceId ?? null,
       ]
     );
@@ -155,16 +161,36 @@ export class SoulsRepository extends BaseRepository {
     return row ? rowToSoul(row) : null;
   }
 
-  async list(limit: number, offset: number): Promise<AgentSoul[]> {
+  async list(userId: string | null, limit: number, offset: number): Promise<AgentSoul[]> {
+    const rows = userId
+      ? await this.query<SoulRow>(
+          `SELECT * FROM agent_souls WHERE workspace_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+          [userId, limit, offset]
+        )
+      : await this.query<SoulRow>(
+          `SELECT * FROM agent_souls ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+          [limit, offset]
+        );
+    return rows.map(rowToSoul);
+  }
+
+  async listByAgentIds(agentIds: string[]): Promise<AgentSoul[]> {
+    if (agentIds.length === 0) return [];
+    const placeholders = agentIds.map((_, i) => `$${i + 1}`).join(',');
     const rows = await this.query<SoulRow>(
-      `SELECT * FROM agent_souls ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
-      [limit, offset]
+      `SELECT * FROM agent_souls WHERE agent_id IN (${placeholders})`,
+      agentIds
     );
     return rows.map(rowToSoul);
   }
 
-  async count(): Promise<number> {
-    const row = await this.queryOne<{ count: string }>(`SELECT COUNT(*) AS count FROM agent_souls`);
+  async count(userId: string | null): Promise<number> {
+    const row = userId
+      ? await this.queryOne<{ count: string }>(
+          `SELECT COUNT(*) AS count FROM agent_souls WHERE workspace_id = $1`,
+          [userId]
+        )
+      : await this.queryOne<{ count: string }>(`SELECT COUNT(*) AS count FROM agent_souls`);
     return parseInt(row?.count ?? '0', 10);
   }
 
@@ -173,8 +199,8 @@ export class SoulsRepository extends BaseRepository {
       `UPDATE agent_souls
        SET identity = $1, purpose = $2, autonomy = $3, heartbeat = $4,
            relationships = $5, evolution = $6, boot_sequence = $7,
-           workspace_id = $8, updated_at = NOW()
-       WHERE agent_id = $9`,
+           provider = $8, skill_access = $9, workspace_id = $10, updated_at = NOW()
+       WHERE agent_id = $11`,
       [
         JSON.stringify(soul.identity),
         JSON.stringify(soul.purpose),
@@ -183,6 +209,8 @@ export class SoulsRepository extends BaseRepository {
         JSON.stringify(soul.relationships),
         JSON.stringify(soul.evolution),
         JSON.stringify(soul.bootSequence),
+        soul.provider ? JSON.stringify(soul.provider) : null,
+        soul.skillAccess ? JSON.stringify(soul.skillAccess) : null,
         soul.workspaceId ?? null,
         soul.agentId,
       ]

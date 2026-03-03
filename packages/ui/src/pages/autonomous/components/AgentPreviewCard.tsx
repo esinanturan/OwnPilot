@@ -3,7 +3,7 @@
  * Used by AIChatCreator (inline after AI response) and TemplateCatalog (expanded view).
  */
 
-import { Bot, Repeat } from '../../../components/icons';
+import { Bot, Repeat, Cpu, Puzzle } from '../../../components/icons';
 import { cronToHuman } from '../helpers';
 
 export interface ProposedAgentConfig {
@@ -14,12 +14,15 @@ export interface ProposedAgentConfig {
   personality?: string;
   mission: string;
   tools?: string[];
+  skills?: string[];
   heartbeatInterval?: string;
   heartbeatEnabled?: boolean;
   autonomyLevel?: number;
   estimatedCost?: string;
   bgMode?: 'continuous' | 'interval' | 'event';
   bgIntervalMs?: number;
+  provider?: string;
+  model?: string;
 }
 
 interface Props {
@@ -80,7 +83,33 @@ export function AgentPreviewCard({ config, onConfirm, confirmLabel, isCreating }
         )}
         {config.autonomyLevel != null && <span>Autonomy: {config.autonomyLevel}/4</span>}
         {config.estimatedCost && <span>{config.estimatedCost}</span>}
+        {(config.provider || config.model) && (
+          <span className="flex items-center gap-1">
+            <Cpu className="w-3 h-3" />
+            {config.provider || 'default'}/{config.model || 'default'}
+          </span>
+        )}
       </div>
+
+      {/* Skills */}
+      {config.skills && config.skills.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          <Puzzle className="w-3 h-3 text-text-muted dark:text-dark-text-muted mt-0.5" />
+          {config.skills.slice(0, 4).map((skill) => (
+            <span
+              key={skill}
+              className="text-xs px-1.5 py-0.5 rounded bg-primary/10 text-primary"
+            >
+              {skill}
+            </span>
+          ))}
+          {config.skills.length > 4 && (
+            <span className="text-xs px-1.5 py-0.5 text-text-muted dark:text-dark-text-muted">
+              +{config.skills.length - 4} more
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Tools */}
       {config.tools && config.tools.length > 0 && (

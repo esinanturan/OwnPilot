@@ -3,7 +3,7 @@
  */
 
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, Pause, Play, MessageSquare, Heart, Trash2, Clock } from '../../../components/icons';
+import { Eye, Pause, Play, MessageSquare, Heart, Trash2, Clock, FlaskConical } from '../../../components/icons';
 import type { UnifiedAgent } from '../types';
 import { AgentStatusBadge } from './AgentStatusBadge';
 import { formatTimeAgo, formatCost, cronToHuman } from '../helpers';
@@ -13,9 +13,10 @@ interface Props {
   onPause?: (id: string) => void;
   onResume?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onTestRun?: (id: string) => void;
 }
 
-export function AgentCard({ agent, onPause, onResume, onDelete }: Props) {
+export function AgentCard({ agent, onPause, onResume, onDelete, onTestRun }: Props) {
   const navigate = useNavigate();
   const [, setSearchParams] = useSearchParams();
 
@@ -61,18 +62,29 @@ export function AgentCard({ agent, onPause, onResume, onDelete }: Props) {
               ? 'bg-primary/10 text-primary'
               : 'bg-text-muted/10 text-text-muted dark:text-dark-text-muted'
           }`}
+          title={
+            agent.kind === 'soul'
+              ? 'Soul Agent: Has personality, scheduled heartbeats, and can learn from feedback'
+              : 'Background Agent: Lightweight worker, runs continuously or on intervals'
+          }
         >
           {agent.kind === 'soul' ? 'Soul Agent' : 'Background'}
         </span>
         {/* Schedule */}
         {agent.soul?.heartbeat.enabled && agent.soul.heartbeat.interval && (
-          <span className="text-xs text-text-muted dark:text-dark-text-muted flex items-center gap-1">
+          <span
+            className="text-xs text-text-muted dark:text-dark-text-muted flex items-center gap-1"
+            title="Heartbeat schedule - when the agent wakes up automatically"
+          >
             <Clock className="w-3 h-3" />
             {cronToHuman(agent.soul.heartbeat.interval)}
           </span>
         )}
         {agent.backgroundAgent?.mode === 'interval' && agent.backgroundAgent.intervalMs && (
-          <span className="text-xs text-text-muted dark:text-dark-text-muted flex items-center gap-1">
+          <span
+            className="text-xs text-text-muted dark:text-dark-text-muted flex items-center gap-1"
+            title="Run interval - how often this agent executes"
+          >
             <Clock className="w-3 h-3" />
             Every {Math.round(agent.backgroundAgent.intervalMs / 60_000)}m
           </span>
@@ -82,14 +94,17 @@ export function AgentCard({ agent, onPause, onResume, onDelete }: Props) {
       {/* Stats row */}
       <div className="mt-3 pt-3 border-t border-border dark:border-dark-border flex items-center gap-4 text-xs text-text-muted dark:text-dark-text-muted">
         {agent.lastActiveAt && (
-          <span className="flex items-center gap-1">
-            <Heart className={`w-3 h-3 ${agent.heartbeatEnabled ? 'text-danger' : ''}`} />
+          <span
+            className="flex items-center gap-1"
+            title={agent.heartbeatEnabled ? 'Heartbeat is enabled - agent runs automatically' : 'Agent is idle'}
+          >
+            <Heart className={`w-3 h-3 ${agent.heartbeatEnabled ? 'text-danger animate-pulse' : ''}`} />
             {formatTimeAgo(agent.lastActiveAt)}
           </span>
         )}
-        <span>{formatCost(agent.todayCost)} today</span>
+        <span title="API cost consumed today">{formatCost(agent.todayCost)} today</span>
         {agent.unreadMessages > 0 && (
-          <span className="flex items-center gap-1 text-primary">
+          <span className="flex items-center gap-1 text-primary" title="Unread messages from other agents">
             <MessageSquare className="w-3 h-3" />
             {agent.unreadMessages}
           </span>
@@ -124,6 +139,16 @@ export function AgentCard({ agent, onPause, onResume, onDelete }: Props) {
               Resume
             </button>
           )}
+        {agent.kind === 'soul' && agent.heartbeatEnabled && onTestRun && (
+          <button
+            onClick={() => onTestRun(agent.id)}
+            className="flex items-center gap-1 text-xs text-primary hover:opacity-80 transition-opacity"
+            title="Run test immediately"
+          >
+            <FlaskConical className="w-3.5 h-3.5" />
+            Test
+          </button>
+        )}
         {onDelete && (
           <button
             onClick={() => onDelete(agent.id)}

@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { soulsApi, heartbeatLogsApi, agentMessagesApi, crewsApi } from '../../api/endpoints/souls';
+import { agentsApi } from '../../api/endpoints/agents';
 import type {
   AgentSoul,
   AgentCrew,
@@ -14,7 +15,9 @@ import type {
   HeartbeatStats,
   AgentMessage,
 } from '../../api/endpoints/souls';
+import type { AgentDetail } from '../../types';
 import { backgroundAgentsApi } from '../../api/endpoints/background-agents';
+import { providersApi } from '../../api/endpoints/providers';
 import type {
   BackgroundAgentConfig,
   BackgroundAgentHistoryEntry,
@@ -30,15 +33,22 @@ import {
   CheckCircle2,
   AlertCircle,
   Trash2,
+  FlaskConical,
+  Cpu,
+  Settings2,
+  Check,
+  X,
 } from '../../components/icons';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { useToast } from '../../components/ToastProvider';
 import { useDialog } from '../../components/ConfirmDialog';
 import { AgentStatusBadge } from './components/AgentStatusBadge';
 import { SoulEditor } from './components/SoulEditor';
+import { ToolSelector } from './components/ToolSelector';
 import type { AgentStatus, ProfileTab } from './types';
 import { mapBackgroundState } from './types';
 import { formatTimeAgo, formatCost, formatDuration } from './helpers';
+import type { Tool } from './components/ToolSelector';
 
 export function AgentProfilePage() {
   const { id } = useParams<{ id: string }>();
@@ -52,6 +62,7 @@ export function AgentProfilePage() {
   // Agent data
   const [soul, setSoul] = useState<AgentSoul | null>(null);
   const [bgAgent, setBgAgent] = useState<BackgroundAgentConfig | null>(null);
+  const [agentData, setAgentData] = useState<AgentDetail | null>(null);
   const [stats, setStats] = useState<HeartbeatStats | null>(null);
   const [heartbeats, setHeartbeats] = useState<HeartbeatLog[]>([]);
   const [bgHistory, setBgHistory] = useState<BackgroundAgentHistoryEntry[]>([]);
@@ -76,44 +87,56 @@ export function AgentProfilePage() {
     if (!id) return;
     setFetchError(null);
     try {
-      const results = await Promise.allSettled([
-        soulsApi.get(id),
-        backgroundAgentsApi.get(id).catch(() => null),
-        heartbeatLogsApi.getStats(id),
-        heartbeatLogsApi.listByAgent(id, 20, 0),
-        agentMessagesApi.listByAgent(id, 30, 0),
-        backgroundAgentsApi.getHistory(id, 20, 0).catch(() => null),
+      // First, try to get the soul agent
+      let soulData: AgentSoul | null = null;
+      let bgAgentData: BackgroundAgentConfig | null = null;
+
+      try {
+        soulData = await soulsApi.get(id);
+      } catch {
+        // Not a soul agent, try background agent
+        try {
+          bgAgentData = await backgroundAgentsApi.get(id);
+        } catch {
+          // Neither - will show error below
+        }
+      }
+
+      // If neither found, show error
+      if (!soulData && !bgAgentData) {
+        setFetchError('Agent not found. It may have been deleted.');
+        setIsLoading(false);
+        return;
+      }
+
+      setSoul(soulData);
+      setBgAgent(bgAgentData);
+
+      const [statsData, heartbeatsData, messagesData, crewsData, bgHistoryData, agentInfo] = await Promise.all([
+        heartbeatLogsApi.getStats(id).catch(() => null),
+        heartbeatLogsApi.listByAgent(id, 20, 0).catch(() => [] as HeartbeatLog[]),
+        agentMessagesApi.listByAgent(id, 30, 0).catch(() => [] as AgentMessage[]),
         crewsApi.list().catch(() => null),
+        bgAgentData
+          ? backgroundAgentsApi.getHistory(id, 20, 0).catch(() => null)
+          : Promise.resolve(null),
+        agentsApi.get(id).catch(() => null),
       ]);
 
-      // Check if both primary sources failed — real API error
-      const soulFailed = results[0].status === 'rejected';
-      const bgFailed =
-        results[1].status === 'rejected' ||
-        (results[1].status === 'fulfilled' && !results[1].value);
-      if (soulFailed && bgFailed && results[0].status === 'rejected') {
-        setFetchError('Failed to load agent data. Please check your connection and try again.');
-      }
-
-      if (results[0].status === 'fulfilled') setSoul(results[0].value);
-      if (results[1].status === 'fulfilled' && results[1].value)
-        setBgAgent(results[1].value as BackgroundAgentConfig);
-      if (results[2].status === 'fulfilled') setStats(results[2].value as HeartbeatStats);
-      if (results[3].status === 'fulfilled') {
-        const hbData = results[3].value;
-        setHeartbeats(Array.isArray(hbData) ? hbData : []);
-      }
-      if (results[4].status === 'fulfilled') {
-        const msgData = results[4].value;
-        setMessages(Array.isArray(msgData) ? msgData : []);
-      }
-      if (results[5].status === 'fulfilled' && results[5].value) {
-        const histData = results[5].value as { entries: BackgroundAgentHistoryEntry[] };
-        setBgHistory(histData.entries ?? []);
-      }
-      if (results[6].status === 'fulfilled' && results[6].value) {
-        const crewsData = results[6].value as { items: AgentCrew[] };
+      if (statsData) setStats(statsData);
+      setHeartbeats(heartbeatsData);
+      setMessages(messagesData);
+      if (crewsData) {
         setCrews(crewsData.items ?? []);
+      }
+      // Background agent history (only for background agents)
+      if (bgHistoryData) {
+        setBgHistory(bgHistoryData.entries ?? []);
+      } else {
+        setBgHistory([]);
+      }
+      if (agentInfo) {
+        setAgentData(agentInfo);
       }
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'An unexpected error occurred.');
@@ -185,9 +208,63 @@ export function AgentProfilePage() {
     }
   }, [id, name, bgAgent, confirm, toast, navigate]);
 
+  const handleTestRun = useCallback(async () => {
+    if (!id || !soul) return;
+    if (!soul.heartbeat.enabled) {
+      toast.warning('Agent is paused. Resume before testing.');
+      return;
+    }
+    try {
+      const result = await soulsApi.runTest(id);
+      toast.success(result.message);
+      // Run is complete server-side — refresh immediately
+      fetchData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Test run failed');
+    }
+  }, [id, soul, toast, fetchData]);
+
+  // Tools state
+  const [tools, setTools] = useState<Tool[]>([]);
+  const [allowedTools, setAllowedTools] = useState<string[]>([]);
+  const [blockedTools, setBlockedTools] = useState<string[]>([]);
+  const [isToolsLoading, setIsToolsLoading] = useState(false);
+
+  // Load tools when on tools tab
+  useEffect(() => {
+    if (activeTab === 'tools' && id) {
+      setIsToolsLoading(true);
+      soulsApi
+        .getTools(id)
+        .then((data) => {
+          setTools(data.tools);
+          setAllowedTools(data.allowed);
+          setBlockedTools(data.blocked);
+        })
+        .catch(() => toast.error('Failed to load tools'))
+        .finally(() => setIsToolsLoading(false));
+    }
+  }, [activeTab, id, toast]);
+
+  const handleToolsChange = useCallback(
+    async (allowed: string[], blocked: string[]) => {
+      if (!id) return;
+      try {
+        await soulsApi.updateTools(id, { allowed, blocked });
+        setAllowedTools(allowed);
+        setBlockedTools(blocked);
+        toast.success('Tool permissions updated');
+      } catch {
+        toast.error('Failed to update tools');
+      }
+    },
+    [id, toast]
+  );
+
   const profileTabs: { key: ProfileTab; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     ...(isSoul ? [{ key: 'soul' as const, label: 'Soul' }] : []),
+    ...(isSoul ? [{ key: 'tools' as const, label: 'Tools' }] : []),
     { key: 'messages', label: 'Messages' },
     { key: 'activity', label: 'Activity' },
     { key: 'budget', label: 'Budget' },
@@ -253,6 +330,21 @@ export function AgentProfilePage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Run Test - for soul agents only */}
+          {isSoul && (
+            <button
+              onClick={handleTestRun}
+              disabled={!soul?.heartbeat.enabled}
+              title={
+                soul?.heartbeat.enabled
+                  ? 'Run agent immediately (test heartbeat)'
+                  : 'Resume agent to run test'
+              }
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-primary text-primary rounded-lg hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <FlaskConical className="w-4 h-4" /> Run Test
+            </button>
+          )}
           {(status === 'running' || status === 'waiting') && (
             <button
               onClick={handlePause}
@@ -295,29 +387,60 @@ export function AgentProfilePage() {
         ))}
       </div>
 
-      {/* Tab content */}
-      {activeTab === 'overview' && (
-        <OverviewTab
-          soul={soul}
-          bgAgent={bgAgent}
-          stats={stats}
-          heartbeats={heartbeats}
-          bgHistory={bgHistory}
-          messages={messages}
-        />
-      )}
+      {/* Tab content - consistent width container */}
+      <div className="w-full min-h-[500px] min-w-[800px]">
+        {activeTab === 'overview' && (
+          <TabContent>
+            <OverviewTab
+              agentId={id!}
+              soul={soul}
+              bgAgent={bgAgent}
+              agentData={agentData}
+              stats={stats}
+              heartbeats={heartbeats}
+              bgHistory={bgHistory}
+              messages={messages}
+              onUpdate={fetchData}
+            />
+          </TabContent>
+        )}
 
-      {activeTab === 'soul' && id && <SoulEditor agentId={id} />}
+        {activeTab === 'soul' && id && (
+          <TabContent>
+            <SoulEditor agentId={id} />
+          </TabContent>
+        )}
 
-      {activeTab === 'messages' && id && (
-        <MessagesTab agentId={id} messages={messages} onRefresh={fetchData} />
-      )}
+        {activeTab === 'tools' && id && (
+          <TabContent>
+            <ToolsTab
+              tools={tools}
+              allowedTools={allowedTools}
+              blockedTools={blockedTools}
+              isLoading={isToolsLoading}
+              onChange={handleToolsChange}
+            />
+          </TabContent>
+        )}
 
-      {activeTab === 'activity' && (
-        <ActivityTab heartbeats={heartbeats} bgHistory={bgHistory} onRefresh={fetchData} />
-      )}
+        {activeTab === 'messages' && id && (
+          <TabContent>
+            <MessagesTab agentId={id} messages={messages} onRefresh={fetchData} />
+          </TabContent>
+        )}
 
-      {activeTab === 'budget' && <BudgetTab soul={soul} bgAgent={bgAgent} stats={stats} />}
+        {activeTab === 'activity' && (
+          <TabContent>
+            <ActivityTab heartbeats={heartbeats} bgHistory={bgHistory} onRefresh={fetchData} />
+          </TabContent>
+        )}
+
+        {activeTab === 'budget' && (
+          <TabContent>
+            <BudgetTab soul={soul} bgAgent={bgAgent} stats={stats} />
+          </TabContent>
+        )}
+      </div>
     </div>
   );
 }
@@ -327,22 +450,119 @@ export function AgentProfilePage() {
 // =============================================================================
 
 function OverviewTab({
+  agentId,
   soul,
   bgAgent,
+  agentData,
   stats,
   heartbeats,
   bgHistory,
   messages,
+  onUpdate,
 }: {
+  agentId: string;
   soul: AgentSoul | null;
   bgAgent: BackgroundAgentConfig | null;
+  agentData: AgentDetail | null;
   stats: HeartbeatStats | null;
   heartbeats: HeartbeatLog[];
   bgHistory: BackgroundAgentHistoryEntry[];
   messages: AgentMessage[];
+  onUpdate: () => void;
 }) {
+  const toast = useToast();
+  const [isEditingProvider, setIsEditingProvider] = useState(false);
+  const [providers, setProviders] = useState<{ id: string; name: string }[]>([]);
+  const [models, setModels] = useState<{ id: string; name: string }[]>([]);
+  // Helper functions to safely get provider/model with fallback to 'default'
+  const getSafeProvider = () => agentData?.provider || 'default';
+  const getSafeModel = () => agentData?.model || 'default';
+  const getSoulFallbackProviderId = () => {
+    if (!soul?.provider || typeof soul.provider === 'string') return '';
+    return soul.provider.fallbackProviderId || '';
+  };
+  const getSoulFallbackModelId = () => {
+    if (!soul?.provider || typeof soul.provider === 'string') return '';
+    return soul.provider.fallbackModelId || '';
+  };
+
+  const [editProvider, setEditProvider] = useState(getSafeProvider());
+  const [editModel, setEditModel] = useState(getSafeModel());
+  const [editFallbackProvider, setEditFallbackProvider] = useState(getSoulFallbackProviderId());
+  const [editFallbackModel, setEditFallbackModel] = useState(getSoulFallbackModelId());
+  const [fallbackModels, setFallbackModels] = useState<{ id: string; name: string }[]>([]);
+
+  // Load providers when editing
+  useEffect(() => {
+    if (isEditingProvider) {
+      providersApi.list().then((data) => {
+        const list = data.providers.map((p) => ({ id: p.id, name: p.name }));
+        setProviders(list);
+      });
+    }
+  }, [isEditingProvider]);
+
+  // Load models when provider changes
+  useEffect(() => {
+    if (editProvider) {
+      providersApi.models(editProvider).then((data) => {
+        setModels(data.models);
+      });
+    }
+  }, [editProvider]);
+
+  // Load fallback models when fallback provider changes
+  useEffect(() => {
+    if (editFallbackProvider) {
+      providersApi.models(editFallbackProvider).then((data) => {
+        setFallbackModels(data.models);
+      });
+    }
+  }, [editFallbackProvider]);
+
+  const handleSaveProvider = async () => {
+    try {
+      // Ensure we have valid values - fallback to 'default' if empty
+      const providerToSave = editProvider || 'default';
+      const modelToSave = editModel || 'default';
+
+      if (bgAgent) {
+        // Update background agent provider/model
+        await backgroundAgentsApi.update(agentId, {
+          provider: providerToSave,
+          model: modelToSave,
+        });
+      } else if (soul) {
+        // Update soul agent via agents API (main agent record)
+        await agentsApi.update(agentId, {
+          provider: providerToSave,
+          model: modelToSave,
+        });
+
+        // Update soul provider configuration
+        await soulsApi.update(soul.agentId, {
+          provider: {
+            providerId: providerToSave,
+            modelId: modelToSave,
+            fallbackProviderId: editFallbackProvider || undefined,
+            fallbackModelId: editFallbackModel || undefined,
+          },
+        });
+      } else {
+        toast.error('Agent data not available');
+        return;
+      }
+
+      toast.success('Provider configuration updated');
+      setIsEditingProvider(false);
+      onUpdate();
+    } catch {
+      toast.error('Failed to update');
+    }
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard
@@ -390,6 +610,14 @@ function OverviewTab({
                 value={soul.heartbeat.enabled ? soul.heartbeat.interval : 'Disabled'}
               />
               <InfoRow label="Mission" value={soul.purpose.mission} />
+              <InfoRow
+                label="Skills"
+                value={
+                  soul.skillAccess?.allowed?.length
+                    ? `${soul.skillAccess.allowed.length} skill${soul.skillAccess.allowed.length !== 1 ? 's' : ''} enabled`
+                    : 'No skills enabled'
+                }
+              />
             </>
           )}
           {bgAgent && (
@@ -405,6 +633,164 @@ function OverviewTab({
             </>
           )}
         </div>
+      </div>
+
+      {/* Provider / Model Configuration */}
+      <div className="border border-border dark:border-dark-border rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary flex items-center gap-2">
+            <Cpu className="w-4 h-4 text-primary" />
+            Provider & Model
+          </h3>
+          {agentData && !isEditingProvider && (
+            <button
+              onClick={() => {
+                // Use safe getters to handle undefined/null values
+                setEditProvider(getSafeProvider());
+                setEditModel(getSafeModel());
+                setEditFallbackProvider(getSoulFallbackProviderId());
+                setEditFallbackModel(getSoulFallbackModelId());
+                setIsEditingProvider(true);
+              }}
+              className="flex items-center gap-1 text-xs text-primary hover:text-primary-dark transition-colors"
+            >
+              <Settings2 className="w-3.5 h-3.5" /> Edit
+            </button>
+          )}
+        </div>
+
+        {agentData ? (
+          isEditingProvider ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-text-muted dark:text-dark-text-muted mb-1">
+                    Provider
+                  </label>
+                  <select
+                    value={editProvider}
+                    onChange={(e) => {
+                      setEditProvider(e.target.value);
+                      setEditModel(''); // Reset model when provider changes
+                    }}
+                    className="w-full rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">Select provider...</option>
+                    {providers.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted dark:text-dark-text-muted mb-1">
+                    Model
+                  </label>
+                  <select
+                    value={editModel}
+                    onChange={(e) => setEditModel(e.target.value)}
+                    disabled={!editProvider || models.length === 0}
+                    className="w-full rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                  >
+                    <option value="">Select model...</option>
+                    {models.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Fallback Configuration */}
+              {soul && (
+                <div className="border-t border-border dark:border-dark-border pt-3 mt-3">
+                  <p className="text-xs text-text-muted dark:text-dark-text-muted mb-2">
+                    Fallback Configuration (used if primary provider fails)
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-text-muted dark:text-dark-text-muted mb-1">
+                        Fallback Provider
+                      </label>
+                      <select
+                        value={editFallbackProvider}
+                        onChange={(e) => {
+                          setEditFallbackProvider(e.target.value);
+                          setEditFallbackModel('');
+                        }}
+                        className="w-full rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                      >
+                        <option value="">None (optional)</option>
+                        {providers.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-text-muted dark:text-dark-text-muted mb-1">
+                        Fallback Model
+                      </label>
+                      <select
+                        value={editFallbackModel}
+                        onChange={(e) => setEditFallbackModel(e.target.value)}
+                        disabled={!editFallbackProvider || fallbackModels.length === 0}
+                        className="w-full rounded-lg border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                      >
+                        <option value="">Select model...</option>
+                        {fallbackModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  onClick={handleSaveProvider}
+                  disabled={!editProvider || !editModel}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs bg-primary hover:bg-primary-dark text-white rounded-lg disabled:opacity-50"
+                >
+                  <Check className="w-3.5 h-3.5" /> Save
+                </button>
+                <button
+                  onClick={() => setIsEditingProvider(false)}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs border border-border dark:border-dark-border text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary rounded-lg"
+                >
+                  <X className="w-3.5 h-3.5" /> Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <InfoRow label="Provider" value={agentData.provider || 'Default'} />
+                <InfoRow label="Model" value={agentData.model || 'Default'} />
+              </div>
+              {getSoulFallbackProviderId() && (
+                <div className="mt-2 pt-2 border-t border-border dark:border-dark-border">
+                  <p className="text-xs text-text-muted dark:text-dark-text-muted mb-1">Fallback:</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <InfoRow label="Provider" value={getSoulFallbackProviderId() || 'None'} />
+                    <InfoRow label="Model" value={getSoulFallbackModelId() || 'Default'} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        ) : (
+          <p className="text-xs text-text-muted dark:text-dark-text-muted">
+            Agent data not available. Provider and model information is loaded from the main agent
+            configuration.
+          </p>
+        )}
       </div>
 
       {/* Recent heartbeats */}
@@ -764,7 +1150,7 @@ function BudgetTab({
   const monthlyLimit = soul?.autonomy.maxCostPerMonth ?? 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard label="Total Spent" value={formatCost(totalCost)} />
         <StatCard
@@ -850,5 +1236,65 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <span className="text-text-muted dark:text-dark-text-muted">{label}</span>
       <span className="text-text-primary dark:text-dark-text-primary">{value}</span>
     </>
+  );
+}
+
+function TabContent({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="w-full min-w-[800px] max-w-4xl py-4 animate-in fade-in duration-200">
+      {children}
+    </div>
+  );
+}
+
+function ToolsTab({
+  tools,
+  allowedTools,
+  blockedTools,
+  isLoading,
+  onChange,
+}: {
+  tools: Tool[];
+  allowedTools: string[];
+  blockedTools: string[];
+  isLoading: boolean;
+  onChange: (allowed: string[], blocked: string[]) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary">
+            Tool Permissions
+          </h3>
+          <p className="text-xs text-text-muted dark:text-dark-text-muted mt-0.5">
+            Control which tools this agent can access. Blocked tools are restricted, allowed tools
+            are explicitly permitted, and neutral tools follow default behavior.
+          </p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="py-8 text-center">
+          <LoadingSpinner message="Loading tools..." />
+        </div>
+      ) : tools.length === 0 ? (
+        <p className="text-sm text-text-muted dark:text-dark-text-muted text-center py-8">
+          No tools available.
+        </p>
+      ) : (
+        <ToolSelector
+          availableTools={tools.map((t) => ({
+            name: t.name,
+            description: t.description,
+            category: t.category,
+            provider: t.provider,
+          }))}
+          allowedTools={allowedTools}
+          blockedTools={blockedTools}
+          onChange={onChange}
+        />
+      )}
+    </div>
   );
 }

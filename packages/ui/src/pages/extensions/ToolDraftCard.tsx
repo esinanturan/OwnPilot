@@ -24,9 +24,14 @@ export function ToolDraftCard({
 
   if (!tool.expanded) {
     return (
-      <button
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onToggleExpanded}
-        className="w-full flex items-center justify-between p-3 bg-bg-tertiary dark:bg-dark-bg-tertiary border border-border dark:border-dark-border rounded-lg text-left hover:border-primary/50 transition-colors"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') onToggleExpanded();
+        }}
+        className="w-full flex items-center justify-between p-3 bg-bg-tertiary dark:bg-dark-bg-tertiary border border-border dark:border-dark-border rounded-lg text-left hover:border-primary/50 transition-colors cursor-pointer"
       >
         <div className="flex items-center gap-3 min-w-0">
           <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />
@@ -42,7 +47,7 @@ export function ToolDraftCard({
             {tool.permissions.length} perm
           </span>
         )}
-      </button>
+      </div>
     );
   }
 

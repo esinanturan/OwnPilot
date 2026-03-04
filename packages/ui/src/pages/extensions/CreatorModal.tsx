@@ -3,6 +3,7 @@ import { Sparkles, Wrench, X, Plus, Copy, Code, Check } from '../../components/i
 import { useToast } from '../../components/ToastProvider';
 import { extensionsApi } from '../../api/endpoints/extensions';
 import type { ToolDraft } from './constants';
+import { nextToolDraftId } from './constants';
 import { EXTENSION_CATEGORIES, DEFAULT_PARAMS, DEFAULT_CODE } from './constants';
 import { ToolDraftCard } from './ToolDraftCard';
 
@@ -67,6 +68,7 @@ export function CreatorModal({
     if (Array.isArray(m.tools)) {
       setTools(
         (m.tools as Record<string, unknown>[]).map((t) => ({
+          id: nextToolDraftId(),
           name: (t.name as string) || '',
           description: (t.description as string) || '',
           parameters: JSON.stringify(
@@ -133,6 +135,7 @@ export function CreatorModal({
     setTools((prev) => [
       ...prev.map((t) => ({ ...t, expanded: false })),
       {
+        id: nextToolDraftId(),
         name: '',
         description: '',
         parameters: DEFAULT_PARAMS,
@@ -544,7 +547,7 @@ export function CreatorModal({
 
               {tools.map((tool, index) => (
                 <ToolDraftCard
-                  key={index}
+                  key={tool.id}
                   tool={tool}
                   index={index}
                   onUpdate={(updates) => updateTool(index, updates)}

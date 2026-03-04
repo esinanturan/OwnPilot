@@ -502,7 +502,7 @@ export class ChannelServiceImpl implements IChannelService {
             senderId: message.sender.platformUserId,
             senderName: message.sender.displayName,
             content: message.text,
-            contentType: 'text',
+            contentType: message.attachments && message.attachments.length > 0 ? 'attachment' : 'text',
             attachments: message.attachments?.map((a) => ({
               type: a.type,
               url: a.url ?? '',

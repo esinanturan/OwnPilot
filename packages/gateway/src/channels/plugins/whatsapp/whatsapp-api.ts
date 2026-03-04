@@ -15,7 +15,7 @@ import makeWASocket, {
   Browsers,
   type WASocket,
   type WAMessage,
-  type proto,
+  proto,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
@@ -141,6 +141,10 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
   // Anti-ban: device info cache (reduces protocol overhead — WAHA pattern)
   private userDevicesCache = new SimpleTTLCache<string[]>(300_000); // 5 min TTL
 
+  // History sync tracking
+  private historySyncInProgress = false;
+  private lastHistoryFetchTime: number | null = null;
+
   // Group listing cache (5 min TTL — prevents excessive groupFetchAllParticipating calls)
   private groupsCache: WhatsAppGroupSummary[] | null = null;
   private groupsRawParticipants: Map<string, Array<{ id: string; admin?: string | null }>> | null = null;
@@ -198,6 +202,9 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
         browser: Browsers.appropriate('Chrome'),
         generateHighQualityLinkPreview: false,
         syncFullHistory: false,
+        // History sync: accept all passive sync messages (Evolution API + WAHA pattern)
+        // REQUIRED for messaging-history.set to fire (GitHub Issue #1934)
+        shouldSyncHistoryMessage: () => true,
         // Anti-ban: don't appear online 24/7 (bot signal)
         markOnlineOnConnect: false,
         connectTimeoutMs: 30_000,
@@ -275,6 +282,118 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
 
       // Save credentials on update
       this.sock.ev.on('creds.update', saveCreds);
+
+      // Handle passive history sync (WhatsApp sends past messages on first connect)
+      this.sock.ev.on('messaging-history.set', async ({ messages, chats, contacts, syncType, progress, isLatest }) => {
+        try {
+          const syncTypeName = syncType != null ? proto.HistorySync.HistorySyncType[syncType] ?? String(syncType) : 'unknown';
+          log.info(`[WhatsApp] History sync received — type: ${syncTypeName}, messages: ${messages.length}, chats: ${chats?.length ?? 0}, contacts: ${contacts?.length ?? 0}, progress: ${progress ?? 'N/A'}%, isLatest: ${isLatest ?? 'N/A'}`);
+
+          if (messages.length === 0) {
+            log.info('[WhatsApp] History sync batch empty — skipping');
+            return;
+          }
+
+          if (this.historySyncInProgress) {
+            log.warn('[WhatsApp] History sync already in progress — queuing');
+          }
+          this.historySyncInProgress = true;
+
+          const { ChannelMessagesRepository } = await import('../../../db/repositories/channel-messages.js');
+          const messagesRepo = new ChannelMessagesRepository();
+
+          // Transform WAMessage[] to DB rows
+          const rows: Array<Parameters<typeof messagesRepo.createBatch>[0][number]> = [];
+
+          for (const msg of messages) {
+            const remoteJid = msg.key?.remoteJid;
+            if (!remoteJid) continue;
+
+            const isGroup = remoteJid.endsWith('@g.us');
+            const isDM = remoteJid.endsWith('@s.whatsapp.net');
+            if (!isDM && !isGroup) continue;
+
+            // Skip our own messages (except self-chat)
+            const isSelf = this.isSelfChat(remoteJid);
+            if (msg.key.fromMe && !isSelf) continue;
+
+            const messageId = msg.key.id ?? '';
+            if (!messageId) continue;
+
+            // Extract text content
+            const m = msg.message;
+            let text = '';
+            if (m?.conversation) text = m.conversation;
+            else if (m?.extendedTextMessage?.text) text = m.extendedTextMessage.text;
+            else if (m?.imageMessage?.caption) text = m.imageMessage.caption;
+            else if (m?.videoMessage?.caption) text = m.videoMessage.caption;
+            else if (m?.documentMessage?.caption) text = m.documentMessage.caption;
+
+            // Skip empty messages (no text, no recognizable content)
+            if (!text && !m?.imageMessage && !m?.audioMessage && !m?.videoMessage && !m?.documentMessage) continue;
+            if (!text) text = '[Attachment]';
+
+            const participantJid = isGroup ? (msg.key.participant ?? '') : remoteJid;
+            const phone = this.phoneFromJid(participantJid || remoteJid);
+
+            // Parse timestamp
+            const rawTs = msg.messageTimestamp;
+            const timestamp =
+              typeof rawTs === 'number'
+                ? new Date(rawTs * 1000)
+                : typeof rawTs === 'object' && rawTs !== null && 'toNumber' in rawTs
+                  ? new Date((rawTs as { toNumber(): number }).toNumber() * 1000)
+                  : new Date();
+
+            rows.push({
+              id: `${this.pluginId}:${messageId}`,
+              channelId: this.pluginId,
+              externalId: messageId,
+              direction: 'inbound' as const,
+              senderId: phone,
+              senderName: msg.pushName || phone,
+              content: text,
+              contentType: (m?.imageMessage || m?.audioMessage || m?.videoMessage || m?.documentMessage) ? 'attachment' : 'text',
+              metadata: {
+                platformMessageId: messageId,
+                jid: remoteJid,
+                isGroup,
+                pushName: msg.pushName || undefined,
+                ...(isGroup && participantJid ? { participant: participantJid } : {}),
+                historySync: true,
+                syncType: syncTypeName,
+              },
+              createdAt: timestamp,
+            });
+
+            // Seed processedMsgIds to prevent double-processing on reconnect
+            if (messageId) {
+              this.processedMsgIds.add(messageId);
+              if (this.processedMsgIds.size > 5000) {
+                const first = this.processedMsgIds.values().next().value;
+                if (first !== undefined) this.processedMsgIds.delete(first);
+              }
+            }
+
+            // Seed messageCache for getMessage retry/decryption
+            if (messageId && m) {
+              this.cacheMessage(messageId, m);
+            }
+          }
+
+          if (rows.length > 0) {
+            const inserted = await messagesRepo.createBatch(rows);
+            log.info(`[WhatsApp] History sync saved ${inserted}/${rows.length} messages to DB (type: ${syncTypeName})`);
+          } else {
+            log.info('[WhatsApp] History sync — no processable messages in batch');
+          }
+
+          this.historySyncInProgress = false;
+        } catch (err) {
+          this.historySyncInProgress = false;
+          log.error('[WhatsApp] History sync failed:', err);
+        }
+      });
 
       this.isReconnecting = false;
       log.info('WhatsApp socket created, waiting for authentication...');
@@ -509,6 +628,39 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
   }
 
   /**
+   * Fetch message history for a specific group on-demand.
+   * Uses Baileys fetchMessageHistory() — sends request to phone (must be online).
+   * Result arrives async via messaging-history.set event (syncType = ON_DEMAND).
+   */
+  async fetchGroupHistory(groupJid: string, count = 50): Promise<string> {
+    if (!groupJid.endsWith('@g.us')) {
+      throw new Error('Invalid group JID: expected @g.us suffix');
+    }
+
+    const sock = this.sock;
+    if (!sock || this.status !== 'connected') {
+      throw new Error('WhatsApp is not connected');
+    }
+
+    // Rate limit: max 1 call per 30 seconds
+    const now = Date.now();
+    if (this.lastHistoryFetchTime && now - this.lastHistoryFetchTime < 30_000) {
+      throw new Error('Rate limited — wait 30 seconds between history fetch requests');
+    }
+    this.lastHistoryFetchTime = now;
+
+    // Use a minimal key to request from the beginning
+    const sessionId = await sock.fetchMessageHistory(
+      Math.min(count, 50), // Baileys max 50 per request
+      { remoteJid: groupJid, fromMe: false, id: '' },
+      0 // oldest timestamp = 0 means "from the beginning"
+    );
+
+    log.info(`[WhatsApp] On-demand history fetch requested — group: ${groupJid}, count: ${count}, sessionId: ${sessionId}`);
+    return sessionId;
+  }
+
+  /**
    * Fetch full metadata for a single group by JID.
    * Uses groupMetadata() — one targeted Baileys call per invocation.
    */
@@ -569,6 +721,7 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
         this.sock.ev.removeAllListeners('connection.update');
         this.sock.ev.removeAllListeners('messages.upsert');
         this.sock.ev.removeAllListeners('creds.update');
+        this.sock.ev.removeAllListeners('messaging-history.set');
       } catch {
         /* listeners may already be gone */
       }
@@ -580,6 +733,7 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
       this.groupsCache = null;
       this.groupsRawParticipants = null;
       this.groupsCacheTime = 0;
+      this.historySyncInProgress = false;
       this.sock = null;
     }
   }
@@ -866,18 +1020,16 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
       return;
     }
 
-    // For group messages, extract participant (individual sender) from msg.key.participant
-    // For DMs, sender is derived from remoteJid
-    const participantJid = isGroup ? (msg.key.participant ?? '') : remoteJid;
-    const phone = isGroup
-      ? this.phoneFromJid(participantJid)
-      : this.phoneFromJid(remoteJid);
-
-    // Skip group messages where participant cannot be determined
-    if (isGroup && !participantJid) {
+    // Skip group messages where participant cannot be determined (guard BEFORE phone extraction)
+    if (isGroup && !msg.key.participant) {
       log.info(`[WhatsApp] Skipping group message without participant from ${remoteJid}`);
       return;
     }
+
+    // For group messages, extract participant (individual sender) from msg.key.participant
+    // For DMs, sender is derived from remoteJid
+    const participantJid = isGroup ? msg.key.participant! : remoteJid;
+    const phone = this.phoneFromJid(participantJid);
 
     // Access control — if allowed_users is set, ONLY those users get AI responses (DM only)
     if (!isGroup && this.allowedUsers.size > 0 && !this.allowedUsers.has(phone)) {

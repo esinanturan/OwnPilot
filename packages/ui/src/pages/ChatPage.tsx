@@ -7,6 +7,7 @@ import { MemoryCards } from '../components/MemoryCards';
 import { ContextBar } from '../components/ContextBar';
 import { ContextDetailModal } from '../components/ContextDetailModal';
 import { WorkspaceSelector } from '../components/WorkspaceSelector';
+import { ConversationSidebar } from '../components/ConversationSidebar';
 import { useChatStore } from '../hooks/useChatStore';
 import { ExecutionSecurityPanel } from '../components/ExecutionSecurityPanel';
 import { ToolCallLimitPanel } from '../components/ToolCallLimitPanel';
@@ -31,6 +32,7 @@ import {
   ChevronRight,
 } from '../components/icons';
 import { modelsApi, providersApi, settingsApi, agentsApi, chatApi } from '../api';
+import type { HistoryMessage } from '../api';
 import type { ModelInfo, AgentDetail } from '../types';
 import { STORAGE_KEYS } from '../constants/storage-keys';
 
@@ -58,6 +60,7 @@ export function ChatPage() {
     sendMessage,
     retryLastMessage,
     clearMessages,
+    loadConversation,
     cancelRequest,
     clearSuggestions,
     acceptMemory,
@@ -273,6 +276,32 @@ export function ChatPage() {
     }
   };
 
+  const handleLoadConversation = async (id: string) => {
+    try {
+      const { messages: histMessages } = await chatApi.getHistory(id);
+      // Convert HistoryMessage[] → Message[] (skip system messages)
+      const messages = (histMessages as HistoryMessage[])
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          timestamp: m.createdAt,
+          toolCalls: m.toolCalls,
+          provider: m.provider,
+          model: m.model,
+          isError: m.isError,
+        }));
+      loadConversation(id, messages);
+      setSearchParams({});
+      // Scroll to bottom after loading
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'instant' }), 50);
+    } catch {
+      // Fallback — just set the session ID so next message continues correctly
+      loadConversation(id, []);
+    }
+  };
+
   const handleCompactContext = async () => {
     try {
       await chatApi.compactContext(provider, model);
@@ -290,7 +319,16 @@ export function ChatPage() {
     currentAgent?.name?.match(/^(\p{Emoji})\s*(.+)$/u)?.[2] ?? currentAgent?.name;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full overflow-hidden">
+      {/* Conversation sidebar */}
+      <ConversationSidebar
+        activeId={sessionId}
+        onNew={handleNewChat}
+        onSelect={handleLoadConversation}
+      />
+
+      {/* Main chat area */}
+      <div className="flex flex-col flex-1 min-w-0">
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-border dark:border-dark-border">
         <div className="flex items-center gap-4">
@@ -874,6 +912,7 @@ export function ChatPage() {
           <ExecutionApprovalDialog approval={pendingApproval} onResolve={resolveApproval} />
         </Suspense>
       )}
+      </div> {/* end main chat area */}
     </div>
   );
 }

@@ -85,6 +85,8 @@ interface ChatStore extends ChatState {
   ) => Promise<void>;
   retryLastMessage: () => Promise<void>;
   clearMessages: () => void;
+  /** Load a past conversation into the chat (sets messages + sessionId). */
+  loadConversation: (id: string, messages: Message[]) => void;
   cancelRequest: () => void;
   clearSuggestions: () => void;
   acceptMemory: (index: number) => void;
@@ -265,6 +267,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
             provider,
             model,
             stream: true, // Enable streaming!
+            // Continue the current conversation by ID so messages are properly linked in DB
+            ...(sessionId && { conversationId: sessionId }),
             ...(agentId && { agentId }),
             ...(workspaceId && { workspaceId }),
             ...(directTools?.length && { directTools }),
@@ -566,6 +570,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setSessionInfo(null);
   }, [cancelRequest]);
 
+  const loadConversation = useCallback(
+    (id: string, messages: Message[]) => {
+      cancelRequest();
+      setMessages(messages);
+      setError(null);
+      setLastFailedMessage(null);
+      setStreamingContent('');
+      setProgressEvents([]);
+      setSuggestions([]);
+      setExtractedMemories([]);
+      setPendingApproval(null);
+      setSessionId(id);
+      setSessionInfo(null);
+    },
+    [cancelRequest]
+  );
+
   const value: ChatStore = {
     messages,
     isLoading,
@@ -592,6 +613,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     sendMessage,
     retryLastMessage,
     clearMessages,
+    loadConversation,
     cancelRequest,
     clearSuggestions,
     acceptMemory,

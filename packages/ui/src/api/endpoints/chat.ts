@@ -12,6 +12,8 @@ export interface ChatRequestBody {
   provider: string;
   model: string;
   stream?: boolean;
+  /** Continue an existing conversation by ID. */
+  conversationId?: string;
   agentId?: string;
   workspaceId?: string;
   directTools?: string[];
@@ -79,6 +81,10 @@ export const chatApi = {
   /** Archive or unarchive a conversation */
   archiveHistory: (id: string, archived: boolean) =>
     apiClient.patch<{ archived: boolean }>(`/chat/history/${id}/archive`, { archived }),
+
+  /** Rename a conversation */
+  renameConversation: (id: string, title: string) =>
+    apiClient.patch<{ id: string; title: string | null }>(`/chat/history/${id}`, { title }),
 
   // ---- Bulk Operations ----
 

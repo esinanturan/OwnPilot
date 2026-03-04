@@ -625,6 +625,40 @@ chatHistoryRoutes.patch('/history/:id/archive', async (c) => {
   }
 });
 
+/**
+ * Rename conversation (update title)
+ */
+chatHistoryRoutes.patch('/history/:id', async (c) => {
+  const id = c.req.param('id');
+  const userId = getUserId(c);
+  const body = await parseJsonBody<{ title?: string }>(c);
+  if (!body) {
+    return apiError(c, { code: ERROR_CODES.INVALID_INPUT, message: 'Invalid JSON body' }, 400);
+  }
+
+  try {
+    const chatRepo = new ChatRepository(userId);
+    const updated = await chatRepo.updateConversation(id, {
+      ...(body.title !== undefined && { title: body.title }),
+    });
+
+    if (!updated) {
+      return notFoundError(c, 'Conversation', id);
+    }
+
+    return apiResponse(c, { id: updated.id, title: updated.title });
+  } catch (error) {
+    return apiError(
+      c,
+      {
+        code: ERROR_CODES.EXECUTION_ERROR,
+        message: getErrorMessage(error, 'Failed to update conversation'),
+      },
+      500
+    );
+  }
+});
+
 // =====================================================
 // LOGS API (Debug/Analytics)
 // =====================================================

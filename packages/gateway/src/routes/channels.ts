@@ -693,6 +693,50 @@ channelRoutes.get('/:id/groups/:groupJid/messages', async (c) => {
 });
 
 /**
+ * POST /channels/:id/groups/:groupJid/sync - Trigger on-demand history fetch for a group
+ * Result arrives async via messaging-history.set event — check messages endpoint later.
+ */
+channelRoutes.post('/:id/groups/:groupJid/sync', async (c) => {
+  const pluginId = c.req.param('id');
+  const rawGroupJid = c.req.param('groupJid');
+
+  let groupJid: string;
+  try {
+    groupJid = decodeURIComponent(rawGroupJid);
+  } catch {
+    return apiError(c, { code: ERROR_CODES.INVALID_REQUEST, message: 'Invalid group JID encoding' }, 400);
+  }
+  if (!groupJid.includes('@')) {
+    groupJid = `${groupJid}@g.us`;
+  }
+  if (!/^\d[\d-]*@g\.us$/.test(groupJid)) {
+    return apiError(c, { code: ERROR_CODES.INVALID_REQUEST, message: 'Invalid group JID format' }, 400);
+  }
+
+  try {
+    const service = getChannelService();
+    const api = service.getChannel(pluginId) as unknown as Record<string, unknown> | null;
+    if (!api || typeof api.fetchGroupHistory !== 'function') {
+      return apiError(c, { code: ERROR_CODES.INVALID_REQUEST, message: 'Channel does not support history fetch' }, 501);
+    }
+
+    const count = parseInt(c.req.query('count') ?? '50', 10);
+    const sessionId = await (api.fetchGroupHistory as (jid: string, count: number) => Promise<string>)(groupJid, Math.min(count, 50));
+
+    return apiResponse(c, {
+      status: 'accepted',
+      message: 'History fetch requested — messages will arrive asynchronously via history sync',
+      sessionId,
+      groupJid,
+    }, 202);
+  } catch (error) {
+    const msg = getErrorMessage(error, 'Failed to trigger history fetch');
+    const status = msg.includes('Rate limited') ? 429 : 500;
+    return apiError(c, { code: ERROR_CODES.FETCH_FAILED, message: msg }, status);
+  }
+});
+
+/**
  * GET /channels/:id/chats - List distinct chats from message history
  */
 channelRoutes.get('/:id/chats', async (c) => {
@@ -943,6 +987,11 @@ channelRoutes.get('/:id/messages', pagination({ defaultLimit: 50, maxLimit: 200 
   const channelId = c.req.param('id');
   const { limit, offset } = c.get('pagination')!;
   const chatId = c.req.query('chatId');
+
+  // Validate chatId format — must contain @ domain suffix (prevents arbitrary string injection into metadata query)
+  if (chatId !== undefined && (chatId.length === 0 || !chatId.includes('@'))) {
+    return apiError(c, { code: ERROR_CODES.INVALID_REQUEST, message: 'Invalid chatId format — must include @ domain suffix' }, 400);
+  }
 
   try {
     const messagesRepo = new ChannelMessagesRepository();

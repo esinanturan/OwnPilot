@@ -457,11 +457,12 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
   }
 
   async sendMessage(message: ChannelOutgoingMessage): Promise<string> {
-    if (!this.sock) {
+    if (!this.sock || this.status !== 'connected') {
       throw new Error('WhatsApp is not connected');
     }
 
     const jid = this.toJid(message.platformChatId);
+    const isSelf = this.isSelfChat(jid);
     const parts = splitMessage(message.text, WHATSAPP_MAX_LENGTH);
     let lastMessageId = '';
 
@@ -471,23 +472,34 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
 
       const options: Record<string, unknown> = {};
 
-      // Reply context for first part
+      // Reply context for first part — include fromMe flag so Baileys can locate
+      // the original message in the correct direction (critical for self-chat)
       if (i === 0 && message.replyToId) {
         const externalId = message.replyToId.includes(':')
           ? message.replyToId.split(':').pop()
           : message.replyToId;
         if (externalId) {
           options.quoted = {
-            key: { remoteJid: jid, id: externalId },
+            key: { remoteJid: jid, id: externalId, fromMe: isSelf },
             message: {},
           };
         }
       }
 
-      // Anti-ban: typing indicator before sending (human-like behavior)
-      await this.simulateTyping(jid, parts[i]!);
+      // Anti-ban: typing indicator before sending.
+      // Skip for self-chat — presenceSubscribe to your own JID is meaningless
+      // and can cause connection instability (1-5s delay while socket may glitch).
+      if (!isSelf) {
+        await this.simulateTyping(jid, parts[i]!);
+      }
 
-      const result = await this.sock.sendMessage(jid, { text: parts[i]! }, options);
+      // Re-check connection after async delay — socket may have reconnected
+      const sock = this.sock;
+      if (!sock || this.status !== 'connected') {
+        throw new Error('WhatsApp disconnected while preparing to send');
+      }
+
+      const result = await sock.sendMessage(jid, { text: parts[i]! }, options);
       lastMessageId = result?.key?.id ?? '';
 
       // Record send time for rate limiting
@@ -510,10 +522,13 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
     }
 
     // Anti-ban: go offline after sending (don't stay 'available' like a bot)
-    try {
-      await this.sock.sendPresenceUpdate('unavailable');
-    } catch {
-      // Non-fatal
+    // Only relevant for non-self-chat (self-chat has no presence observers)
+    if (!isSelf) {
+      try {
+        await this.sock?.sendPresenceUpdate('unavailable');
+      } catch {
+        // Non-fatal
+      }
     }
 
     return lastMessageId;

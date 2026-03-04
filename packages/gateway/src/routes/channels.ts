@@ -201,24 +201,30 @@ channelRoutes.get('/status', (c) => {
 });
 
 /**
- * GET /channels/pairing - Return pairing key and per-platform owner status
+ * GET /channels/pairing - Return per-channel pairing keys and owner status
  */
 channelRoutes.get('/pairing', async (c) => {
   const { getPairingKey, getOwnerUserId } = await import('../services/pairing-service.js');
   const service = getChannelService();
-  const channels = service.listChannels();
+  const channelList = service.listChannels();
 
-  const key = await getPairingKey();
-
-  // Build per-platform owner map using unique platform values from registered channels
-  const platforms = [...new Set(channels.map((ch) => ch.platform))];
-  const ownerEntries = await Promise.all(
-    platforms.map(async (platform) => [platform, await getOwnerUserId(platform)] as const)
+  const channelPairings = await Promise.all(
+    channelList.map(async (ch) => {
+      const key = await getPairingKey(ch.pluginId);
+      const ownerUserId = await getOwnerUserId(ch.platform);
+      return {
+        pluginId: ch.pluginId,
+        platform: ch.platform,
+        name: ch.name,
+        key,
+        claimed: !!ownerUserId,
+        ownerUserId: ownerUserId ?? null,
+      };
+    })
   );
-  const owners: Record<string, string | null> = Object.fromEntries(ownerEntries);
-  const hasAnyOwner = Object.values(owners).some(Boolean);
 
-  return apiResponse(c, { key, owners, hasAnyOwner });
+  const hasAnyOwner = channelPairings.some((ch) => ch.claimed);
+  return apiResponse(c, { channels: channelPairings, hasAnyOwner });
 });
 
 /**
@@ -348,6 +354,27 @@ channelRoutes.post('/:id/reconnect', async (c) => {
       500
     );
   }
+});
+
+/**
+ * POST /channels/:id/revoke-owner - Revoke ownership and rotate pairing key
+ *
+ * Clears the owner for this channel's platform and generates a new pairing key
+ * so a fresh /connect claim can be made.
+ */
+channelRoutes.post('/:id/revoke-owner', async (c) => {
+  const pluginId = c.req.param('id');
+  const { revokeOwnership, getPairingKey } = await import('../services/pairing-service.js');
+  const service = getChannelService();
+  const channel = service.listChannels().find((ch) => ch.pluginId === pluginId);
+  if (!channel) {
+    return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'Channel not found' }, 404);
+  }
+  await revokeOwnership(pluginId, channel.platform);
+  const newKey = await getPairingKey(pluginId);
+  log.info('Ownership revoked via API', { pluginId, platform: channel.platform });
+  wsGateway.broadcast('data:changed', { entity: 'channel', action: 'updated', id: pluginId });
+  return apiResponse(c, { pluginId, platform: channel.platform, newKey });
 });
 
 /**

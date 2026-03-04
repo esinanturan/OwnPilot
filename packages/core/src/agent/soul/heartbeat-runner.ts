@@ -11,6 +11,9 @@ import type { IAgentCommunicationBus } from './communication.js';
 import type { ISoulRepository, IHeartbeatLogRepository } from './evolution.js';
 import type { BudgetTracker } from './budget-tracker.js';
 import type { Result } from '../../types/result.js';
+import { getLog } from '../../services/get-log.js';
+
+const log = getLog('HeartbeatRunner');
 
 // ============================================================
 // Agent engine interface (minimal subset)
@@ -103,6 +106,10 @@ export class HeartbeatRunner {
     // Filter tasks that should run this cycle (force=true runs all tasks regardless of schedule)
     const tasksToRun = this.filterTasksToRun(soul.heartbeat.checklist, force);
 
+    // Keep an in-memory copy of the checklist to batch all status updates in one DB write.
+    const updatedChecklist = soul.heartbeat.checklist.map((t) => ({ ...t }));
+    let pauseTriggered = false;
+
     for (const task of tasksToRun) {
       // Per-cycle budget check
       if (result.totalCost >= soul.autonomy.maxCostPerCycle) {
@@ -129,13 +136,40 @@ export class HeartbeatRunner {
         await this.routeOutput(agentId, soul, task, taskResult.output || '');
       }
 
-      // Update task status in DB
-      await this.soulRepo.updateTaskStatus(agentId, task.id, {
-        lastRunAt: new Date(),
-        lastResult: taskResult.status,
-        lastError: taskResult.error,
-        consecutiveFailures:
-          taskResult.status === 'failure' ? (task.consecutiveFailures || 0) + 1 : 0,
+      // Update in-memory checklist (batched — no per-task DB write)
+      const newConsecutiveFailures =
+        taskResult.status === 'failure' ? (task.consecutiveFailures || 0) + 1 : 0;
+      const idx = updatedChecklist.findIndex((t) => t.id === task.id);
+      if (idx !== -1) {
+        const existing = updatedChecklist[idx];
+        updatedChecklist[idx] = Object.assign({}, existing, {
+          lastRunAt: new Date(),
+          lastResult: taskResult.status as 'success' | 'failure' | 'skipped',
+          lastError: taskResult.error,
+          consecutiveFailures: newConsecutiveFailures,
+        });
+      }
+
+      // Enforce pauseOnConsecutiveErrors threshold
+      if (
+        taskResult.status === 'failure' &&
+        soul.autonomy.pauseOnConsecutiveErrors > 0 &&
+        newConsecutiveFailures >= soul.autonomy.pauseOnConsecutiveErrors
+      ) {
+        pauseTriggered = true;
+      }
+    }
+
+    // Persist all checklist updates in a single DB write (fixes N+1 per-task SELECT+UPDATE)
+    await this.soulRepo.updateHeartbeatChecklist(agentId, updatedChecklist);
+
+    // Auto-pause agent if any task crossed the consecutiveFailures threshold
+    if (pauseTriggered) {
+      await this.soulRepo.setHeartbeatEnabled(agentId, false);
+      this.eventBus?.emit('soul.heartbeat.auto_paused', {
+        agentId,
+        reason: 'consecutive_failures',
+        threshold: soul.autonomy.pauseOnConsecutiveErrors,
       });
     }
 
@@ -181,10 +215,11 @@ export class HeartbeatRunner {
    */
   private async executeTask(
     agentId: string,
-    _soul: AgentSoul,
+    soul: AgentSoul,
     task: HeartbeatTask
   ): Promise<HeartbeatTaskResult> {
     const startTime = Date.now();
+    const timeoutMs = soul.heartbeat.maxDurationMs ?? 120_000;
     try {
       const taskPrompt =
         task.prompt ||
@@ -193,7 +228,7 @@ export class HeartbeatRunner {
 ${task.tools.length ? `Available tools: ${task.tools.join(', ')}` : ''}
 Be concise and focused. Report your findings clearly.`.trim();
 
-      const response = await this.agentEngine.processMessage({
+      const responsePromise = this.agentEngine.processMessage({
         agentId,
         message: taskPrompt,
         context: {
@@ -202,6 +237,12 @@ Be concise and focused. Report your findings clearly.`.trim();
           allowedTools: task.tools.length > 0 ? task.tools : undefined,
         },
       });
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Task timed out after ${timeoutMs}ms`)), timeoutMs)
+      );
+
+      const response = await Promise.race([responsePromise, timeoutPromise]);
 
       return {
         taskId: task.id,
@@ -277,10 +318,15 @@ Be concise and focused. Report your findings clearly.`.trim();
       case 'memory':
         await this.agentEngine.saveMemory?.(agentId, output, 'heartbeat');
         break;
-      case 'inbox':
+      case 'inbox': {
+        const targetAgentId = task.outputTo.agentId;
+        if (!targetAgentId) {
+          log.warn(`Task ${task.id} outputTo.inbox missing agentId — skipping output routing`);
+          break;
+        }
         await this.communicationBus.send({
           from: agentId,
-          to: task.outputTo.agentId,
+          to: targetAgentId,
           type: 'task_result',
           subject: `[Heartbeat] ${task.name}`,
           content: output,
@@ -288,6 +334,7 @@ Be concise and focused. Report your findings clearly.`.trim();
           requiresResponse: false,
         });
         break;
+      }
       case 'channel':
         await this.agentEngine.sendToChannel?.(task.outputTo.channel, output, task.outputTo.chatId);
         break;
@@ -317,18 +364,21 @@ Be concise and focused. Report your findings clearly.`.trim();
     const { start, end, timezone } = soul.heartbeat.quietHours;
     const now = new Date();
 
-    // Get current time as total minutes (HH:MM) in the configured timezone
+    // Get current time as total minutes in the configured timezone.
+    // Use Intl.DateTimeFormat with hourCycle h23 to guarantee 0-23 range
+    // (avoids toLocaleString returning "24:00" for midnight on some V8/ICU builds).
     let currentTotalMinutes: number;
     if (timezone) {
-      const parts = now.toLocaleString('en-US', {
+      const fmt = new Intl.DateTimeFormat('en-US', {
         timeZone: timezone,
-        hour: 'numeric',
-        minute: 'numeric',
-        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
       });
-      // Format: "HH:MM" or "H:MM"
-      const [hStr, mStr] = parts.split(':');
-      currentTotalMinutes = parseInt(hStr ?? '0', 10) * 60 + parseInt(mStr ?? '0', 10);
+      const parts = fmt.formatToParts(now);
+      const h = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10);
+      const m = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+      currentTotalMinutes = h * 60 + m;
     } else {
       currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
     }
@@ -356,17 +406,8 @@ Be concise and focused. Report your findings clearly.`.trim();
       startedAt: new Date(),
       completedAt: new Date(),
       durationMs: 0,
-      tasks: [
-        {
-          taskId: 'all',
-          taskName: 'all',
-          status: 'skipped',
-          error: reason,
-          tokenUsage: { input: 0, output: 0 },
-          cost: 0,
-          durationMs: 0,
-        },
-      ],
+      tasks: [],
+      skippedReason: reason,
       totalTokens: { input: 0, output: 0 },
       totalCost: 0,
     };

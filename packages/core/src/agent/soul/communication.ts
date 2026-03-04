@@ -79,11 +79,11 @@ export interface IAgentCommunicationBus {
   /** Read inbox messages for an agent */
   readInbox(agentId: string, options?: MessageQueryOptions): Promise<AgentMessage[]>;
 
-  /** Broadcast a message to all crew members */
+  /** Broadcast a message to all crew members. Returns per-member delivery result. */
   broadcast(
     crewId: string,
     msg: Omit<AgentMessage, 'id' | 'status' | 'createdAt' | 'to'>
-  ): Promise<void>;
+  ): Promise<{ delivered: string[]; failed: string[] }>;
 
   /** Get conversation between two agents */
   getConversation(a1: string, a2: string, limit?: number): Promise<AgentMessage[]>;

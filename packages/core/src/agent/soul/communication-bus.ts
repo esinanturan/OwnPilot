@@ -7,12 +7,15 @@
  * AGENT-HIGH-004: Rate limiting added to prevent message flooding.
  */
 
+import { getLog } from '../../services/get-log.js';
 import type {
   AgentMessage,
   AgentMessageType,
   IAgentCommunicationBus,
   MessageQueryOptions,
 } from './communication.js';
+
+const log = getLog('AgentCommunicationBus');
 
 // Rate limiting constants
 const DEFAULT_MAX_MESSAGES_PER_MINUTE = 30;
@@ -128,17 +131,31 @@ export class AgentCommunicationBus implements IAgentCommunicationBus {
     return messages;
   }
 
-  /** Broadcast a message to all crew members (except sender). */
+  /** Broadcast a message to all crew members (except sender). Returns per-member delivery result. */
   async broadcast(
     crewId: string,
     msg: Omit<AgentMessage, 'id' | 'status' | 'createdAt' | 'to'>
-  ): Promise<void> {
+  ): Promise<{ delivered: string[]; failed: string[] }> {
     const members = await this.messageRepo.getCrewMembers(crewId);
+    const delivered: string[] = [];
+    const failed: string[] = [];
     for (const memberId of members) {
       if (memberId !== msg.from) {
-        await this.send({ ...msg, to: memberId, crewId });
+        try {
+          await this.send({ ...msg, to: memberId, crewId });
+          delivered.push(memberId);
+        } catch (err) {
+          // Log but continue — broadcast should reach all reachable members
+          const message = err instanceof Error ? err.message : String(err);
+          log.warn(`broadcast to ${memberId} failed: ${message}`);
+          failed.push(memberId);
+        }
       }
     }
+    if (failed.length > 0) {
+      log.warn(`broadcast for crew ${crewId} had ${failed.length}/${members.length - 1} failed deliveries`);
+    }
+    return { delivered, failed };
   }
 
   /** Get conversation between two agents. */

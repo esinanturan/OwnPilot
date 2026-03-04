@@ -2,7 +2,7 @@
  * Soul Repository — CRUD for agent_souls and agent_soul_versions
  */
 
-import { BaseRepository, parseJsonField } from './base.js';
+import { BaseRepository, parseJsonField, parseJsonFieldNullable } from './base.js';
 import type {
   AgentSoul,
   SoulVersion,
@@ -114,7 +114,7 @@ function rowToSoulVersion(row: SoulVersionRow): SoulVersion {
     id: row.id,
     soulId: row.soul_id,
     version: row.version,
-    snapshot: parseJsonField<AgentSoul>(row.snapshot, {} as AgentSoul),
+    snapshot: parseJsonFieldNullable<AgentSoul>(row.snapshot),
     changeReason: row.change_reason ?? undefined,
     changedBy: row.changed_by ?? undefined,
     createdAt: new Date(row.created_at),
@@ -234,6 +234,11 @@ export class SoulsRepository extends BaseRepository {
     );
   }
 
+  /**
+   * @deprecated Use updateHeartbeatChecklist() for batch updates.
+   * HeartbeatRunner no longer calls this method — it is kept for backward
+   * compatibility with the ISoulRepository interface until the next cleanup pass.
+   */
   async updateTaskStatus(
     agentId: string,
     taskId: string,
@@ -261,6 +266,17 @@ export class SoulsRepository extends BaseRepository {
       return t;
     });
 
+    await this.execute(
+      `UPDATE agent_souls
+       SET heartbeat = jsonb_set(heartbeat, '{checklist}', $1::jsonb),
+           updated_at = NOW()
+       WHERE agent_id = $2`,
+      [JSON.stringify(checklist), agentId]
+    );
+  }
+
+  /** Batch-update the full checklist in a single SQL statement. */
+  async updateHeartbeatChecklist(agentId: string, checklist: AgentSoul['heartbeat']['checklist']): Promise<void> {
     await this.execute(
       `UPDATE agent_souls
        SET heartbeat = jsonb_set(heartbeat, '{checklist}', $1::jsonb),

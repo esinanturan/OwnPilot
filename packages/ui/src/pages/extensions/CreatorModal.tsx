@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Sparkles, Wrench, X, Plus, Copy, Code, Check } from '../../components/icons';
 import { useToast } from '../../components/ToastProvider';
 import { extensionsApi } from '../../api/endpoints/extensions';
@@ -230,7 +230,16 @@ export function CreatorModal({
     return manifest;
   };
 
-  const manifestJson = step === 'preview' ? JSON.stringify(buildManifest(), null, 2) : '';
+  // M7: useMemo + try/catch — buildManifest calls JSON.parse internally; guard against
+  // corrupt parameter state reaching the render without crashing the component.
+  const manifestJson = useMemo(() => {
+    if (step !== 'preview') return '';
+    try {
+      return JSON.stringify(buildManifest(), null, 2);
+    } catch {
+      return '// Error: one or more tool parameter schemas contain invalid JSON.';
+    }
+  }, [step, extensionId, name, version, description, category, icon, authorName, tags, systemPrompt, keywords, docsUrl, tools]);
 
   const handleInstall = async () => {
     setError(null);
@@ -521,7 +530,7 @@ export function CreatorModal({
             </div>
           )}
 
-          {/* Step 2: Tools */}
+          {/* Step 3: Tools */}
           {step === 'tools' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -559,7 +568,7 @@ export function CreatorModal({
             </div>
           )}
 
-          {/* Step 3: Extras */}
+          {/* Step 4: Extras */}
           {step === 'extras' && (
             <div className="space-y-4">
               <p className="text-sm text-text-muted dark:text-dark-text-muted">

@@ -16,6 +16,10 @@ export interface ISoulRepository {
   update(soul: AgentSoul): Promise<void>;
   createVersion(soul: AgentSoul, changeReason: string, changedBy: string): Promise<void>;
   setHeartbeatEnabled(agentId: string, enabled: boolean): Promise<void>;
+  /**
+   * @deprecated Use updateHeartbeatChecklist() instead.
+   * Kept on the interface for backward compatibility; HeartbeatRunner no longer calls this.
+   */
   updateTaskStatus(
     agentId: string,
     taskId: string,
@@ -26,6 +30,8 @@ export interface ISoulRepository {
       consecutiveFailures: number;
     }
   ): Promise<void>;
+  /** Batch-update checklist task statuses in a single DB write. */
+  updateHeartbeatChecklist(agentId: string, checklist: import('./types.js').HeartbeatTask[]): Promise<void>;
 }
 
 export interface IHeartbeatLogRepository {
@@ -67,6 +73,10 @@ export interface IReflectionEngine {
 const MAX_LEARNINGS = 50;
 /** Maximum feedback entries to keep */
 const MAX_FEEDBACK = 100;
+/** Maximum boundary entries to keep */
+const MAX_BOUNDARIES = 100;
+/** Maximum mutable traits to keep */
+const MAX_MUTABLE_TRAITS = 100;
 
 export class SoulEvolutionEngine {
   constructor(
@@ -92,6 +102,9 @@ export class SoulEvolutionEngine {
         break;
       case 'correction':
         soul.identity.boundaries.push(feedback.content);
+        if (soul.identity.boundaries.length > MAX_BOUNDARIES) {
+          soul.identity.boundaries = soul.identity.boundaries.slice(-MAX_BOUNDARIES);
+        }
         soul.evolution.learnings.push(`Correction: ${feedback.content}`);
         break;
       case 'directive':
@@ -99,6 +112,9 @@ export class SoulEvolutionEngine {
         break;
       case 'personality_tweak':
         soul.evolution.mutableTraits.push(feedback.content);
+        if (soul.evolution.mutableTraits.length > MAX_MUTABLE_TRAITS) {
+          soul.evolution.mutableTraits = soul.evolution.mutableTraits.slice(-MAX_MUTABLE_TRAITS);
+        }
         soul.evolution.learnings.push(`Personality: ${feedback.content}`);
         break;
     }
@@ -168,6 +184,8 @@ Return ONLY the suggestions, one per line.
       .filter((s) => s.length > 0 && s.startsWith('I should'));
 
     if (soul.evolution.evolutionMode === 'autonomous' && suggestions.length > 0) {
+      // Snapshot BEFORE mutation (mirrors applyFeedback pattern)
+      await this.soulRepo.createVersion(soul, 'Self-reflection', 'self_reflection');
       for (const s of suggestions) {
         soul.evolution.learnings.push(`Self: ${s}`);
       }
@@ -176,7 +194,6 @@ Return ONLY the suggestions, one per line.
       }
       soul.evolution.version++;
       soul.evolution.lastReflectionAt = new Date();
-      await this.soulRepo.createVersion(soul, 'Self-reflection', 'self_reflection');
       await this.soulRepo.update(soul);
       return { suggestions, applied: true };
     }

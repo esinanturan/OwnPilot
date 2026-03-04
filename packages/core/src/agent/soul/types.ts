@@ -264,6 +264,8 @@ export interface HeartbeatResult {
   tasks: HeartbeatTaskResult[];
   totalTokens: { input: number; output: number };
   totalCost: number;
+  /** Populated when the entire cycle was skipped (quiet hours, etc.) */
+  skippedReason?: string;
 }
 
 export interface HeartbeatTaskResult {
@@ -340,7 +342,8 @@ export interface SoulVersion {
   id: string;
   soulId: string;
   version: number;
-  snapshot: AgentSoul;
+  /** Null when the snapshot column is corrupt or missing in the DB row. */
+  snapshot: AgentSoul | null;
   changeReason?: string;
   changedBy?: string;
   createdAt: Date;

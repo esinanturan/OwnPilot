@@ -265,6 +265,169 @@ export class ChannelMessagesRepository extends BaseRepository {
     return row ? new Date(row.created_at) : null;
   }
 
+  /**
+   * Get distinct chats (by JID) for a channel, with message count and last activity.
+   * Groups on metadata->>'jid' to unify DM and group conversations.
+   */
+  async getDistinctChats(
+    channelId: string,
+    limit = 20,
+    offset = 0
+  ): Promise<{
+    chats: Array<{
+      id: string;
+      displayName: string | null;
+      platform: string;
+      messageCount: number;
+      lastMessageAt: string;
+      isGroup?: boolean;
+    }>;
+    total: number;
+  }> {
+    const rows = await this.query<{
+      chat_jid: string;
+      display_name: string | null;
+      is_group: string | null;
+      message_count: string;
+      last_message_at: string;
+      total_count: string;
+    }>(
+      `SELECT
+         g.chat_jid,
+         (SELECT m2.sender_name FROM channel_messages m2
+          WHERE m2.metadata->>'jid' = g.chat_jid
+            AND m2.channel_id = $1
+          ORDER BY m2.created_at DESC LIMIT 1) AS display_name,
+         g.is_group,
+         g.message_count,
+         g.last_message_at,
+         g.total_count
+       FROM (
+         SELECT
+           metadata->>'jid'     AS chat_jid,
+           MAX(metadata->>'isGroup') AS is_group,
+           COUNT(*)              AS message_count,
+           MAX(created_at)       AS last_message_at,
+           COUNT(*) OVER()       AS total_count
+         FROM channel_messages
+         WHERE channel_id = $1
+           AND direction = 'inbound'
+           AND metadata->>'jid' IS NOT NULL
+         GROUP BY metadata->>'jid'
+         ORDER BY last_message_at DESC
+         LIMIT $2 OFFSET $3
+       ) g`,
+      [channelId, limit, offset]
+    );
+
+    const platform = channelId.includes('.') ? channelId.split('.').pop() ?? channelId : channelId;
+    const total = rows.length > 0 ? parseInt(rows[0]!.total_count, 10) : 0;
+
+    return {
+      chats: rows.map((r) => ({
+        id: r.chat_jid,
+        displayName: r.display_name ?? null,
+        platform,
+        messageCount: parseInt(r.message_count, 10),
+        lastMessageAt: r.last_message_at,
+        isGroup: r.is_group === 'true',
+      })),
+      total,
+    };
+  }
+
+  /**
+   * Get messages for a specific chat (group or DM) by JID.
+   * Filters on metadata->>'jid' which stores the full chat JID
+   * (e.g., "120363xxx@g.us" for groups, "316xxx@s.whatsapp.net" for DMs).
+   */
+  async getByChat(
+    channelId: string,
+    chatJid: string,
+    limit = 50,
+    offset = 0
+  ): Promise<{ messages: ChannelMessage[]; total: number }> {
+    const rows = await this.query<ChannelMessageRow & { total_count: string }>(
+      `SELECT
+         *,
+         COUNT(*) OVER() AS total_count
+       FROM channel_messages
+       WHERE channel_id = $1
+         AND metadata->>'jid' = $2
+       ORDER BY created_at ASC
+       LIMIT $3 OFFSET $4`,
+      [channelId, chatJid, limit, offset]
+    );
+
+    const total = rows.length > 0 ? parseInt(rows[0]!.total_count, 10) : 0;
+
+    return {
+      messages: rows.map((r) => rowToChannelMessage(r)),
+      total,
+    };
+  }
+
+  /**
+   * Batch insert messages with deduplication (ON CONFLICT DO NOTHING).
+   * Used for history sync — processes in chunks of 100 for memory safety.
+   */
+  async createBatch(rows: Array<{
+    id: string;
+    channelId: string;
+    externalId?: string;
+    direction: ChannelMessage['direction'];
+    senderId?: string;
+    senderName?: string;
+    content: string;
+    contentType?: string;
+    attachments?: ChannelMessage['attachments'];
+    metadata?: Record<string, unknown>;
+    createdAt?: Date;
+  }>): Promise<number> {
+    if (rows.length === 0) return 0;
+    let inserted = 0;
+    const BATCH_SIZE = 100;
+
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      await this.transaction(async () => {
+        for (const data of batch) {
+          try {
+            const result = await this.execute(
+              `INSERT INTO channel_messages (
+                id, channel_id, external_id, direction, sender_id, sender_name,
+                content, content_type, attachments, metadata, created_at
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+              ON CONFLICT (id) DO NOTHING`,
+              [
+                data.id,
+                data.channelId,
+                data.externalId ?? null,
+                data.direction,
+                data.senderId ?? null,
+                data.senderName ?? null,
+                data.content,
+                data.contentType ?? 'text',
+                data.attachments ? JSON.stringify(data.attachments) : null,
+                JSON.stringify(data.metadata ?? {}),
+                data.createdAt ? data.createdAt.toISOString() : new Date().toISOString(),
+              ]
+            );
+            if (result.changes > 0) inserted++;
+          } catch (err) {
+            // ON CONFLICT DO NOTHING won't throw — this catches real DB errors
+            console.warn('[createBatch] Row insert failed:', { id: data.id, error: String(err) });
+          }
+        }
+      });
+      // Yield event loop between batches (WAHA pattern)
+      if (i + BATCH_SIZE < rows.length) {
+        await new Promise(r => setTimeout(r, 1));
+      }
+    }
+    return inserted;
+  }
+
   async countInbox(): Promise<number> {
     const row = await this.queryOne<{ count: string }>(
       `SELECT COUNT(*) as count FROM channel_messages WHERE direction = 'inbound'`

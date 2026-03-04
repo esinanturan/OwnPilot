@@ -201,6 +201,27 @@ channelRoutes.get('/status', (c) => {
 });
 
 /**
+ * GET /channels/pairing - Return pairing key and per-platform owner status
+ */
+channelRoutes.get('/pairing', async (c) => {
+  const { getPairingKey, getOwnerUserId } = await import('../services/pairing-service.js');
+  const service = getChannelService();
+  const channels = service.listChannels();
+
+  const key = await getPairingKey();
+
+  // Build per-platform owner map using unique platform values from registered channels
+  const platforms = [...new Set(channels.map((ch) => ch.platform))];
+  const ownerEntries = await Promise.all(
+    platforms.map(async (platform) => [platform, await getOwnerUserId(platform)] as const)
+  );
+  const owners: Record<string, string | null> = Object.fromEntries(ownerEntries);
+  const hasAnyOwner = Object.values(owners).some(Boolean);
+
+  return apiResponse(c, { key, owners, hasAnyOwner });
+});
+
+/**
  * GET /channels - List all channels
  */
 channelRoutes.get('/', (c) => {

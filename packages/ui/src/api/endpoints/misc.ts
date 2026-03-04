@@ -357,6 +357,12 @@ export const channelsApi = {
     apiClient.post<{ unblocked: boolean }>(`/channels/auth/users/${userId}/unblock`),
   deleteUser: (userId: string) =>
     apiClient.delete<{ deleted: boolean }>(`/channels/auth/users/${userId}`),
+  getPairing: () =>
+    apiClient.get<{
+      key: string;
+      owners: Record<string, string | null>;
+      hasAnyOwner: boolean;
+    }>('/channels/pairing'),
 };
 
 // ---- Expenses ----

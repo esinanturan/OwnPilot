@@ -29,6 +29,8 @@ import {
   Unlock,
   Trash2,
   LogOut,
+  Key,
+  Copy,
 } from '../components/icons';
 import type { Channel, ChannelUser, ChannelStats } from '../api/types';
 
@@ -454,6 +456,9 @@ export function ChannelsPage() {
           </div>
         </div>
       </div>
+
+      {/* Pairing banner */}
+      <PairingBanner />
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
@@ -1024,5 +1029,122 @@ function ActionButton({
       )}
       {label}
     </button>
+  );
+}
+
+// ============================================================================
+// Pairing Banner
+// ============================================================================
+
+function PairingBanner() {
+  const [pairing, setPairing] = useState<{
+    key: string;
+    owners: Record<string, string | null>;
+    hasAnyOwner: boolean;
+  } | null>(null);
+  const [copied, setCopied] = useState(false);
+  const toast = useToast();
+
+  useEffect(() => {
+    channelsApi
+      .getPairing()
+      .then(setPairing)
+      .catch(() => {/* silently ignore */});
+  }, []);
+
+  if (!pairing) return null;
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy');
+    }
+  };
+
+  const claimedPlatforms = Object.entries(pairing.owners)
+    .filter(([, v]) => v !== null)
+    .map(([k]) => k);
+
+  if (pairing.hasAnyOwner && claimedPlatforms.length > 0) {
+    // Compact "owner claimed" pill — still show key for adding more platforms
+    return (
+      <div className="mx-6 mt-4 p-3 rounded-lg border border-success/30 bg-success/5 flex items-start gap-3">
+        <ShieldCheck className="w-4 h-4 text-success mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-success">
+            Owner claimed on: {claimedPlatforms.join(', ')}
+          </p>
+          <p className="text-[11px] text-text-muted dark:text-dark-text-muted mt-0.5">
+            To claim on another channel, send{' '}
+            <code className="font-mono bg-bg-tertiary dark:bg-dark-bg-tertiary px-1 rounded">
+              /connect {pairing.key}
+            </code>
+          </p>
+        </div>
+        <button
+          onClick={() => handleCopy(`/connect ${pairing.key}`)}
+          title="Copy command"
+          className="text-text-muted dark:text-dark-text-muted hover:text-text-primary dark:hover:text-dark-text-primary transition-colors shrink-0"
+        >
+          {copied ? (
+            <CheckCircle2 className="w-4 h-4 text-success" />
+          ) : (
+            <Copy className="w-4 h-4" />
+          )}
+        </button>
+      </div>
+    );
+  }
+
+  // No owner yet — show prominent setup banner
+  const connectCmd = `/connect ${pairing.key}`;
+  return (
+    <div className="mx-6 mt-4 p-4 rounded-lg border border-warning/40 bg-warning/5">
+      <div className="flex items-start gap-3">
+        <Key className="w-5 h-5 text-warning mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-text-primary dark:text-dark-text-primary">
+            Claim ownership of your bot
+          </p>
+          <p className="text-xs text-text-secondary dark:text-dark-text-secondary mt-1">
+            No owner configured yet. Send the command below to your bot on Telegram, WhatsApp, or
+            any connected channel. The first person to send it becomes the owner of that channel.
+          </p>
+
+          {/* Key display */}
+          <div className="mt-3 flex items-center gap-2">
+            <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-bg-tertiary dark:bg-dark-bg-tertiary rounded-md border border-border dark:border-dark-border font-mono text-sm">
+              <span className="text-text-muted dark:text-dark-text-muted text-xs">/connect</span>
+              <span className="font-bold text-text-primary dark:text-dark-text-primary tracking-widest">
+                {pairing.key}
+              </span>
+            </div>
+            <button
+              onClick={() => handleCopy(connectCmd)}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-border dark:border-dark-border rounded-md hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary transition-colors text-text-primary dark:text-dark-text-primary"
+            >
+              {copied ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy
+                </>
+              )}
+            </button>
+          </div>
+
+          <p className="text-[11px] text-text-muted dark:text-dark-text-muted mt-2">
+            Only the owner's messages will be processed. All others are silently ignored.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }

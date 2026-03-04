@@ -8,9 +8,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { chatApi } from '../api';
 import type { Conversation } from '../api';
-import { Plus, MessageSquare, Trash2, Edit2, Telegram, Globe } from './icons';
+import { Plus, MessageSquare, Trash2, Edit2, Telegram, Globe, WhatsApp } from './icons';
 import { useToast } from './ToastProvider';
 import { useDialog } from './ConfirmDialog';
+import { useGateway } from '../hooks/useWebSocket';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,8 @@ function ConvItem({
       {/* Platform icon */}
       {isChannel && isTelegram ? (
         <Telegram className="w-3 h-3 shrink-0 opacity-60" />
+      ) : isChannel && conv.channelPlatform === 'whatsapp' ? (
+        <WhatsApp className="w-3 h-3 shrink-0 opacity-60" />
       ) : isChannel ? (
         <MessageSquare className="w-3 h-3 shrink-0 opacity-60" />
       ) : (
@@ -165,6 +168,7 @@ export function ConversationSidebar({ activeId, onNew, onSelect }: Props) {
   const prevActiveIdRef = useRef<string | null>(null);
   const toast = useToast();
   const dialog = useDialog();
+  const { subscribe } = useGateway();
 
   const load = useCallback(
     async (q = '') => {
@@ -197,6 +201,13 @@ export function ConversationSidebar({ activeId, onNew, onSelect }: Props) {
       prevActiveIdRef.current = null;
     }
   }, [activeId, load, search]);
+
+  // Auto-refresh when a channel message arrives (WhatsApp, Telegram, etc.)
+  useEffect(() => {
+    return subscribe('channel:message', () => {
+      load(search);
+    });
+  }, [subscribe, load, search]);
 
   const handleSearch = useCallback(
     (q: string) => {

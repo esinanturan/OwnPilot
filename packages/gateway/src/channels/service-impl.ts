@@ -52,6 +52,7 @@ import { tryGetService } from '../services/service-helpers.js';
 import {
   claimOwnership,
   getOwnerUserId,
+  getPairingKey,
 } from '../services/pairing-service.js';
 
 const log = getLog('ChannelService');
@@ -557,11 +558,23 @@ export class ChannelServiceImpl implements IChannelService {
           return;
         }
       } else {
-        // No owner claimed — drop silently (user must /connect first)
-        log.debug('Dropping message — no owner claimed yet', {
+        // No owner claimed — reply with pairing instructions so the user knows what to do
+        log.info('No owner claimed yet — sending pairing instructions', {
           platform: message.platform,
           sender: message.sender.platformUserId,
         });
+        const api = this.getChannel(message.channelPluginId);
+        if (api) {
+          try {
+            const key = await getPairingKey(message.channelPluginId);
+            await api.sendMessage({
+              platformChatId: message.platformChatId,
+              text: `👋 OwnPilot is running but not yet claimed.\n\nTo activate, send:\n/connect ${key}`,
+            });
+          } catch (err) {
+            log.warn('Failed to send pairing instructions', { error: getErrorMessage(err) });
+          }
+        }
         return;
       }
 

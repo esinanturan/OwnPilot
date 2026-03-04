@@ -1200,6 +1200,7 @@ export class ChannelServiceImpl implements IChannelService {
 
     // Try pairing key claim first
     const claim = await claimOwnership(
+      message.channelPluginId,
       message.platform,
       message.sender.platformUserId,
       message.platformChatId,

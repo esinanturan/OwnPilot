@@ -359,10 +359,20 @@ export const channelsApi = {
     apiClient.delete<{ deleted: boolean }>(`/channels/auth/users/${userId}`),
   getPairing: () =>
     apiClient.get<{
-      key: string;
-      owners: Record<string, string | null>;
+      channels: Array<{
+        pluginId: string;
+        platform: string;
+        name: string;
+        key: string;
+        claimed: boolean;
+        ownerUserId: string | null;
+      }>;
       hasAnyOwner: boolean;
     }>('/channels/pairing'),
+  revokeOwner: (channelId: string) =>
+    apiClient.post<{ pluginId: string; platform: string; newKey: string }>(
+      `/channels/${channelId}/revoke-owner`
+    ),
 };
 
 // ---- Expenses ----

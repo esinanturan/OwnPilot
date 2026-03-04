@@ -322,13 +322,16 @@ async function main() {
     log.warn('Channel auto-connect had errors', { error: String(err) });
   });
 
-  // Print pairing banner if no owner has been claimed yet
+  // Print pairing banners for unclaimed channels
   try {
-    const { hasAnyOwner, getPairingKey, printPairingBanner } = await import('./services/pairing-service.js');
-    const claimed = await hasAnyOwner();
-    if (!claimed) {
-      const key = await getPairingKey();
-      printPairingBanner(key);
+    const { getPairingKey, printPairingBanner, getOwnerUserId } = await import('./services/pairing-service.js');
+    const channels = channelService.listChannels();
+    for (const ch of channels) {
+      const owner = await getOwnerUserId(ch.platform);
+      if (!owner) {
+        const key = await getPairingKey(ch.pluginId);
+        printPairingBanner(ch.name, key);
+      }
     }
   } catch (err) {
     log.warn('Could not check owner/pairing state', { error: String(err) });

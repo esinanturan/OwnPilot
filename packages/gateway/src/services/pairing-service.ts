@@ -1,18 +1,16 @@
 /**
- * Pairing Service — first-boot ownership claim via one-time pairing key.
+ * Pairing Service — per-channel ownership claim via rotating one-time pairing keys.
  *
  * Flow:
- *   1. On first start (no owner claimed on any platform), a random key like
- *      "A1B2-C3D4" is generated and printed prominently to the console.
- *   2. The owner sends `/connect A1B2-C3D4` on Telegram, WhatsApp, or any
- *      other channel. This is the ONLY accepted command until claimed.
- *   3. Ownership is stored per-platform. The same key can be used to claim
- *      ownership on multiple platforms (e.g., both Telegram and WhatsApp).
- *   4. Once claimed on a platform, all messages from non-owners on that
- *      platform are silently dropped.
- *   5. The pairing key itself is never invalidated — it can always be used to
- *      claim a new platform. To reset ownership, delete the relevant
- *      `owner_<platform>` rows from system_settings.
+ *   1. Each channel gets its own rotating pairing key (e.g., "A1B2-C3D4").
+ *      Keys are printed to the console at startup for unclaimed channels.
+ *   2. The owner sends `/connect A1B2-C3D4` on that channel. This is the ONLY
+ *      accepted command until an owner is claimed for that channel's platform.
+ *   3. On success, ownership is stored per-platform and the channel's key is
+ *      immediately rotated — the old key cannot be reused.
+ *   4. Once claimed, all messages from non-owners are silently dropped.
+ *   5. Ownership can be revoked via revokeOwnership(), which clears the owner
+ *      and rotates the key so a fresh /connect claim can be made.
  */
 
 import { randomBytes } from 'node:crypto';
@@ -24,42 +22,49 @@ const log = getLog('PairingService');
 
 // ── DB key helpers ────────────────────────────────────────────────────────────
 
-const KEY_PAIRING     = 'pairing_key';
-const ownerKey        = (platform: string) => `owner_${platform}`;
-const ownerChatKey    = (platform: string) => `owner_chat_${platform}`;
+const pairingKey   = (pluginId: string) => `pairing_key_${pluginId}`;
+const ownerKey     = (platform: string) => `owner_${platform}`;
+const ownerChatKey = (platform: string) => `owner_chat_${platform}`;
 
 // ── Key generation ────────────────────────────────────────────────────────────
 
 function generateKey(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1 — easy to read
-  const pick = () => chars[randomBytes(1)[0]! % chars.length]!
+  const pick = () => chars[randomBytes(1)[0]! % chars.length]!;
   return `${pick()}${pick()}${pick()}${pick()}-${pick()}${pick()}${pick()}${pick()}`;
+}
+
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+async function rotatePairingKey(pluginId: string): Promise<string> {
+  const newKey = generateKey();
+  await getSystemSettingsRepository().set(pairingKey(pluginId), newKey);
+  return newKey;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Returns the current pairing key, generating and persisting one if needed.
+ * Returns the current pairing key for a channel, generating and persisting
+ * one if needed.
  */
-export async function getPairingKey(): Promise<string> {
+export async function getPairingKey(pluginId: string): Promise<string> {
   const repo = getSystemSettingsRepository();
-  const stored = await repo.get(KEY_PAIRING);
+  const stored = await repo.get(pairingKey(pluginId));
   if (stored) return stored;
 
   const key = generateKey();
-  await repo.set(KEY_PAIRING, key);
+  await repo.set(pairingKey(pluginId), key);
   return key;
 }
 
 /**
  * Checks whether ANY platform has been claimed, used to decide whether to
- * print the pairing key banner at startup.
+ * print pairing key banners at startup.
  */
 export async function hasAnyOwner(): Promise<boolean> {
-  // We query all settings; if any key starts with 'owner_' and has a value → claimed
   const repo = getSystemSettingsRepository();
-  // Peek at a few common platforms
-  for (const platform of ['telegram', 'whatsapp', 'discord', 'slack']) {
+  for (const platform of ['telegram', 'whatsapp']) {
     const v = await repo.get(ownerKey(platform));
     if (v) return true;
   }
@@ -97,11 +102,11 @@ export interface ClaimResult {
 }
 
 /**
- * Attempts to claim ownership of a platform using the provided pairing key.
- *
- * @returns ClaimResult — success=true when ownership is newly established.
+ * Attempts to claim ownership of a platform using the channel's current pairing key.
+ * On success, the key is immediately rotated so it cannot be reused.
  */
 export async function claimOwnership(
+  pluginId: string,
   platform: string,
   platformUserId: string,
   platformChatId: string,
@@ -115,12 +120,12 @@ export async function claimOwnership(
     return {
       success: false,
       alreadyClaimed: true,
-      message: 'This channel is already configured. To reset, remove the owner entry from system_settings.',
+      message: 'This channel already has an owner. Use /revoke to reset ownership.',
     };
   }
 
-  // Fetch stored key
-  const storedKey = await repo.get(KEY_PAIRING);
+  // Fetch stored key for this specific channel
+  const storedKey = await repo.get(pairingKey(pluginId));
   if (!storedKey) {
     return { success: false, alreadyClaimed: false, message: 'No pairing key found.' };
   }
@@ -131,7 +136,7 @@ export async function claimOwnership(
   const valid = a.length === b.length && timingSafeEqual(a, b);
 
   if (!valid) {
-    log.warn('Invalid pairing key attempt', { platform, platformUserId });
+    log.warn('Invalid pairing key attempt', { pluginId, platform, platformUserId });
     return { success: false, alreadyClaimed: false, message: 'Invalid pairing key.' };
   }
 
@@ -139,30 +144,47 @@ export async function claimOwnership(
   await repo.set(ownerKey(platform), platformUserId);
   await repo.set(ownerChatKey(platform), platformChatId);
 
-  log.info(`Ownership claimed on ${platform}`, { platformUserId, platformChatId });
+  // Rotate the key immediately — old key is now invalid
+  await rotatePairingKey(pluginId);
+
+  log.info(`Ownership claimed on ${platform} via channel ${pluginId}`, {
+    platformUserId,
+    platformChatId,
+  });
 
   return { success: true, alreadyClaimed: false, message: 'Ownership claimed.' };
 }
 
 /**
- * Print the pairing key banner to stdout so the operator can see it.
- * Called at server startup when no owner is claimed.
+ * Revokes ownership of a platform and rotates the channel's pairing key.
+ * After revoking, a fresh /connect claim can be made with the new key.
  */
-export function printPairingBanner(key: string): void {
-  const line  = '═'.repeat(54);
-  const pad   = (s: string) => `║  ${s.padEnd(50)}  ║`;
+export async function revokeOwnership(pluginId: string, platform: string): Promise<void> {
+  const repo = getSystemSettingsRepository();
+  await repo.delete(ownerKey(platform));
+  await repo.delete(ownerChatKey(platform));
+  await rotatePairingKey(pluginId);
+  log.info(`Ownership revoked for ${platform} via channel ${pluginId}`);
+}
+
+/**
+ * Print the pairing key banner for a specific channel to stdout.
+ * Called at server startup for each unclaimed channel.
+ */
+export function printPairingBanner(channelName: string, key: string): void {
+  const line = '═'.repeat(54);
+  const pad  = (s: string) => `║  ${s.padEnd(50)}  ║`;
   console.log(`\n╔${line}╗`);
   console.log(pad(''));
-  console.log(pad('  🔑  OwnPilot — First-Time Setup'));
+  console.log(pad(`  🔑  OwnPilot — Channel Setup`));
+  console.log(pad(`      ${channelName}`));
   console.log(pad(''));
-  console.log(pad('  No owner is configured yet.'));
-  console.log(pad('  Send the following command to your bot to claim'));
-  console.log(pad('  ownership (Telegram, WhatsApp, or any channel):'));
+  console.log(pad('  No owner is configured for this channel yet.'));
+  console.log(pad('  Send the following command on this channel:'));
   console.log(pad(''));
   console.log(pad(`      /connect ${key}`));
   console.log(pad(''));
-  console.log(pad('  Only the first person to send this command'));
-  console.log(pad('  per channel becomes the owner of that channel.'));
+  console.log(pad('  The key rotates after each successful claim.'));
   console.log(pad(''));
   console.log(`╚${line}╝\n`);
 }

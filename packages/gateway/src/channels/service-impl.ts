@@ -53,6 +53,7 @@ import {
   claimOwnership,
   getOwnerUserId,
   getPairingKey,
+  autoClaimOwnership,
 } from '../services/pairing-service.js';
 
 const log = getLog('ChannelService');
@@ -558,24 +559,52 @@ export class ChannelServiceImpl implements IChannelService {
           return;
         }
       } else {
-        // No owner claimed — reply with pairing instructions so the user knows what to do
-        log.info('No owner claimed yet — sending pairing instructions', {
-          platform: message.platform,
-          sender: message.sender.platformUserId,
-        });
-        const api = this.getChannel(message.channelPluginId);
-        if (api) {
-          try {
-            const key = await getPairingKey(message.channelPluginId);
-            await api.sendMessage({
-              platformChatId: message.platformChatId,
-              text: `👋 OwnPilot is running but not yet claimed.\n\nTo activate, send:\n/connect ${key}`,
+        // No owner claimed yet.
+        // WhatsApp self-chat: the Baileys `fromMe` filter already guarantees only the
+        // account owner can reach this point via self-chat, so auto-claim them.
+        if (message.platform === 'whatsapp') {
+          const api = this.getChannel(message.channelPluginId);
+          const botInfo = api?.getBotInfo?.();
+          const botPhone = botInfo?.username ?? '';
+          if (botPhone && message.sender.platformUserId === botPhone) {
+            await autoClaimOwnership(
+              message.channelPluginId,
+              message.platform,
+              message.sender.platformUserId,
+              message.platformChatId
+            );
+            log.info('Auto-claimed WhatsApp owner from self-chat', {
+              userId: message.sender.platformUserId,
             });
-          } catch (err) {
-            log.warn('Failed to send pairing instructions', { error: getErrorMessage(err) });
+            // Fall through — process this message normally
+          } else {
+            // fromMe=false message from another person before owner is set — just drop
+            log.debug('Dropping WhatsApp message from non-owner (no claim yet)', {
+              sender: message.sender.platformUserId,
+              botPhone,
+            });
+            return;
           }
+        } else {
+          // Telegram/other: reply with pairing instructions so the user knows what to do
+          log.info('No owner claimed yet — sending pairing instructions', {
+            platform: message.platform,
+            sender: message.sender.platformUserId,
+          });
+          const api = this.getChannel(message.channelPluginId);
+          if (api) {
+            try {
+              const key = await getPairingKey(message.channelPluginId);
+              await api.sendMessage({
+                platformChatId: message.platformChatId,
+                text: `👋 OwnPilot is running but not yet claimed.\n\nTo activate, send:\n/connect ${key}`,
+              });
+            } catch (err) {
+              log.warn('Failed to send pairing instructions', { error: getErrorMessage(err) });
+            }
+          }
+          return;
         }
-        return;
       }
 
       // 4. Check verification — whitelist, approval code, or admin approval

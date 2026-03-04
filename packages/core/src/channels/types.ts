@@ -145,6 +145,9 @@ export interface ChannelPluginAPI {
 
   /** Logout and clear session data (optional — forces re-authentication on next connect) */
   logout?(): Promise<void>;
+
+  /** Return basic info about the bot account (optional) */
+  getBotInfo?(): { username?: string; firstName?: string } | null;
 }
 
 // ============================================================================

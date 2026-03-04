@@ -156,6 +156,29 @@ export async function claimOwnership(
 }
 
 /**
+ * Directly claim ownership without requiring a pairing key.
+ * Used for channels where the transport layer already provides authentication
+ * (e.g. WhatsApp self-chat where `fromMe:true` guarantees the phone owner).
+ * No-ops if ownership is already claimed by the same user.
+ */
+export async function autoClaimOwnership(
+  pluginId: string,
+  platform: string,
+  platformUserId: string,
+  platformChatId: string
+): Promise<void> {
+  const repo = getSystemSettingsRepository();
+  const existing = await repo.get(ownerKey(platform));
+  if (existing) return; // already claimed — don't overwrite
+
+  await repo.set(ownerKey(platform), platformUserId);
+  await repo.set(ownerChatKey(platform), platformChatId);
+  // Rotate key so the startup-banner key can't be used after auto-claim
+  await rotatePairingKey(pluginId);
+  log.info(`Auto-claimed ownership on ${platform} via channel ${pluginId}`, { platformUserId });
+}
+
+/**
  * Revokes ownership of a platform and rotates the channel's pairing key.
  * After revoking, a fresh /connect claim can be made with the new key.
  */

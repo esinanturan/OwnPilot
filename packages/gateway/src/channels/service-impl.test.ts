@@ -72,6 +72,7 @@ const mockClaimOwnership = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ success: false, alreadyClaimed: true, message: 'Already claimed.' })
 );
 const mockGetPairingKey = vi.hoisted(() => vi.fn().mockResolvedValue('TEST-KEY-1234'));
+const mockAutoClaimOwnership = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const mockResolveForProcess = vi.hoisted(() =>
   vi.fn().mockResolvedValue({
     provider: 'openai',
@@ -153,6 +154,7 @@ vi.mock('../services/pairing-service.js', () => ({
   getOwnerUserId: mockGetOwnerUserId,
   claimOwnership: mockClaimOwnership,
   getPairingKey: mockGetPairingKey,
+  autoClaimOwnership: mockAutoClaimOwnership,
 }));
 
 // ============================================================================
@@ -168,6 +170,7 @@ function createChannelPlugin(
     connectionStatus: string;
     sendMessageResult: string;
     requiredServices: Array<{ name: string }>;
+    botPhone: string | null;
   }>
 ) {
   const opts = {
@@ -178,6 +181,7 @@ function createChannelPlugin(
     connectionStatus: 'disconnected',
     sendMessageResult: 'msg-123',
     requiredServices: [{ name: 'telegram' }],
+    botPhone: null as string | null,
     ...overrides,
   };
 
@@ -198,6 +202,7 @@ function createChannelPlugin(
       getStatus: vi.fn().mockReturnValue(opts.connectionStatus),
       getPlatform: vi.fn().mockReturnValue(opts.platform),
       sendTyping: vi.fn().mockResolvedValue(undefined),
+      getBotInfo: vi.fn().mockReturnValue(opts.botPhone ? { username: opts.botPhone } : null),
     },
   };
 }
@@ -1032,6 +1037,51 @@ describe('ChannelServiceImpl', () => {
         expect(channelPlugin.api.sendMessage).toHaveBeenCalledWith(
           expect.objectContaining({ text: expect.stringContaining('/connect TEST-KEY-1234') })
         );
+      });
+
+      it('auto-claims WhatsApp owner when sender matches bot phone (self-chat)', async () => {
+        mockGetOwnerUserId.mockResolvedValue(null);
+        const waPlugin = createChannelPlugin({
+          platform: 'whatsapp',
+          botPhone: 'user-456', // matches sender.platformUserId in createIncomingMessage
+        });
+        const waRegistry = createMockPluginRegistry([waPlugin]);
+        const waMessage = createIncomingMessage({ platform: 'whatsapp' });
+        const waService = new ChannelServiceImpl(waRegistry as never, {
+          usersRepo: mockUsersRepo as never,
+          sessionsRepo: mockSessionsRepo as never,
+          verificationService: mockVerificationService as never,
+        });
+        mockGetOrCreateChatAgent.mockResolvedValue(createMockAgent());
+
+        await waService.processIncomingMessage(waMessage);
+        waService.dispose();
+
+        expect(mockAutoClaimOwnership).toHaveBeenCalledWith(
+          'test-plugin', 'whatsapp', 'user-456', expect.any(String)
+        );
+        expect(mockSessionsRepo.findActive).toHaveBeenCalled();
+      });
+
+      it('drops WhatsApp message silently when sender does not match bot phone', async () => {
+        mockGetOwnerUserId.mockResolvedValue(null);
+        const waPlugin = createChannelPlugin({
+          platform: 'whatsapp',
+          botPhone: '999999999', // different from sender 'user-456'
+        });
+        const waRegistry = createMockPluginRegistry([waPlugin]);
+        const waMessage = createIncomingMessage({ platform: 'whatsapp' });
+        const waService = new ChannelServiceImpl(waRegistry as never, {
+          usersRepo: mockUsersRepo as never,
+          sessionsRepo: mockSessionsRepo as never,
+          verificationService: mockVerificationService as never,
+        });
+
+        await waService.processIncomingMessage(waMessage);
+        waService.dispose();
+
+        expect(mockAutoClaimOwnership).not.toHaveBeenCalled();
+        expect(mockSessionsRepo.findActive).not.toHaveBeenCalled();
       });
 
       it('passes through messages from the claimed owner', async () => {

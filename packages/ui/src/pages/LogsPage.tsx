@@ -960,13 +960,13 @@ export function LogsPage() {
                       </div>
 
                       {/* Result Preview */}
-                      {selectedDebugEntry.data.resultPreview && (
+                      {selectedDebugEntry.data.result && (
                         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 space-y-2">
                           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                             Result (Output)
                           </h4>
                           <pre className="p-2 bg-gray-100 dark:bg-gray-900 rounded text-xs overflow-auto max-h-60 text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                            {selectedDebugEntry.data.resultPreview}
+                            {selectedDebugEntry.data.result}
                           </pre>
                         </div>
                       )}

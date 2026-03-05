@@ -19,7 +19,8 @@ interface DebugEntry {
     | 'tool_result'
     | 'error'
     | 'retry'
-    | 'sandbox_execution';
+    | 'sandbox_execution'
+    | 'system_prompt';
   provider?: string;
   model?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,7 +28,7 @@ interface DebugEntry {
   duration?: number;
 }
 
-type FilterType = 'all' | 'request' | 'response' | 'tool_call' | 'tool_result' | 'error';
+type FilterType = 'all' | 'request' | 'response' | 'tool_call' | 'tool_result' | 'error' | 'system_prompt';
 
 const MAX_ENTRIES = 200;
 
@@ -54,6 +55,10 @@ const TYPE_STYLES: Record<string, { bg: string; label: string }> = {
     bg: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
     label: 'SANDBOX',
   },
+  system_prompt: {
+    bg: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+    label: 'PROMPT',
+  },
 };
 
 function formatTime(iso: string): string {
@@ -76,8 +81,8 @@ function summarizeEntry(entry: DebugEntry): string {
     case 'response':
       if (d.status === 'error') return d.error ?? 'error';
       return [
-        d.contentPreview
-          ? `"${d.contentPreview.slice(0, 60)}${d.contentPreview.length > 60 ? '...' : ''}"`
+        d.content
+          ? `"${d.content.slice(0, 60)}${d.content.length > 60 ? '...' : ''}"`
           : '',
         d.toolCalls?.length ? `${d.toolCalls.length} tool calls` : '',
         d.usage ? `${d.usage.totalTokens}tok` : '',
@@ -94,9 +99,41 @@ function summarizeEntry(entry: DebugEntry): string {
       return `attempt ${d.attempt}/${d.maxRetries}, wait ${formatDuration(d.delayMs)}`;
     case 'sandbox_execution':
       return `${d.tool ?? '?'} (${d.language}) ${d.success ? 'ok' : 'fail'}`;
+    case 'system_prompt': {
+      const sections: Array<{ name: string; chars: number }> = d.sections ?? [];
+      return `${d.stage} — ${d.totalChars} chars total | ${sections.map((s) => `${s.name}:${s.chars}`).join(', ')}`;
+    }
     default:
       return '';
   }
+}
+
+function SystemPromptDetail({ data }: { data: { stage: string; totalChars: number; sections: Array<{ name: string; chars: number; content: string }> } }) {
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  return (
+    <div className="text-[11px] text-text-secondary dark:text-dark-text-secondary space-y-1 max-h-[400px] overflow-auto">
+      <div className="text-text-muted dark:text-dark-text-muted mb-1">
+        stage: <strong>{data.stage}</strong> — total: <strong>{data.totalChars} chars</strong>
+      </div>
+      {(data.sections ?? []).map((s) => (
+        <div key={s.name} className="border border-border dark:border-dark-border rounded overflow-hidden">
+          <button
+            onClick={() => setOpenSection(openSection === s.name ? null : s.name)}
+            className="w-full flex items-center gap-2 px-2 py-1 bg-bg-tertiary dark:bg-dark-bg-tertiary hover:bg-bg-secondary dark:hover:bg-dark-bg-secondary text-left"
+          >
+            <span className="font-semibold text-indigo-600 dark:text-indigo-400 w-36 shrink-0">{s.name}</span>
+            <span className="text-text-muted dark:text-dark-text-muted">{s.chars} chars</span>
+            <span className="ml-auto text-text-muted dark:text-dark-text-muted">{openSection === s.name ? '▴' : '▾'}</span>
+          </button>
+          {openSection === s.name && (
+            <pre className="px-2 py-1.5 whitespace-pre-wrap break-all text-[10px] bg-bg-primary dark:bg-dark-bg-primary text-text-secondary dark:text-dark-text-secondary max-h-[250px] overflow-auto">
+              {s.content}
+            </pre>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function DebugDrawer() {
@@ -229,6 +266,7 @@ export function DebugDrawer() {
               <option value="response">Responses</option>
               <option value="tool_call">Tool Calls</option>
               <option value="tool_result">Tool Results</option>
+              <option value="system_prompt">Prompt</option>
               <option value="error">Errors</option>
             </select>
 
@@ -317,9 +355,13 @@ export function DebugDrawer() {
                   {/* Expanded detail */}
                   {isExpanded && (
                     <div className="px-3 py-2 bg-bg-secondary dark:bg-dark-bg-secondary border-b border-border dark:border-dark-border">
-                      <pre className="whitespace-pre-wrap break-all text-[11px] text-text-secondary dark:text-dark-text-secondary max-h-[200px] overflow-auto">
-                        {JSON.stringify(entry.data, null, 2)}
-                      </pre>
+                      {entry.type === 'system_prompt' ? (
+                        <SystemPromptDetail data={entry.data} />
+                      ) : (
+                        <pre className="whitespace-pre-wrap break-all text-[11px] text-text-secondary dark:text-dark-text-secondary max-h-[200px] overflow-auto">
+                          {JSON.stringify(entry.data, null, 2)}
+                        </pre>
+                      )}
                     </div>
                   )}
                 </div>

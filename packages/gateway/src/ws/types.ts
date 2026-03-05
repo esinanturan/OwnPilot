@@ -281,7 +281,8 @@ export interface ServerEvents {
       | 'tool_result'
       | 'error'
       | 'retry'
-      | 'sandbox_execution';
+      | 'sandbox_execution'
+      | 'system_prompt';
     provider?: string;
     model?: string;
     data: unknown;

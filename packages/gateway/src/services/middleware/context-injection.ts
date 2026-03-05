@@ -133,15 +133,29 @@ export function createContextInjectionMiddleware(): MessageMiddleware {
         ? `\n---\n## Request Focus\n${routing.intentHint}`
         : '';
 
-      // 6. Combine: base + extensions + skills + tool suggestions + data hints + orchestrator + focus
+      // 6. Combine — extensions + skills go BEFORE ## Current Context so they land in
+      // Anthropic's cached block (static content). Dynamic content goes after.
+      const CACHE_SPLIT_MARKER = '\n\n---\n\n## Current Context';
+      const splitIdx = basePrompt.indexOf(CACHE_SPLIT_MARKER);
       const finalPrompt =
-        basePrompt +
-        extensionSuffix +
-        skillsSuffix +
-        toolSuggestionSuffix +
-        dataHintSuffix +
-        orchestratorSuffix +
-        focusSuffix;
+        splitIdx > 0
+          ? // Insert extensions+skills before the time context (cacheable)
+            basePrompt.slice(0, splitIdx) +
+            extensionSuffix +
+            skillsSuffix +
+            basePrompt.slice(splitIdx) +
+            toolSuggestionSuffix +
+            dataHintSuffix +
+            orchestratorSuffix +
+            focusSuffix
+          : // Fallback: no time context marker found, append everything after
+            basePrompt +
+            extensionSuffix +
+            skillsSuffix +
+            toolSuggestionSuffix +
+            dataHintSuffix +
+            orchestratorSuffix +
+            focusSuffix;
 
       if (finalPrompt !== currentSystemPrompt) {
         agent.updateSystemPrompt(finalPrompt);

@@ -386,13 +386,23 @@ export class PromptComposer {
       }
     }
 
-    // 6. Time context
+    // 6. Time context — rounded to the hour so Anthropic prompt cache hits within same hour
     if (this.options.includeTimeContext && context.timeContext) {
       const tc = context.timeContext;
+      const rounded = new Date(tc.currentTime);
+      rounded.setMinutes(0, 0, 0);
+      const timeStr = rounded.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
       push(
         'time_context',
         PROMPT_SECTIONS.timeContext
-          .replace('{{time}}', tc.currentTime.toLocaleString())
+          .replace('{{time}}', timeStr)
           .replace('{{dayOfWeek}}', tc.dayOfWeek)
           .replace('{{timezone}}', tc.timezone ?? 'Unknown')
       );

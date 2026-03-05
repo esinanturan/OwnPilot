@@ -37,6 +37,7 @@ const mockSessionsRepo = vi.hoisted(() => ({
   create: vi.fn(),
   touchLastMessage: vi.fn(),
   linkConversation: vi.fn().mockResolvedValue(undefined),
+  deactivate: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockMessagesRepo = vi.hoisted(() => ({
@@ -1140,6 +1141,49 @@ describe('ChannelServiceImpl', () => {
       });
     });
 
+    describe('/clear command', () => {
+      it('should deactivate active session and send confirmation', async () => {
+        const clearMsg = createIncomingMessage({ text: '/clear' });
+        mockSessionsRepo.findActive.mockResolvedValueOnce({
+          id: 'session-to-clear',
+          conversationId: 'conv-1',
+        });
+
+        await service.processIncomingMessage(clearMsg);
+
+        expect(mockSessionsRepo.deactivate).toHaveBeenCalledWith('session-to-clear');
+        expect(channelPlugin.api.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('Conversation cleared'),
+          })
+        );
+      });
+
+      it('should send "no active session" message when nothing to clear', async () => {
+        const clearMsg = createIncomingMessage({ text: '/clear' });
+        mockSessionsRepo.findActive.mockResolvedValueOnce(null);
+
+        await service.processIncomingMessage(clearMsg);
+
+        expect(mockSessionsRepo.deactivate).not.toHaveBeenCalled();
+        expect(channelPlugin.api.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('No active session'),
+          })
+        );
+      });
+
+      it('should return early after /clear (no AI routing)', async () => {
+        const clearMsg = createIncomingMessage({ text: '/clear' });
+        mockSessionsRepo.findActive.mockResolvedValueOnce(null);
+
+        await service.processIncomingMessage(clearMsg);
+
+        // Should not proceed to session findActive for AI processing
+        expect(mockSessionsRepo.create).not.toHaveBeenCalled();
+      });
+    });
+
     describe('verification', () => {
       it('should send pending approval message for unverified user not in whitelist', async () => {
         mockUsersRepo.findOrCreate.mockResolvedValue(createChannelUser({ isVerified: false }));
@@ -1672,6 +1716,42 @@ describe('ChannelServiceImpl', () => {
 
         // Should NOT call loadConversation
         expect(agent.loadConversation).not.toHaveBeenCalled();
+      });
+
+      it('should append context-full warning when tokens >= 80% of context window', async () => {
+        mockBus.process.mockResolvedValue({
+          response: {
+            content: 'Response text',
+            metadata: { source: 'channel', tokens: { input: 108000, output: 500 } },
+          },
+        });
+
+        await service.processIncomingMessage(message);
+
+        expect(channelPlugin.api.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('⚠️ Context is'),
+          })
+        );
+        expect(channelPlugin.api.sendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            text: expect.stringContaining('/clear'),
+          })
+        );
+      });
+
+      it('should not append context warning when tokens < 80%', async () => {
+        mockBus.process.mockResolvedValue({
+          response: {
+            content: 'Response text',
+            metadata: { source: 'channel', tokens: { input: 50000, output: 500 } },
+          },
+        });
+
+        await service.processIncomingMessage(message);
+
+        const call = (channelPlugin.api.sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][0];
+        expect(call.text).not.toContain('⚠️');
       });
     });
 

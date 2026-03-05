@@ -105,8 +105,43 @@ const sampleLogStats = {
 // Mocks
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Channel-specific fixtures
+// ---------------------------------------------------------------------------
+
+const sampleChannelConversation = {
+  id: 'conv-ch-1',
+  title: 'WhatsApp Conversation',
+  agentId: null,
+  agentName: null,
+  provider: null,
+  model: null,
+  systemPrompt: null,
+  messageCount: 3,
+  isArchived: false,
+  userId: 'default',
+  metadata: { source: 'channel', platform: 'whatsapp' },
+  createdAt: new Date('2026-01-01'),
+  updatedAt: new Date('2026-01-01'),
+};
+
+const sampleChannelSession = {
+  id: 'session-1',
+  channelPluginId: 'whatsapp-plugin',
+  platformChatId: 'chat-123',
+  channelUserId: 'user-ch-1',
+  conversationId: 'conv-ch-1',
+};
+
+// ---------------------------------------------------------------------------
+// Mock objects
+// ---------------------------------------------------------------------------
+
 const mockChatRepo = {
   listConversations: vi.fn(async () => [sampleConversation]),
+  getConversation: vi.fn(async (id: string) =>
+    id === 'conv-ch-1' ? sampleChannelConversation : id === 'conv-1' ? sampleConversation : null
+  ),
   getConversationWithMessages: vi.fn(async (id: string) =>
     id === 'conv-1'
       ? { conversation: sampleConversation, messages: [sampleMessage, sampleMessage2] }
@@ -120,6 +155,19 @@ const mockChatRepo = {
     id === 'conv-1' ? { ...sampleConversation, isArchived: data.isArchived } : null
   ),
 };
+
+const mockChannelSessionsRepo = {
+  findByConversation: vi.fn(async () => sampleChannelSession as typeof sampleChannelSession | null),
+};
+
+const mockProcessIncomingMessage = vi.fn(async () => {});
+
+const mockGetChannelServiceImpl = vi.fn(() => ({
+  processIncomingMessage: mockProcessIncomingMessage,
+}));
+
+const mockGetOwnerUserId = vi.fn(async () => 'owner-user-123' as string | null);
+const mockGetOwnerChatId = vi.fn(async () => 'owner-chat-456' as string | null);
 
 const mockLogsRepo = {
   list: vi.fn(async () => [sampleLog]),
@@ -200,6 +248,42 @@ vi.mock('../config/defaults.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../db/repositories/channel-sessions.js', () => ({
+  channelSessionsRepo: mockChannelSessionsRepo,
+}));
+
+vi.mock('../db/repositories/channel-messages.js', () => ({
+  channelMessagesRepo: {
+    getByConversation: vi.fn(async () => []),
+    create: vi.fn(async () => ({})),
+  },
+}));
+
+vi.mock('../db/repositories/channel-users.js', () => ({
+  channelUsersRepo: {
+    getById: vi.fn(async () => null),
+  },
+}));
+
+vi.mock('../channels/service-impl.js', () => ({
+  getChannelServiceImpl: (...args: unknown[]) => mockGetChannelServiceImpl(...args),
+}));
+
+vi.mock('../services/pairing-service.js', () => ({
+  getOwnerUserId: (...args: unknown[]) => mockGetOwnerUserId(...args),
+  getOwnerChatId: (...args: unknown[]) => mockGetOwnerChatId(...args),
+}));
+
+vi.mock('../services/middleware/context-injection.js', () => ({
+  clearInjectionCache: vi.fn(),
+}));
+
+vi.mock('../ws/server.js', () => ({
+  wsGateway: {
+    broadcast: vi.fn(),
+  },
+}));
+
 // Import after mocks
 const { chatHistoryRoutes } = await import('./chat-history.js');
 
@@ -248,6 +332,15 @@ describe('Chat History & Logs Routes', () => {
     mockResetChatAgentContext.mockReturnValue({ reset: true, newSessionId: 'new-session-1' });
     mockClearAllChatAgentCaches.mockReturnValue(3);
     mockGetDefaultModel.mockResolvedValue('gpt-4o');
+    // Channel-send mocks
+    mockChatRepo.getConversation.mockImplementation(async (id: string) =>
+      id === 'conv-ch-1' ? sampleChannelConversation : id === 'conv-1' ? sampleConversation : null
+    );
+    mockChannelSessionsRepo.findByConversation.mockResolvedValue(sampleChannelSession);
+    mockGetChannelServiceImpl.mockReturnValue({ processIncomingMessage: mockProcessIncomingMessage });
+    mockProcessIncomingMessage.mockResolvedValue(undefined);
+    mockGetOwnerUserId.mockResolvedValue('owner-user-123');
+    mockGetOwnerChatId.mockResolvedValue('owner-chat-456');
     app = createApp();
   });
 
@@ -638,10 +731,143 @@ describe('Chat History & Logs Routes', () => {
       expect(json.error.message).toContain('Conversation not found');
     });
 
+    it('strips internal tags from assistant messages', async () => {
+      mockChatRepo.getConversationWithMessages.mockResolvedValueOnce({
+        conversation: sampleConversation,
+        messages: [
+          sampleMessage,
+          { ...sampleMessage2, content: 'Answer<suggestions>opt1\nopt2</suggestions> done.' },
+        ],
+      });
+
+      const res = await app.request('/api/history/conv-1');
+      const json = await res.json();
+      const [userMsg, assistantMsg] = json.data.messages;
+      expect(userMsg.content).toBe('Hello world');
+      expect(assistantMsg.content).toBe('Answer done.');
+    });
+
+    it('does not strip content from user messages', async () => {
+      mockChatRepo.getConversationWithMessages.mockResolvedValueOnce({
+        conversation: sampleConversation,
+        messages: [
+          { ...sampleMessage, content: 'What about <context>this</context>?' },
+          sampleMessage2,
+        ],
+      });
+
+      const res = await app.request('/api/history/conv-1');
+      const json = await res.json();
+      expect(json.data.messages[0].content).toBe('What about <context>this</context>?');
+    });
+
     it('returns 500 when repository throws', async () => {
       mockChatRepo.getConversationWithMessages.mockRejectedValue(new Error('DB error'));
 
       const res = await app.request('/api/history/conv-1');
+
+      expect(res.status).toBe(500);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+    });
+  });
+
+  // ========================================================================
+  // GET /history/:id/unified - Unified conversation view
+  // ========================================================================
+
+  describe('GET /api/history/:id/unified', () => {
+    it('returns web conversation with source tag', async () => {
+      const res = await app.request('/api/history/conv-1/unified');
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.data.conversation.source).toBe('web');
+      expect(json.data.messages).toHaveLength(2);
+      expect(json.data.messages[0].direction).toBe('inbound');
+      expect(json.data.messages[1].direction).toBe('outbound');
+    });
+
+    it('strips internal tags from assistant messages in web path', async () => {
+      mockChatRepo.getConversationWithMessages.mockResolvedValueOnce({
+        conversation: sampleConversation,
+        messages: [
+          sampleMessage,
+          { ...sampleMessage2, content: 'Response<memories>note</memories> here.' },
+        ],
+      });
+
+      const res = await app.request('/api/history/conv-1/unified');
+      const json = await res.json();
+      const assistantMsg = json.data.messages.find(
+        (m: { role: string }) => m.role === 'assistant'
+      );
+      expect(assistantMsg.content).toBe('Response here.');
+    });
+
+    it('does not strip user messages in web path', async () => {
+      mockChatRepo.getConversationWithMessages.mockResolvedValueOnce({
+        conversation: sampleConversation,
+        messages: [
+          { ...sampleMessage, content: 'User <context>ctx</context> msg' },
+          sampleMessage2,
+        ],
+      });
+
+      const res = await app.request('/api/history/conv-1/unified');
+      const json = await res.json();
+      const userMsg = json.data.messages.find((m: { role: string }) => m.role === 'user');
+      expect(userMsg.content).toBe('User <context>ctx</context> msg');
+    });
+
+    it('returns 404 when conversation not found', async () => {
+      const res = await app.request('/api/history/nonexistent/unified');
+
+      expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json.error.message).toContain('Conversation not found');
+    });
+
+    it('returns channel conversation with source and channelInfo', async () => {
+      mockChatRepo.getConversationWithMessages.mockResolvedValueOnce({
+        conversation: sampleChannelConversation,
+        messages: [sampleMessage, sampleMessage2],
+      });
+
+      const res = await app.request('/api/history/conv-ch-1/unified');
+      const json = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(json.data.conversation.source).toBe('channel');
+      expect(json.data.conversation.channelPlatform).toBe('whatsapp');
+      expect(json.data.channelInfo).toBeTruthy();
+      expect(json.data.channelInfo.channelPluginId).toBe('whatsapp-plugin');
+    });
+
+    it('strips internal tags from AI messages in channel path', async () => {
+      mockChatRepo.getConversationWithMessages.mockResolvedValueOnce({
+        conversation: sampleChannelConversation,
+        messages: [
+          sampleMessage,
+          {
+            ...sampleMessage2,
+            content: 'Resp<context>internal</context><suggestions>s</suggestions>',
+          },
+        ],
+      });
+
+      const res = await app.request('/api/history/conv-ch-1/unified');
+      const json = await res.json();
+      const aiMsg = json.data.messages.find(
+        (m: { role: string; source: string }) => m.role === 'assistant' && m.source === 'ai'
+      );
+      expect(aiMsg?.content).toBe('Resp');
+    });
+
+    it('returns 500 when repository throws', async () => {
+      mockChatRepo.getConversationWithMessages.mockRejectedValue(new Error('DB error'));
+
+      const res = await app.request('/api/history/conv-1/unified');
 
       expect(res.status).toBe(500);
       const json = await res.json();
@@ -1170,6 +1396,193 @@ describe('Chat History & Logs Routes', () => {
       expect(res.status).toBe(500);
       const json = await res.json();
       expect(json.error.message).toContain('Agent not found');
+    });
+  });
+
+  // ========================================================================
+  // POST /channel-send - Send Web UI message through channel AI pipeline
+  // ========================================================================
+
+  describe('POST /api/channel-send', () => {
+    it('returns queued:true and fires processIncomingMessage', async () => {
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'conv-ch-1', text: 'Hello from web' }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.queued).toBe(true);
+      // processIncomingMessage is fire-and-forget; give microtasks a tick to fire
+      await Promise.resolve();
+      expect(mockProcessIncomingMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('builds synthetic message with correct fields', async () => {
+      await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'conv-ch-1', text: '  trimmed  ' }),
+      });
+
+      await Promise.resolve();
+      const [syntheticMsg] = mockProcessIncomingMessage.mock.calls[0] as [
+        { text: string; channelPluginId: string; platform: string; sender: { platformUserId: string } },
+      ];
+      expect(syntheticMsg.text).toBe('trimmed');
+      expect(syntheticMsg.channelPluginId).toBe('whatsapp-plugin');
+      expect(syntheticMsg.platform).toBe('whatsapp');
+      expect(syntheticMsg.sender.platformUserId).toBe('owner-user-123');
+    });
+
+    it('returns 400 when text is missing', async () => {
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'conv-ch-1' }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error.message).toContain('text and conversationId are required');
+    });
+
+    it('returns 400 when text is blank whitespace', async () => {
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'conv-ch-1', text: '   ' }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error.message).toContain('text and conversationId are required');
+    });
+
+    it('returns 400 when conversationId is missing', async () => {
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'hello' }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error.message).toContain('text and conversationId are required');
+    });
+
+    it('returns 400 when body is invalid JSON', async () => {
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: 'not json',
+      });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 404 when conversation not found', async () => {
+      mockChatRepo.getConversation.mockResolvedValueOnce(null);
+
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'nonexistent', text: 'hello' }),
+      });
+
+      expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json.error.message).toContain('Conversation');
+    });
+
+    it('returns 400 when conversation is not a channel conversation', async () => {
+      mockChatRepo.getConversation.mockResolvedValueOnce({
+        ...sampleConversation,
+        metadata: { source: 'web' },
+      });
+
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'conv-1', text: 'hello' }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error.message).toContain('Not a channel conversation');
+    });
+
+    it('returns 404 when no active channel session found', async () => {
+      mockChannelSessionsRepo.findByConversation.mockResolvedValueOnce(null);
+
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'conv-ch-1', text: 'hello' }),
+      });
+
+      expect(res.status).toBe(404);
+      const json = await res.json();
+      expect(json.error.message).toContain('No active channel session');
+    });
+
+    it('returns 503 when channel service is not available', async () => {
+      mockGetChannelServiceImpl.mockReturnValueOnce(null);
+
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'conv-ch-1', text: 'hello' }),
+      });
+
+      expect(res.status).toBe(503);
+      const json = await res.json();
+      expect(json.error.message).toContain('Channel service not available');
+    });
+
+    it('returns 400 when no owner is registered for the platform', async () => {
+      mockGetOwnerUserId.mockResolvedValueOnce(null);
+
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'conv-ch-1', text: 'hello' }),
+      });
+
+      expect(res.status).toBe(400);
+      const json = await res.json();
+      expect(json.error.message).toContain('No owner registered for platform');
+    });
+
+    it('returns 500 when repository throws', async () => {
+      mockChatRepo.getConversation.mockRejectedValueOnce(new Error('DB connection failed'));
+
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'conv-ch-1', text: 'hello' }),
+      });
+
+      expect(res.status).toBe(500);
+      const json = await res.json();
+      expect(json.success).toBe(false);
+    });
+
+    it('still returns 200 even when processIncomingMessage fails (fire-and-forget)', async () => {
+      mockProcessIncomingMessage.mockRejectedValueOnce(new Error('AI pipeline crashed'));
+
+      const res = await app.request('/api/channel-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: 'conv-ch-1', text: 'hello' }),
+      });
+
+      // The endpoint returns immediately; the error is swallowed by .catch()
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.data.queued).toBe(true);
     });
   });
 });

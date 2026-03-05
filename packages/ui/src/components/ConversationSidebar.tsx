@@ -148,6 +148,10 @@ function ConvItem({
   );
 }
 
+// ── Filter tab type ───────────────────────────────────────────────────────────
+
+type SourceFilter = 'all' | 'web' | 'whatsapp' | 'telegram';
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
@@ -164,58 +168,107 @@ export function ConversationSidebar({ activeId, onNew, onSelect }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
+  const [availablePlatforms, setAvailablePlatforms] = useState<Set<string>>(new Set());
   const editInputRef = useRef<HTMLInputElement>(null);
   const prevActiveIdRef = useRef<string | null>(null);
   const toast = useToast();
   const dialog = useDialog();
   const { subscribe } = useGateway();
 
+  const buildQueryParams = useCallback(
+    (q: string, filter: SourceFilter) => {
+      if (filter === 'web') return { limit: 50, offset: 0, search: q || undefined, source: 'web' as const };
+      if (filter === 'whatsapp') return { limit: 50, offset: 0, search: q || undefined, source: 'channel' as const, channelPlatform: 'whatsapp' };
+      if (filter === 'telegram') return { limit: 50, offset: 0, search: q || undefined, source: 'channel' as const, channelPlatform: 'telegram' };
+      return { limit: 50, offset: 0, search: q || undefined };
+    },
+    []
+  );
+
   const load = useCallback(
-    async (q = '') => {
+    async (q = '', filter: SourceFilter = 'all') => {
       setIsLoading(true);
       try {
-        const res = await chatApi.listHistory({ limit: 50, offset: 0, search: q || undefined });
+        const res = await chatApi.listHistory(buildQueryParams(q, filter));
         setConversations(res.conversations);
         setTotal(res.total);
+        // Update available platforms from unfiltered data
+        if (filter === 'all') {
+          const platforms = new Set<string>();
+          for (const conv of res.conversations) {
+            if (conv.source === 'channel' && conv.channelPlatform) {
+              platforms.add(conv.channelPlatform);
+            }
+          }
+          setAvailablePlatforms(platforms);
+        }
       } catch {
         /* silently ignore */
       } finally {
         setIsLoading(false);
       }
     },
-    []
+    [buildQueryParams]
   );
 
   // Initial load
   useEffect(() => {
-    load();
+    load('', 'all');
   }, [load]);
 
   // Reload when a new conversation is started (activeId changes to a new value)
   useEffect(() => {
     if (activeId && activeId !== prevActiveIdRef.current) {
       prevActiveIdRef.current = activeId;
-      load(search);
+      load(search, sourceFilter);
     }
     if (!activeId) {
       prevActiveIdRef.current = null;
     }
-  }, [activeId, load, search]);
+  }, [activeId, load, search, sourceFilter]);
 
   // Auto-refresh when a channel message arrives (WhatsApp, Telegram, etc.)
   useEffect(() => {
     return subscribe('channel:message', () => {
-      load(search);
+      load(search, sourceFilter);
     });
-  }, [subscribe, load, search]);
+  }, [subscribe, load, search, sourceFilter]);
 
   const handleSearch = useCallback(
     (q: string) => {
       setSearch(q);
-      load(q);
+      load(q, sourceFilter);
     },
-    [load]
+    [load, sourceFilter]
   );
+
+  const handleFilterChange = useCallback(
+    (filter: SourceFilter) => {
+      setSourceFilter(filter);
+      load(search, filter);
+    },
+    [load, search]
+  );
+
+  const handleClearAll = async () => {
+    const ok = await dialog.confirm({
+      title: 'Clear All History',
+      message: 'Delete all conversations? This cannot be undone.',
+      confirmText: 'Delete All',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await chatApi.deleteAllHistory();
+      setConversations([]);
+      setTotal(0);
+      onNew();
+      toast.success('All conversations deleted');
+    } catch {
+      toast.error('Failed to clear history');
+    }
+  };
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -314,6 +367,34 @@ export function ConversationSidebar({ activeId, onNew, onSelect }: Props) {
         />
       </div>
 
+      {/* Source filter tabs */}
+      {(availablePlatforms.size > 0) && (
+        <div className="flex items-center gap-0.5 px-2 py-1 border-b border-border dark:border-dark-border overflow-x-auto">
+          {(['all', 'web', ...(availablePlatforms.has('whatsapp') ? ['whatsapp'] : []), ...(availablePlatforms.has('telegram') ? ['telegram'] : [])] as SourceFilter[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => handleFilterChange(tab)}
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap transition-colors ${
+                sourceFilter === tab
+                  ? 'bg-primary text-white'
+                  : 'text-text-muted dark:text-dark-text-muted hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary'
+              }`}
+            >
+              {tab === 'all' && 'All'}
+              {tab === 'web' && (
+                <><Globe className="w-2.5 h-2.5" />Web</>
+              )}
+              {tab === 'whatsapp' && (
+                <><WhatsApp className="w-2.5 h-2.5" />WA</>
+              )}
+              {tab === 'telegram' && (
+                <><Telegram className="w-2.5 h-2.5" />TG</>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Conversation list */}
       <div className="flex-1 overflow-y-auto py-1">
         {isLoading && conversations.length === 0 ? (
@@ -361,6 +442,19 @@ export function ConversationSidebar({ activeId, onNew, onSelect }: Props) {
           </p>
         )}
       </div>
+
+      {/* Footer — bulk cleanup */}
+      {conversations.length > 0 && (
+        <div className="border-t border-border dark:border-dark-border px-2 py-1.5 shrink-0">
+          <button
+            onClick={handleClearAll}
+            className="w-full flex items-center gap-1.5 px-2 py-1 text-xs text-text-muted dark:text-dark-text-muted hover:text-error hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded transition-colors"
+          >
+            <Trash2 className="w-3 h-3" />
+            Clear all history
+          </button>
+        </div>
+      )}
     </div>
   );
 }

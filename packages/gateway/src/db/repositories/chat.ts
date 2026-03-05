@@ -84,6 +84,8 @@ export interface ConversationQuery {
   search?: string;
   limit?: number;
   offset?: number;
+  source?: string;
+  channelPlatform?: string;
 }
 
 // =====================================================
@@ -234,6 +236,16 @@ export class ChatRepository extends BaseRepository {
       conditions.push(`(title ILIKE $${paramIndex} OR agent_name ILIKE $${paramIndex})`);
       params.push(`%${this.escapeLike(query.search)}%`);
       paramIndex++;
+    }
+
+    if (query.source) {
+      conditions.push(`metadata->>'source' = $${paramIndex++}`);
+      params.push(query.source);
+    }
+
+    if (query.channelPlatform) {
+      conditions.push(`metadata->>'platform' = $${paramIndex++}`);
+      params.push(query.channelPlatform);
     }
 
     const limit = query.limit ?? 50;

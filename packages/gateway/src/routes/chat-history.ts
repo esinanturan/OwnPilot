@@ -37,6 +37,12 @@ import { channelUsersRepo } from '../db/repositories/channel-users.js';
 import { getChannelServiceImpl } from '../channels/service-impl.js';
 import { wsGateway } from '../ws/server.js';
 import { randomUUID } from 'node:crypto';
+import { getOwnerUserId, getOwnerChatId } from '../services/pairing-service.js';
+import { getLog } from '../services/log.js';
+import { stripInternalTags } from '../channels/normalizers/base.js';
+import type { ChannelIncomingMessage } from '@ownpilot/core';
+
+const log = getLog('ChatHistory');
 
 export const chatHistoryRoutes = new Hono();
 
@@ -54,6 +60,9 @@ chatHistoryRoutes.get('/history', async (c) => {
   const agentId = c.req.query('agentId');
   const archived = c.req.query('archived') === 'true';
 
+  const source = c.req.query('source');
+  const channelPlatform = c.req.query('channelPlatform');
+
   const chatRepo = new ChatRepository(userId);
   const conversations = await chatRepo.listConversations({
     limit,
@@ -61,6 +70,8 @@ chatHistoryRoutes.get('/history', async (c) => {
     search,
     agentId,
     isArchived: archived,
+    source,
+    channelPlatform,
   });
 
   return apiResponse(c, {
@@ -239,7 +250,7 @@ chatHistoryRoutes.get('/history/:id', async (c) => {
       messages: data.messages.map((msg) => ({
         id: msg.id,
         role: msg.role,
-        content: msg.content,
+        content: msg.role === 'assistant' ? stripInternalTags(msg.content) : msg.content,
         provider: msg.provider,
         model: msg.model,
         toolCalls: msg.toolCalls,
@@ -300,7 +311,7 @@ chatHistoryRoutes.get('/history/:id/unified', async (c) => {
         messages: data.messages.map((msg) => ({
           id: msg.id,
           role: msg.role,
-          content: msg.content,
+          content: msg.role === 'assistant' ? stripInternalTags(msg.content) : msg.content,
           provider: msg.provider,
           model: msg.model,
           toolCalls: msg.toolCalls,
@@ -385,7 +396,7 @@ chatHistoryRoutes.get('/history/:id/unified', async (c) => {
         unified.push({
           id: msg.id,
           role: msg.role,
-          content: msg.content,
+          content: msg.role === 'assistant' ? stripInternalTags(msg.content) : msg.content,
           provider: msg.provider,
           model: msg.model,
           toolCalls: msg.toolCalls,
@@ -555,6 +566,108 @@ chatHistoryRoutes.post('/history/:conversationId/channel-reply', async (c) => {
       {
         code: ERROR_CODES.EXECUTION_ERROR,
         message: getErrorMessage(error, 'Failed to send channel reply'),
+      },
+      500
+    );
+  }
+});
+
+/**
+ * Send a message from the Web UI through the full AI pipeline.
+ * The message is processed by the channel's AI pipeline and the response
+ * is also sent back to the originating phone (WhatsApp/Telegram).
+ * Updates flow via existing channel:message WebSocket events.
+ */
+chatHistoryRoutes.post('/channel-send', async (c) => {
+  const userId = getUserId(c);
+  const body = await parseJsonBody<{ text: string; conversationId: string }>(c);
+
+  if (!body?.text?.trim() || !body?.conversationId) {
+    return apiError(
+      c,
+      { code: ERROR_CODES.INVALID_INPUT, message: 'text and conversationId are required' },
+      400
+    );
+  }
+
+  const { text, conversationId } = body;
+
+  try {
+    const chatRepo = new ChatRepository(userId);
+    const conversation = await chatRepo.getConversation(conversationId);
+    if (!conversation) {
+      return notFoundError(c, 'Conversation', conversationId);
+    }
+
+    const meta = conversation.metadata ?? {};
+    if (meta.source !== 'channel') {
+      return apiError(
+        c,
+        { code: ERROR_CODES.INVALID_REQUEST, message: 'Not a channel conversation' },
+        400
+      );
+    }
+
+    const session = await channelSessionsRepo.findByConversation(conversationId);
+    if (!session) {
+      return apiError(
+        c,
+        { code: ERROR_CODES.NOT_FOUND, message: 'No active channel session for this conversation' },
+        404
+      );
+    }
+
+    const channelService = getChannelServiceImpl();
+    if (!channelService) {
+      return apiError(
+        c,
+        { code: ERROR_CODES.INTERNAL_ERROR, message: 'Channel service not available' },
+        503
+      );
+    }
+
+    const platform = (meta.platform as string) ?? session.platformChatId;
+    const ownerPlatformUserId = await getOwnerUserId(platform);
+    const ownerChatId = await getOwnerChatId(platform);
+
+    if (!ownerPlatformUserId) {
+      return apiError(
+        c,
+        {
+          code: ERROR_CODES.INVALID_REQUEST,
+          message: `No owner registered for platform: ${platform}`,
+        },
+        400
+      );
+    }
+
+    const syntheticMessage: ChannelIncomingMessage = {
+      id: `webui:${randomUUID()}`,
+      channelPluginId: session.channelPluginId,
+      platform,
+      platformChatId: ownerChatId ?? session.platformChatId,
+      sender: {
+        platformUserId: ownerPlatformUserId,
+        platform,
+        displayName: 'Web UI',
+      },
+      text: text.trim(),
+      timestamp: new Date(),
+      metadata: { fromWebUI: true, conversationId },
+    };
+
+    // Fire-and-forget: processIncomingMessage handles AI pipeline + WS broadcasts + phone reply
+    channelService.processIncomingMessage(syntheticMessage).catch((err: unknown) => {
+      log.error('Failed to process WebUI channel message', { error: err });
+    });
+
+    return apiResponse(c, { queued: true });
+  } catch (error) {
+    return apiError(
+      c,
+      {
+        code: ERROR_CODES.EXECUTION_ERROR,
+        message: getErrorMessage(error, 'Failed to queue channel message'),
       },
       500
     );

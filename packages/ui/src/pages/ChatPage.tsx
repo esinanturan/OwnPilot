@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, lazy, Suspense } from 'react';
+import { useRef, useEffect, useState, useCallback, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChatInput, type ChatInputHandle } from '../components/ChatInput';
 import { MessageList } from '../components/MessageList';
@@ -12,6 +12,8 @@ import { useChatStore } from '../hooks/useChatStore';
 import { ExecutionSecurityPanel } from '../components/ExecutionSecurityPanel';
 import { ToolCallLimitPanel } from '../components/ToolCallLimitPanel';
 import { ThinkingToggle } from '../components/ThinkingToggle';
+import { useGateway } from '../hooks/useWebSocket';
+import type { Conversation, ChannelInfo } from '../api';
 
 // Lazy-load rarely-used components
 const SetupWizard = lazy(() =>
@@ -30,9 +32,11 @@ import {
   Shield,
   ChevronDown,
   ChevronRight,
+  Telegram,
+  WhatsApp,
+  MessageSquare,
 } from '../components/icons';
 import { modelsApi, providersApi, settingsApi, agentsApi, chatApi } from '../api';
-import type { HistoryMessage } from '../api';
 import type { ModelInfo, AgentDetail } from '../types';
 import { STORAGE_KEYS } from '../constants/storage-keys';
 
@@ -81,6 +85,20 @@ export function ChatPage() {
   const [showContextDetail, setShowContextDetail] = useState(false);
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
 
+  // Channel mode state
+  const [activeConv, setActiveConv] = useState<Conversation | null>(null);
+  const [channelMessages, setChannelMessages] = useState<Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: string;
+    direction: 'inbound' | 'outbound';
+    senderName?: string;
+  }>>([]);
+  const [channelInfo, setChannelInfo] = useState<ChannelInfo | null>(null);
+  const [isChannelMode, setIsChannelMode] = useState(false);
+  const { subscribe } = useGateway();
+
   // Close dropdowns on Escape key
   useEffect(() => {
     if (!showProviderMenu) return;
@@ -90,6 +108,54 @@ export function ChatPage() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [showProviderMenu]);
+
+  // WS subscription for real-time channel message updates in channel mode
+  useEffect(() => {
+    if (!isChannelMode || !channelInfo) return;
+    return subscribe<{
+      id: string;
+      channelId: string;
+      sender: string;
+      content: string;
+      timestamp: string;
+      direction: 'incoming' | 'outgoing';
+    }>('channel:message', (data) => {
+      if (data.channelId !== channelInfo.channelPluginId) return;
+      const role = data.direction === 'incoming' ? 'user' : 'assistant';
+      setChannelMessages((prev) => {
+        // Deduplicate by content+role+approximate time (optimistic messages)
+        const isOptimistic =
+          role === 'user' &&
+          prev.some(
+            (m) =>
+              m.id.startsWith('optimistic:') &&
+              m.content === data.content &&
+              m.role === 'user'
+          );
+        if (isOptimistic) {
+          // Replace the optimistic message with the real one
+          return prev.map((m) =>
+            m.id.startsWith('optimistic:') && m.content === data.content && m.role === 'user'
+              ? { ...m, id: data.id }
+              : m
+          );
+        }
+        // Avoid adding duplicates
+        if (prev.some((m) => m.id === data.id)) return prev;
+        return [
+          ...prev,
+          {
+            id: data.id,
+            role,
+            content: data.content,
+            timestamp: data.timestamp,
+            direction: data.direction === 'incoming' ? 'inbound' : 'outbound',
+            senderName: data.sender,
+          },
+        ];
+      });
+    });
+  }, [isChannelMode, channelInfo, subscribe]);
 
   // Fetch data on mount (only if provider not set - preserves state on navigation)
   useEffect(() => {
@@ -237,7 +303,7 @@ export function ChatPage() {
   // Auto-scroll to bottom when new messages or streaming content arrives
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingContent, progressEvents, suggestions, extractedMemories]);
+  }, [messages, streamingContent, progressEvents, suggestions, extractedMemories, channelMessages]);
 
   // Group models by provider (only configured providers)
   const modelsByProvider = models.reduce<Record<string, ModelInfo[]>>((acc, m) => {
@@ -267,6 +333,11 @@ export function ChatPage() {
     setCurrentAgent(null);
     setAgentId(null); // Clear agent for chat requests
     setSearchParams({});
+    // Reset channel mode
+    setIsChannelMode(false);
+    setActiveConv(null);
+    setChannelInfo(null);
+    setChannelMessages([]);
 
     // Reset backend context for fresh conversation
     try {
@@ -278,29 +349,76 @@ export function ChatPage() {
 
   const handleLoadConversation = async (id: string) => {
     try {
-      const { messages: histMessages } = await chatApi.getHistory(id);
-      // Convert HistoryMessage[] → Message[] (skip system messages)
-      const messages = (histMessages as HistoryMessage[])
-        .filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => ({
-          id: m.id,
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-          timestamp: m.createdAt,
-          toolCalls: m.toolCalls,
-          provider: m.provider,
-          model: m.model,
-          isError: m.isError,
-        }));
-      loadConversation(id, messages);
-      setSearchParams({});
-      // Scroll to bottom after loading
+      const { conversation: conv, messages: unified, channelInfo: chInfo } = await chatApi.getUnifiedHistory(id);
+
+      if (conv.source === 'channel') {
+        // Channel mode: show unified history in separate state, not useChatStore
+        setActiveConv({ ...conv, id, source: 'channel' } as Conversation);
+        setChannelInfo(chInfo ?? null);
+        setIsChannelMode(true);
+        setChannelMessages(
+          unified
+            .filter((m) => m.role === 'user' || m.role === 'assistant')
+            .map((m) => ({
+              id: m.id,
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+              timestamp: m.createdAt,
+              direction: m.direction,
+              senderName: m.senderName,
+            }))
+        );
+        // Also set the session so the sidebar highlights correctly
+        loadConversation(id, []);
+        setSearchParams({});
+      } else {
+        // Web mode: load into useChatStore as usual
+        setIsChannelMode(false);
+        setActiveConv(null);
+        setChannelInfo(null);
+        setChannelMessages([]);
+        const msgs = unified
+          .filter((m) => m.role === 'user' || m.role === 'assistant')
+          .map((m) => ({
+            id: m.id,
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+            timestamp: m.createdAt,
+            toolCalls: (m.toolCalls ?? undefined) as Array<{ id: string; name: string; arguments: Record<string, unknown> }> | undefined,
+            provider: m.provider ?? undefined,
+            model: m.model ?? undefined,
+            isError: m.isError,
+          }));
+        loadConversation(id, msgs);
+        setSearchParams({});
+      }
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'instant' }), 50);
     } catch {
       // Fallback — just set the session ID so next message continues correctly
+      setIsChannelMode(false);
+      setActiveConv(null);
       loadConversation(id, []);
     }
   };
+
+  const handleSendChannelMessage = useCallback(
+    async (text: string) => {
+      if (!activeConv) return;
+      // Optimistically append the user message
+      const optimisticId = `optimistic:${Date.now()}`;
+      setChannelMessages((prev) => [
+        ...prev,
+        { id: optimisticId, role: 'user', content: text, timestamp: new Date().toISOString(), direction: 'inbound' as const },
+      ]);
+      try {
+        await chatApi.sendChannelMessage(activeConv.id, text);
+      } catch {
+        // Remove optimistic message on failure
+        setChannelMessages((prev) => prev.filter((m) => m.id !== optimisticId));
+      }
+    },
+    [activeConv]
+  );
 
   const handleCompactContext = async () => {
     try {
@@ -334,7 +452,21 @@ export function ChatPage() {
         <div className="flex items-center gap-4">
           <div>
             <h2 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary flex items-center gap-2">
-              {currentAgent ? (
+              {isChannelMode ? (
+                <>
+                  {activeConv?.channelPlatform === 'telegram' ? (
+                    <Telegram className="w-5 h-5 text-primary" />
+                  ) : activeConv?.channelPlatform === 'whatsapp' ? (
+                    <WhatsApp className="w-5 h-5 text-primary" />
+                  ) : (
+                    <MessageSquare className="w-5 h-5 text-primary" />
+                  )}
+                  {activeConv?.title ?? activeConv?.channelSenderName ?? 'Channel Chat'}
+                  <span className="px-1.5 py-0.5 text-xs font-medium bg-primary/10 text-primary rounded-full capitalize">
+                    {activeConv?.channelPlatform ?? 'channel'}
+                  </span>
+                </>
+              ) : currentAgent ? (
                 <>
                   <Bot className="w-5 h-5 text-primary" />
                   {agentDisplayName}
@@ -344,7 +476,9 @@ export function ChatPage() {
               )}
             </h2>
             <p className="text-sm text-text-muted dark:text-dark-text-muted">
-              {currentAgent ? (
+              {isChannelMode ? (
+                `${activeConv?.channelSenderName ? `with ${activeConv.channelSenderName} · ` : ''}Messages go to ${activeConv?.channelPlatform ?? 'channel'}`
+              ) : currentAgent ? (
                 `Using ${currentProviderName} / ${model}`
               ) : !isLoadingModels && configuredProviders.length > 0 && !isProviderConfigured ? (
                 <span className="text-warning">Provider not configured</span>
@@ -469,18 +603,18 @@ export function ChatPage() {
         </button>
       </header>
 
-      {/* Session context bar — visible immediately, even before first message */}
-      <ContextBar
+      {/* Session context bar — visible only in web mode */}
+      {!isChannelMode && <ContextBar
         sessionInfo={sessionInfo}
         defaultMaxTokens={
           models.find((m) => m.id === model && m.provider === provider)?.contextWindow
         }
         onNewSession={handleNewChat}
         onShowDetail={() => setShowContextDetail(true)}
-      />
+      />}
 
       {/* Context detail modal */}
-      {showContextDetail && (
+      {!isChannelMode && showContextDetail && (
         <ContextDetailModal
           sessionInfo={
             sessionInfo ?? {
@@ -506,8 +640,43 @@ export function ChatPage() {
         <div className="fixed inset-0 z-40" onClick={() => setShowProviderMenu(false)} />
       )}
 
+      {/* Channel mode message list */}
+      {isChannelMode && (
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+          {channelMessages.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <p className="text-text-muted dark:text-dark-text-muted text-sm italic">No messages yet</p>
+            </div>
+          ) : (
+            channelMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}
+              >
+                <div
+                  className={`max-w-[75%] px-3 py-2 rounded-lg text-sm whitespace-pre-wrap ${
+                    msg.role === 'user'
+                      ? 'bg-bg-secondary dark:bg-dark-bg-secondary text-text-primary dark:text-dark-text-primary'
+                      : 'bg-primary text-white'
+                  }`}
+                >
+                  {msg.senderName && msg.role === 'user' && (
+                    <p className="text-[10px] opacity-60 mb-0.5 font-medium">{msg.senderName}</p>
+                  )}
+                  {msg.content}
+                  <p className={`text-[10px] mt-1 opacity-50 text-right`}>
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      )}
+
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      {!isChannelMode && <div className="flex-1 overflow-y-auto px-6 py-4">
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center max-w-md">
@@ -884,10 +1053,10 @@ export function ChatPage() {
             <div ref={messagesEndRef} />
           </>
         )}
-      </div>
+      </div>}
 
-      {/* Error display */}
-      {error && (
+      {/* Error display (web mode only) */}
+      {!isChannelMode && error && (
         <div className="mx-6 mb-4 px-4 py-2 bg-error/10 border border-error/20 rounded-lg text-error text-sm">
           {error}
         </div>
@@ -895,14 +1064,23 @@ export function ChatPage() {
 
       {/* Input */}
       <div className="px-6 py-4 border-t border-border dark:border-dark-border">
-        <ExecutionSecurityPanel />
-        <ToolCallLimitPanel />
-        <ThinkingToggle />
+        {!isChannelMode && (
+          <>
+            <ExecutionSecurityPanel />
+            <ToolCallLimitPanel />
+            <ThinkingToggle />
+          </>
+        )}
         <ChatInput
           ref={chatInputRef}
-          onSend={sendMessage}
+          onSend={isChannelMode ? handleSendChannelMessage : sendMessage}
           onStop={cancelRequest}
           isLoading={isLoading}
+          placeholder={
+            isChannelMode
+              ? `Message ${activeConv?.channelPlatform ?? 'channel'}…`
+              : undefined
+          }
         />
       </div>
 

@@ -38,6 +38,8 @@ export const chatApi = {
     search?: string;
     agentId?: string;
     archived?: boolean;
+    source?: 'web' | 'channel';
+    channelPlatform?: string;
   }) =>
     apiClient.get<{
       conversations: Conversation[];
@@ -66,6 +68,10 @@ export const chatApi = {
       messages: UnifiedMessage[];
       channelInfo?: ChannelInfo | null;
     }>(`/chat/history/${id}/unified`),
+
+  /** Send a message from WebUI through the full AI pipeline (triggers AI response + phone delivery) */
+  sendChannelMessage: (conversationId: string, text: string) =>
+    apiClient.post<{ queued: boolean }>('/chat/channel-send', { conversationId, text }),
 
   /** Send a reply from WebUI to a channel conversation */
   channelReply: (conversationId: string, text: string) =>

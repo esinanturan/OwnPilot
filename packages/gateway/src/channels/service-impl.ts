@@ -55,6 +55,7 @@ import {
   getPairingKey,
   autoClaimOwnership,
 } from '../services/pairing-service.js';
+import { clearChannelSession } from '../services/conversation-service.js';
 
 const log = getLog('ChannelService');
 
@@ -542,6 +543,12 @@ export class ChannelServiceImpl implements IChannelService {
       if (message.text.startsWith('/connect ')) {
         const submittedKey = message.text.slice('/connect '.length).trim();
         await this.handleConnectCommand(message, channelUser.id, submittedKey);
+        return;
+      }
+
+      // 3a. Handle /clear — deactivate session so next message starts fresh
+      if (message.text.trim() === '/clear') {
+        await this.handleClearCommand(message, channelUser.id);
         return;
       }
 
@@ -1125,7 +1132,19 @@ export class ChannelServiceImpl implements IChannelService {
       const { extractMemoriesFromResponse } = await import('../utils/memory-extraction.js');
       const { content: stripped } = extractMemoriesFromResponse(result.response.content);
       const parts = channelNormalizer.normalizeOutgoing(stripped);
-      return parts.join('\n\n');
+      let responseText = parts.join('\n\n');
+
+      // Context saturation warning — append if input tokens exceed 80% of context window
+      const inputTokens = result.response.metadata?.tokens?.input ?? 0;
+      if (inputTokens > 0) {
+        const contextWindow = 128000;
+        const fillPercent = Math.round((inputTokens / contextWindow) * 100);
+        if (fillPercent >= 80) {
+          responseText += `\n\n⚠️ Context is ${fillPercent}% full. Send /clear to start a fresh conversation.`;
+        }
+      }
+
+      return responseText;
     } finally {
       // Always cleanup per-request overrides — even if bus.process() throws,
       // otherwise the Telegram approval handler leaks to subsequent non-channel requests
@@ -1231,6 +1250,30 @@ export class ChannelServiceImpl implements IChannelService {
     const raw = entry?.data?.approval_code;
     if (typeof raw !== 'string' || !raw.trim()) return null;
     return raw.trim();
+  }
+
+  private async handleClearCommand(
+    message: ChannelIncomingMessage,
+    channelUserId: string
+  ): Promise<void> {
+    const api = this.getChannel(message.channelPluginId);
+    const cleared = await clearChannelSession(
+      channelUserId,
+      message.channelPluginId,
+      message.platformChatId
+    );
+    if (cleared) {
+      log.info('Channel session cleared via /clear', { platform: message.platform });
+    }
+    if (api) {
+      await api.sendMessage({
+        platformChatId: message.platformChatId,
+        text: cleared
+          ? '🧹 Conversation cleared. Your next message starts a fresh session.'
+          : '⚠️ No active session to clear. Send a message to start one.',
+        replyToId: message.id,
+      });
+    }
   }
 
   private async handleConnectCommand(

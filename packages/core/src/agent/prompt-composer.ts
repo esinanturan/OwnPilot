@@ -431,18 +431,12 @@ export class PromptComposer {
       prompt = this.truncatePrompt(prompt, this.options.maxPromptLength);
     }
 
-    // Debug: log each injected section with its char count
+    // Debug: log each injected section with name, char count, and full content
     const total = prompt.length;
-    const divider = '\n\n---\n\n'.length;
-    const overhead = Math.max(0, (namedSections.length - 1) * divider);
-    const rows = namedSections
-      .map(([name, text]) => `  ${name.padEnd(22)} ${text.length.toString().padStart(5)} chars`)
+    const sectionDump = namedSections
+      .map(([name, text]) => `\n──── ${name} (${text.length} chars) ────\n${text}`)
       .join('\n');
-    log.info(
-      `System prompt composed: ${total} chars (overhead ${overhead} dividers)\n` +
-        `  ${'SECTION'.padEnd(22)} ${'CHARS'.padStart(5)}\n` +
-        rows
-    );
+    log.info(`System prompt composed: ${total} chars total${sectionDump}`);
 
     return prompt;
   }

@@ -147,25 +147,21 @@ export function createContextInjectionMiddleware(): MessageMiddleware {
         agent.updateSystemPrompt(finalPrompt);
       }
 
-      // Debug: log each injected suffix with its char count
-      const sections: Array<[string, number]> = [
-        ['base_prompt', basePrompt.length],
-        ['extensions', extensionSuffix.length],
-        ['soul_skills', skillsSuffix.length],
-        ['tool_suggestions', toolSuggestionSuffix.length],
-        ['data_hints', dataHintSuffix.length],
-        ['orchestrator', orchestratorSuffix.length],
-        ['request_focus', focusSuffix.length],
+      // Debug: log each suffix with name, char count, and full content
+      const suffixes: Array<[string, string]> = [
+        ['base_prompt', basePrompt],
+        ['extensions', extensionSuffix],
+        ['soul_skills', skillsSuffix],
+        ['tool_suggestions', toolSuggestionSuffix],
+        ['data_hints', dataHintSuffix],
+        ['orchestrator', orchestratorSuffix],
+        ['request_focus', focusSuffix],
       ];
-      const activeRows = sections
-        .filter(([, len]) => len > 0)
-        .map(([name, len]) => `  ${name.padEnd(20)} ${len.toString().padStart(5)} chars`)
+      const sectionDump = suffixes
+        .filter(([, text]) => text.length > 0)
+        .map(([name, text]) => `\n──── ${name} (${text.length} chars) ────\n${text}`)
         .join('\n');
-      log.info(
-        `System prompt final: ${finalPrompt.length} chars total (base ${basePrompt.length})\n` +
-          `  ${'SECTION'.padEnd(20)} ${'CHARS'.padStart(5)}\n` +
-          activeRows
-      );
+      log.info(`System prompt final: ${finalPrompt.length} chars total${sectionDump}`);
 
       ctx.set('contextStats', stats);
     } catch (error) {

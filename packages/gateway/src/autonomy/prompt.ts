@@ -97,7 +97,7 @@ export function buildPulseUserMessage(
   if (ctx.goals.active.length > 0) {
     sections.push(`## Active Goals (${ctx.goals.active.length})`);
     for (const goal of ctx.goals.active.slice(0, 10)) {
-      const due = goal.dueDate ? ` | Due: ${goal.dueDate.split('T')[0]}` : '';
+      const due = goal.dueDate ? ` | Due: ${String(goal.dueDate).split('T')[0]}` : '';
       sections.push(`- ${goal.title} — ${goal.progress}% progress${due}`);
     }
     sections.push('');

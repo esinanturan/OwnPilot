@@ -243,10 +243,7 @@ export const codingAgentsApi = {
 
   /** Upsert permission profile */
   updatePermissions: (providerRef: string, data: Record<string, unknown>) =>
-    apiClient.put<CodingAgentPermissionProfile>(
-      `/coding-agents/permissions/${providerRef}`,
-      data
-    ),
+    apiClient.put<CodingAgentPermissionProfile>(`/coding-agents/permissions/${providerRef}`, data),
 
   /** Delete permission profile */
   deletePermissions: (providerRef: string) =>
@@ -273,8 +270,7 @@ export const codingAgentsApi = {
   // --- Subscriptions ---
 
   /** List all subscriptions */
-  listSubscriptions: () =>
-    apiClient.get<CodingAgentSubscription[]>('/coding-agents/subscriptions'),
+  listSubscriptions: () => apiClient.get<CodingAgentSubscription[]>('/coding-agents/subscriptions'),
 
   /** Get subscription for a provider */
   getSubscription: (providerRef: string) =>
@@ -282,10 +278,7 @@ export const codingAgentsApi = {
 
   /** Upsert subscription */
   updateSubscription: (providerRef: string, data: Record<string, unknown>) =>
-    apiClient.put<CodingAgentSubscription>(
-      `/coding-agents/subscriptions/${providerRef}`,
-      data
-    ),
+    apiClient.put<CodingAgentSubscription>(`/coding-agents/subscriptions/${providerRef}`, data),
 
   /** Delete subscription */
   deleteSubscription: (providerRef: string) =>
@@ -403,6 +396,7 @@ export interface OrchestrationRun {
   currentStep: number;
   maxSteps: number;
   autoMode: boolean;
+  enableAnalysis: boolean;
   skillIds?: string[];
   createdAt: string;
   updatedAt: string;
@@ -423,6 +417,7 @@ export const orchestrationApi = {
     model?: string;
     maxSteps?: number;
     autoMode?: boolean;
+    enableAnalysis?: boolean;
     skillIds?: string[];
   }) => apiClient.post<{ run: OrchestrationRun }>('/coding-agents/orchestrate', input),
 
@@ -433,8 +428,7 @@ export const orchestrationApi = {
     ),
 
   /** Get a specific run */
-  get: (id: string) =>
-    apiClient.get<{ run: OrchestrationRun }>(`/coding-agents/orchestrate/${id}`),
+  get: (id: string) => apiClient.get<{ run: OrchestrationRun }>(`/coding-agents/orchestrate/${id}`),
 
   /** Continue a paused run with user input */
   continue: (id: string, prompt: string) =>

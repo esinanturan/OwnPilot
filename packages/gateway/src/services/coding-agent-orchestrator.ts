@@ -22,11 +22,7 @@ import { getCodingAgentService } from './coding-agent-service.js';
 import { orchestrationRunsRepo } from '../db/repositories/orchestration-runs.js';
 import { codingAgentResultsRepo } from '../db/repositories/coding-agent-results.js';
 import { resolveProviderAndModel } from '../routes/settings.js';
-import {
-  NATIVE_PROVIDERS,
-  loadProviderConfig,
-  getProviderApiKey,
-} from '../routes/agent-cache.js';
+import { NATIVE_PROVIDERS, loadProviderConfig, getProviderApiKey } from '../routes/agent-cache.js';
 import { getLog } from './log.js';
 import { wsGateway } from '../ws/server.js';
 
@@ -109,9 +105,10 @@ async function analyzeOutput(
       .map((s, i) => `Step ${i + 1}: ${s.outputSummary}`)
       .join('\n');
 
-    const truncatedOutput = output.length > OUTPUT_CONTEXT_LIMIT
-      ? output.slice(-OUTPUT_CONTEXT_LIMIT) + '\n...(truncated)'
-      : output;
+    const truncatedOutput =
+      output.length > OUTPUT_CONTEXT_LIMIT
+        ? output.slice(-OUTPUT_CONTEXT_LIMIT) + '\n...(truncated)'
+        : output;
 
     const userMessage = [
       `GOAL: ${goal}`,
@@ -194,6 +191,7 @@ export async function startOrchestration(
     model: input.model,
     maxSteps: input.maxSteps ?? DEFAULT_MAX_STEPS,
     autoMode: input.autoMode ?? false,
+    enableAnalysis: input.enableAnalysis ?? true,
     skillIds: input.skillIds,
     permissions: input.permissions,
   });
@@ -249,10 +247,7 @@ export async function continueOrchestration(
 /**
  * Cancel/stop an orchestration run.
  */
-export async function cancelOrchestration(
-  runId: string,
-  userId: string
-): Promise<boolean> {
+export async function cancelOrchestration(runId: string, userId: string): Promise<boolean> {
   const ctrl = activeRuns.get(runId);
   if (ctrl) ctrl.abort = true;
 
@@ -294,10 +289,7 @@ export async function listOrchestrations(
 // THE LOOP — The core orchestration engine
 // =============================================================================
 
-async function runOrchestrationLoop(
-  run: OrchestrationRun,
-  userId: string
-): Promise<void> {
+async function runOrchestrationLoop(run: OrchestrationRun, userId: string): Promise<void> {
   const ctrl = activeRuns.get(run.id);
   const startTime = Date.now();
   const maxDuration = DEFAULT_MAX_DURATION_MS;
@@ -334,9 +326,7 @@ async function runOrchestrationLoop(
 
     // --- STEP: Spawn CLI session ---
     const pendingLast = run.steps.length > 0 ? run.steps[run.steps.length - 1] : undefined;
-    const stepIndex = pendingLast?.status === 'pending'
-      ? run.steps.length - 1
-      : run.steps.length;
+    const stepIndex = pendingLast?.status === 'pending' ? run.steps.length - 1 : run.steps.length;
 
     const step: OrchestrationStep = run.steps[stepIndex] ?? {
       index: stepIndex,
@@ -386,17 +376,11 @@ async function runOrchestrationLoop(
       });
 
       // Wait for the CLI tool to finish
-      const completed = await service.waitForCompletion(
-        session.id,
-        userId,
-        STEP_TIMEOUT_MS
-      );
+      const completed = await service.waitForCompletion(session.id, userId, STEP_TIMEOUT_MS);
 
       step.exitCode = completed.exitCode;
       step.completedAt = new Date().toISOString();
-      step.durationMs = step.startedAt
-        ? Date.now() - new Date(step.startedAt).getTime()
-        : 0;
+      step.durationMs = step.startedAt ? Date.now() - new Date(step.startedAt).getTime() : 0;
 
       // Get the full output
       const output = service.getOutputBuffer(session.id, userId) ?? '';
@@ -414,56 +398,63 @@ async function runOrchestrationLoop(
         exitCode: step.exitCode,
       });
 
-      // --- ANALYZE: Ask OwnPilot's AI to decide next step ---
-      const analysis = await analyzeOutput(
-        run.goal,
-        currentPrompt,
-        output,
-        run.steps.slice(0, -1) // previous steps (not current)
-      );
+      // --- ANALYZE (optional) ---
+      if (run.enableAnalysis) {
+        const analysis = await analyzeOutput(
+          run.goal,
+          currentPrompt,
+          output,
+          run.steps.slice(0, -1)
+        );
 
-      step.analysis = analysis;
-      step.outputSummary = analysis.summary;
+        step.analysis = analysis;
+        step.outputSummary = analysis.summary;
 
-      await orchestrationRunsRepo.updateSteps(run.id, userId, run.steps, run.currentStep);
-      broadcast('orchestration:step:analyzed', {
-        id: run.id,
-        stepIndex,
-        analysis,
-      });
-
-      // --- DECIDE: What to do next? ---
-      if (analysis.goalComplete && analysis.confidence >= 0.7) {
-        log.info(`Orchestration ${run.id} goal complete (confidence: ${analysis.confidence})`);
-        await finishRun(run, userId, 'completed', startTime);
-        return;
-      }
-
-      if (analysis.needsUserInput || !run.autoMode) {
-        // Pause and ask the user
-        run.status = 'waiting_user';
-        await orchestrationRunsRepo.updateStatus(run.id, userId, 'waiting_user');
-        broadcast('orchestration:waiting', {
+        await orchestrationRunsRepo.updateSteps(run.id, userId, run.steps, run.currentStep);
+        broadcast('orchestration:step:analyzed', {
           id: run.id,
-          question: analysis.userQuestion ?? analysis.summary,
+          stepIndex,
           analysis,
         });
-        activeRuns.delete(run.id);
-        return;
-      }
 
-      if (analysis.nextPrompt) {
-        currentPrompt = analysis.nextPrompt;
+        // --- DECIDE: What to do next? ---
+        if (analysis.goalComplete && analysis.confidence >= 0.7) {
+          log.info(`Orchestration ${run.id} goal complete (confidence: ${analysis.confidence})`);
+          await finishRun(run, userId, 'completed', startTime);
+          return;
+        }
+
+        if (analysis.needsUserInput || !run.autoMode) {
+          run.status = 'waiting_user';
+          await orchestrationRunsRepo.updateStatus(run.id, userId, 'waiting_user');
+          broadcast('orchestration:waiting', {
+            id: run.id,
+            question: analysis.userQuestion ?? analysis.summary,
+            analysis,
+          });
+          activeRuns.delete(run.id);
+          return;
+        }
+
+        if (analysis.nextPrompt) {
+          currentPrompt = analysis.nextPrompt;
+        } else {
+          run.status = 'waiting_user';
+          await orchestrationRunsRepo.updateStatus(run.id, userId, 'waiting_user');
+          broadcast('orchestration:waiting', {
+            id: run.id,
+            question: 'The analyzer could not determine the next step. What should we do?',
+            analysis,
+          });
+          activeRuns.delete(run.id);
+          return;
+        }
       } else {
-        // No next prompt and goal not complete — ask user
-        run.status = 'waiting_user';
-        await orchestrationRunsRepo.updateStatus(run.id, userId, 'waiting_user');
-        broadcast('orchestration:waiting', {
-          id: run.id,
-          question: 'The analyzer could not determine the next step. What should we do?',
-          analysis,
-        });
-        activeRuns.delete(run.id);
+        // No analysis — single step, mark complete
+        step.outputSummary = output.length > 200 ? output.slice(-200) + '...' : output;
+        await orchestrationRunsRepo.updateSteps(run.id, userId, run.steps, run.currentStep);
+        broadcast('orchestration:step:analyzed', { id: run.id, stepIndex });
+        await finishRun(run, userId, 'completed', startTime);
         return;
       }
     } catch (err) {
@@ -534,6 +525,7 @@ function recordToRun(
     currentStep: r.currentStep,
     maxSteps: r.maxSteps,
     autoMode: r.autoMode,
+    enableAnalysis: r.enableAnalysis ?? true,
     skillIds: r.skillIds,
     permissions: r.permissions,
     createdAt: r.createdAt,

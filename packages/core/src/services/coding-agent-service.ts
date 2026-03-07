@@ -340,6 +340,8 @@ export interface StartOrchestrationInput {
   permissions?: CodingAgentPermissions;
   /** Auto-continue without asking user (full autonomy) */
   autoMode?: boolean;
+  /** Enable AI analysis of output between steps (default: true) */
+  enableAnalysis?: boolean;
 }
 
 /** Full orchestration run state */
@@ -364,6 +366,8 @@ export interface OrchestrationRun {
   maxSteps: number;
   /** Auto-continue mode */
   autoMode: boolean;
+  /** Whether AI analysis is enabled between steps */
+  enableAnalysis: boolean;
   /** Skill IDs */
   skillIds?: string[];
   /** Permission constraints */

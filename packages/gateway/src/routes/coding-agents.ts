@@ -236,17 +236,29 @@ codingAgentsRoutes.post('/sessions', async (c) => {
         maxTurns: max_turns as number | undefined,
         maxBudgetUsd: max_budget_usd as number | undefined,
         skillIds: Array.isArray(skill_ids) ? (skill_ids as string[]) : undefined,
-        permissions: permissions as Record<string, unknown> | undefined
-          ? {
-              outputFormat: (permissions as Record<string, unknown>).output_format as string | undefined,
-              fileAccess: (permissions as Record<string, unknown>).file_access as string | undefined,
-              allowedPaths: (permissions as Record<string, unknown>).allowed_paths as string[] | undefined,
-              networkAccess: (permissions as Record<string, unknown>).network_access as boolean | undefined,
-              shellAccess: (permissions as Record<string, unknown>).shell_access as boolean | undefined,
+        permissions: (permissions as Record<string, unknown> | undefined)
+          ? ({
+              outputFormat: (permissions as Record<string, unknown>).output_format as
+                | string
+                | undefined,
+              fileAccess: (permissions as Record<string, unknown>).file_access as
+                | string
+                | undefined,
+              allowedPaths: (permissions as Record<string, unknown>).allowed_paths as
+                | string[]
+                | undefined,
+              networkAccess: (permissions as Record<string, unknown>).network_access as
+                | boolean
+                | undefined,
+              shellAccess: (permissions as Record<string, unknown>).shell_access as
+                | boolean
+                | undefined,
               gitAccess: (permissions as Record<string, unknown>).git_access as boolean | undefined,
               autonomy: (permissions as Record<string, unknown>).autonomy as string | undefined,
-              maxFileChanges: (permissions as Record<string, unknown>).max_file_changes as number | undefined,
-            } as import('@ownpilot/core').CodingAgentPermissions
+              maxFileChanges: (permissions as Record<string, unknown>).max_file_changes as
+                | number
+                | undefined,
+            } as import('@ownpilot/core').CodingAgentPermissions)
           : undefined,
       },
       userId
@@ -450,7 +462,11 @@ codingAgentsRoutes.get('/permissions/:providerRef', async (c) => {
   try {
     const perm = await codingAgentPermissionsRepo.getByProvider(providerRef, userId);
     if (!perm) {
-      return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'No permissions configured' }, 404);
+      return apiError(
+        c,
+        { code: ERROR_CODES.NOT_FOUND, message: 'No permissions configured' },
+        404
+      );
     }
     return apiResponse(c, perm);
   } catch (err) {
@@ -586,7 +602,11 @@ codingAgentsRoutes.put('/skills/:providerRef/:id', async (c) => {
       userId
     );
     if (!record) {
-      return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'Skill attachment not found' }, 404);
+      return apiError(
+        c,
+        { code: ERROR_CODES.NOT_FOUND, message: 'Skill attachment not found' },
+        404
+      );
     }
     return apiResponse(c, record);
   } catch (err) {
@@ -633,7 +653,11 @@ codingAgentsRoutes.get('/subscriptions/:providerRef', async (c) => {
   try {
     const sub = await codingAgentSubscriptionsRepo.getByProvider(providerRef, userId);
     if (!sub) {
-      return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'No subscription configured' }, 404);
+      return apiError(
+        c,
+        { code: ERROR_CODES.NOT_FOUND, message: 'No subscription configured' },
+        404
+      );
     }
     return apiResponse(c, sub);
   } catch (err) {
@@ -703,6 +727,7 @@ codingAgentsRoutes.post('/orchestrate', async (c) => {
     model?: string;
     maxSteps?: number;
     autoMode?: boolean;
+    enableAnalysis?: boolean;
     skillIds?: string[];
     permissions?: Record<string, unknown>;
   }>(c);
@@ -732,6 +757,7 @@ codingAgentsRoutes.post('/orchestrate', async (c) => {
         model: body.model,
         maxSteps: body.maxSteps,
         autoMode: body.autoMode,
+        enableAnalysis: body.enableAnalysis,
         skillIds: body.skillIds,
         permissions: body.permissions as never,
       },
@@ -741,7 +767,10 @@ codingAgentsRoutes.post('/orchestrate', async (c) => {
   } catch (err) {
     return apiError(
       c,
-      { code: ERROR_CODES.CREATE_FAILED, message: getErrorMessage(err, 'Failed to start orchestration') },
+      {
+        code: ERROR_CODES.CREATE_FAILED,
+        message: getErrorMessage(err, 'Failed to start orchestration'),
+      },
       500
     );
   }
@@ -779,11 +808,7 @@ codingAgentsRoutes.post('/orchestrate/:id/continue', async (c) => {
   const body = await parseJsonBody<{ prompt: string }>(c);
 
   if (!body?.prompt) {
-    return apiError(
-      c,
-      { code: ERROR_CODES.VALIDATION_ERROR, message: 'prompt is required' },
-      400
-    );
+    return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: 'prompt is required' }, 400);
   }
 
   try {

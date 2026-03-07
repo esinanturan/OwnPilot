@@ -49,7 +49,11 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const style = STATUS_STYLES[status] ?? { bg: 'bg-gray-500/15', text: 'text-gray-500', label: status };
+  const style = STATUS_STYLES[status] ?? {
+    bg: 'bg-gray-500/15',
+    text: 'text-gray-500',
+    label: status,
+  };
   return (
     <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${style.bg} ${style.text}`}>
       {style.label}
@@ -132,17 +136,11 @@ function StepTimeline({ steps }: { steps: OrchestrationStep[] }) {
                       {step.analysis.summary}
                     </p>
                     {step.analysis.hasErrors && step.analysis.errors?.length ? (
-                      <div className="text-error">
-                        Errors: {step.analysis.errors.join(', ')}
-                      </div>
+                      <div className="text-error">Errors: {step.analysis.errors.join(', ')}</div>
                     ) : null}
                     <div className="flex items-center gap-3 text-text-muted">
-                      <span>
-                        Confidence: {Math.round(step.analysis.confidence * 100)}%
-                      </span>
-                      <span>
-                        Goal complete: {step.analysis.goalComplete ? 'Yes' : 'No'}
-                      </span>
+                      <span>Confidence: {Math.round(step.analysis.confidence * 100)}%</span>
+                      <span>Goal complete: {step.analysis.goalComplete ? 'Yes' : 'No'}</span>
                     </div>
                     {step.analysis.nextPrompt && (
                       <div>
@@ -174,7 +172,13 @@ function NewRunForm({
 }: {
   providers: CodingAgentStatus[];
   workspaces: FileWorkspaceInfo[];
-  onStart: (goal: string, provider: string, cwd: string, autoMode: boolean) => void;
+  onStart: (
+    goal: string,
+    provider: string,
+    cwd: string,
+    autoMode: boolean,
+    enableAnalysis: boolean
+  ) => void;
 }) {
   const [goal, setGoal] = useState('');
   const [provider, setProvider] = useState('claude-code');
@@ -183,6 +187,7 @@ function NewRunForm({
   const [manualPath, setManualPath] = useState('');
   const [useManual, setUseManual] = useState(workspaces.length === 0);
   const [autoMode, setAutoMode] = useState(false);
+  const [enableAnalysis, setEnableAnalysis] = useState(false);
 
   const selectedWorkspace = workspaces.find((w) => w.id === selectedWorkspaceId);
 
@@ -196,11 +201,12 @@ function NewRunForm({
       : '';
 
   // Basic path validation hint (real validation happens server-side)
-  const pathWarning = resolvedCwd && useManual
-    ? !/^([A-Za-z]:\\|\/[a-zA-Z])/.test(resolvedCwd)
-      ? 'Path should be absolute (e.g. D:\\Projects\\... or /home/...)'
-      : null
-    : null;
+  const pathWarning =
+    resolvedCwd && useManual
+      ? !/^([A-Za-z]:\\|\/[a-zA-Z])/.test(resolvedCwd)
+        ? 'Path should be absolute (e.g. D:\\Projects\\... or /home/...)'
+        : null
+      : null;
 
   return (
     <div className="space-y-4">
@@ -230,7 +236,8 @@ function NewRunForm({
             >
               {providers.map((p) => (
                 <option key={p.provider} value={p.provider}>
-                  {p.displayName}{!p.installed ? ' (not installed)' : ''}
+                  {p.displayName}
+                  {!p.installed ? ' (not installed)' : ''}
                 </option>
               ))}
             </select>
@@ -240,7 +247,10 @@ function NewRunForm({
             const sel = providers.find((p) => p.provider === provider);
             if (sel && !sel.installed && sel.installCommand) {
               return (
-                <code className="block mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-mono truncate" title={sel.installCommand}>
+                <code
+                  className="block mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-mono truncate"
+                  title={sel.installCommand}
+                >
                   {sel.installCommand}
                 </code>
               );
@@ -325,23 +335,45 @@ function NewRunForm({
       )}
 
       <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={autoMode}
-            onChange={(e) => setAutoMode(e.target.checked)}
-            className="w-4 h-4 rounded border-border dark:border-dark-border accent-primary"
-          />
-          <span className="text-xs text-text-secondary dark:text-dark-text-secondary">
-            Full auto-mode
-            <span className="text-text-muted dark:text-dark-text-muted ml-1">
-              (continue without asking)
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoMode}
+              onChange={(e) => setAutoMode(e.target.checked)}
+              className="w-4 h-4 rounded border-border dark:border-dark-border accent-primary"
+            />
+            <span className="text-xs text-text-secondary dark:text-dark-text-secondary">
+              Full auto-mode
+              <span className="text-text-muted dark:text-dark-text-muted ml-1">
+                (continue without asking)
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={enableAnalysis}
+              onChange={(e) => setEnableAnalysis(e.target.checked)}
+              className="w-4 h-4 rounded border-border dark:border-dark-border accent-primary"
+            />
+            <span className="text-xs text-text-secondary dark:text-dark-text-secondary">
+              AI analysis
+              <span className="text-text-muted dark:text-dark-text-muted ml-1">
+                (analyze output between steps)
+              </span>
+            </span>
+          </label>
+        </div>
 
         <button
-          onClick={() => goal.trim() && resolvedCwd && !pathWarning && onStart(goal, provider, resolvedCwd, autoMode)}
+          onClick={() =>
+            goal.trim() &&
+            resolvedCwd &&
+            !pathWarning &&
+            onStart(goal, provider, resolvedCwd, autoMode, enableAnalysis)
+          }
           disabled={!goal.trim() || !resolvedCwd || !!pathWarning}
           className="flex items-center gap-2 px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
@@ -467,10 +499,17 @@ export function OrchestrationPage() {
     goal: string,
     provider: string,
     cwd: string,
-    autoMode: boolean
+    autoMode: boolean,
+    enableAnalysis: boolean
   ) => {
     try {
-      const { run } = await orchestrationApi.start({ goal, provider, cwd, autoMode });
+      const { run } = await orchestrationApi.start({
+        goal,
+        provider,
+        cwd,
+        autoMode,
+        enableAnalysis,
+      });
       toast.success('Orchestration started');
       setShowNewForm(false);
       setSelectedRunId(run.id);
@@ -553,11 +592,7 @@ export function OrchestrationPage() {
       {/* New run form */}
       {showNewForm && (
         <div className="px-6 py-4 border-b border-border dark:border-dark-border bg-bg-secondary dark:bg-dark-bg-secondary">
-          <NewRunForm
-            providers={providers}
-            workspaces={workspaces}
-            onStart={handleStart}
-          />
+          <NewRunForm providers={providers} workspaces={workspaces} onStart={handleStart} />
         </div>
       )}
 
@@ -632,9 +667,8 @@ export function OrchestrationPage() {
                     <div className="flex items-center gap-3 mt-1 text-[11px] text-text-muted">
                       <span>Provider: {selectedRun.provider}</span>
                       <span>Workspace: {selectedRun.cwd}</span>
-                      <span>
-                        Mode: {selectedRun.autoMode ? 'Full auto' : 'Step-by-step'}
-                      </span>
+                      <span>Mode: {selectedRun.autoMode ? 'Full auto' : 'Step-by-step'}</span>
+                      {selectedRun.enableAnalysis && <span>AI Analysis: On</span>}
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
@@ -719,8 +753,8 @@ export function OrchestrationPage() {
                   Select a run or start a new orchestration
                 </p>
                 <p className="text-xs text-text-muted/60 mt-1 max-w-sm mx-auto">
-                  Set a goal, pick a CLI tool (Claude Code, Codex, Gemini), and let OwnPilot
-                  chain sessions together — analyzing output and deciding next steps automatically.
+                  Set a goal, pick a CLI tool (Claude Code, Codex, Gemini), and let OwnPilot chain
+                  sessions together — analyzing output and deciding next steps automatically.
                 </p>
               </div>
             </div>

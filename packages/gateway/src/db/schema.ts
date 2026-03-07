@@ -967,6 +967,7 @@ CREATE TABLE IF NOT EXISTS orchestration_runs (
   current_step INTEGER NOT NULL DEFAULT 0,
   max_steps INTEGER NOT NULL DEFAULT 10,
   auto_mode BOOLEAN NOT NULL DEFAULT FALSE,
+  enable_analysis BOOLEAN NOT NULL DEFAULT TRUE,
   skill_ids JSONB NOT NULL DEFAULT '[]',
   permissions JSONB,
   total_duration_ms INTEGER,

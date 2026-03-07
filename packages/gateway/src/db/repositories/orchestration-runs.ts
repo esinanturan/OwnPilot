@@ -27,6 +27,7 @@ interface RunRow {
   current_step: number;
   max_steps: number;
   auto_mode: number | boolean;
+  enable_analysis: number | boolean;
   skill_ids: string;
   permissions: string | null;
   total_duration_ms: number | null;
@@ -51,6 +52,7 @@ export interface OrchestrationRunRecord {
   currentStep: number;
   maxSteps: number;
   autoMode: boolean;
+  enableAnalysis: boolean;
   skillIds: string[];
   permissions?: CodingAgentPermissions;
   totalDurationMs?: number;
@@ -68,6 +70,7 @@ export interface CreateRunInput {
   model?: string;
   maxSteps?: number;
   autoMode?: boolean;
+  enableAnalysis?: boolean;
   skillIds?: string[];
   permissions?: CodingAgentPermissions;
 }
@@ -89,8 +92,12 @@ function rowToRecord(row: RunRow): OrchestrationRunRecord {
     currentStep: Number(row.current_step),
     maxSteps: Number(row.max_steps),
     autoMode: typeof row.auto_mode === 'boolean' ? row.auto_mode : !!row.auto_mode,
+    enableAnalysis:
+      typeof row.enable_analysis === 'boolean' ? row.enable_analysis : row.enable_analysis !== 0,
     skillIds: parseJsonField<string[]>(row.skill_ids, []),
-    permissions: row.permissions ? parseJsonField<CodingAgentPermissions>(row.permissions, {} as CodingAgentPermissions) : undefined,
+    permissions: row.permissions
+      ? parseJsonField<CodingAgentPermissions>(row.permissions, {} as CodingAgentPermissions)
+      : undefined,
     totalDurationMs: row.total_duration_ms != null ? Number(row.total_duration_ms) : undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -107,8 +114,8 @@ export class OrchestrationRunsRepository extends BaseRepository {
     await this.execute(
       `INSERT INTO orchestration_runs (
         id, user_id, goal, provider, cwd, model,
-        max_steps, auto_mode, skill_ids, permissions
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        max_steps, auto_mode, enable_analysis, skill_ids, permissions
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         input.id,
         input.userId,
@@ -118,6 +125,7 @@ export class OrchestrationRunsRepository extends BaseRepository {
         input.model ?? null,
         input.maxSteps ?? 10,
         input.autoMode ?? false,
+        input.enableAnalysis ?? true,
         JSON.stringify(input.skillIds ?? []),
         input.permissions ? JSON.stringify(input.permissions) : null,
       ]
@@ -135,11 +143,7 @@ export class OrchestrationRunsRepository extends BaseRepository {
     return row ? rowToRecord(row) : null;
   }
 
-  async list(
-    userId: string,
-    limit = 20,
-    offset = 0
-  ): Promise<OrchestrationRunRecord[]> {
+  async list(userId: string, limit = 20, offset = 0): Promise<OrchestrationRunRecord[]> {
     const rows = await this.query<RunRow>(
       'SELECT * FROM orchestration_runs WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
       [userId, limit, offset]

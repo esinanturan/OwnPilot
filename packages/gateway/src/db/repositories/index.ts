@@ -401,6 +401,15 @@ export {
   type UpsertSubscriptionInput,
 } from './coding-agent-subscriptions.js';
 
+// Orchestration runs repository
+export {
+  OrchestrationRunsRepository,
+  orchestrationRunsRepo,
+  createOrchestrationRunsRepository,
+  type OrchestrationRunRecord,
+  type CreateRunInput,
+} from './orchestration-runs.js';
+
 // CLI tool policies repository
 export {
   CliToolPoliciesRepository,

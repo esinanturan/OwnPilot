@@ -247,14 +247,20 @@ export async function loadApiKeysToEnvironment(): Promise<void> {
  * Returns null if no provider is configured
  */
 export async function getDefaultProvider(): Promise<string | null> {
-  // Check database setting
+  // Check database setting — if the user explicitly chose a default, respect it
   const savedProvider = await settingsRepo.get<string>(DEFAULT_PROVIDER_KEY);
   if (savedProvider) {
-    // Check if it's a local provider
+    // For local providers, check they're enabled
     const localProv = await localProvidersRepo.getProvider(savedProvider);
-    if (localProv?.isEnabled) return savedProvider;
-    // Check remote provider
-    if (await hasApiKey(savedProvider)) return savedProvider;
+    if (localProv) {
+      if (localProv.isEnabled) return savedProvider;
+      // Local provider is disabled — fall through to fallbacks
+    } else {
+      // Remote provider — always respect the user's explicit choice.
+      // If the API key is missing/invalid, the caller gets a clear error
+      // instead of silently switching to a different provider.
+      return savedProvider;
+    }
   }
 
   // Check if a local provider is marked as default

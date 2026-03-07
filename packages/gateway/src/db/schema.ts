@@ -954,6 +954,27 @@ CREATE TABLE IF NOT EXISTS coding_agent_subscriptions (
   UNIQUE(user_id, provider_ref)
 );
 
+-- Orchestration runs: multi-step CLI tool orchestration
+CREATE TABLE IF NOT EXISTS orchestration_runs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL DEFAULT 'default',
+  goal TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  cwd TEXT NOT NULL,
+  model TEXT,
+  status TEXT NOT NULL DEFAULT 'planning' CHECK(status IN ('planning', 'running', 'waiting_user', 'paused', 'completed', 'failed', 'cancelled')),
+  steps JSONB NOT NULL DEFAULT '[]',
+  current_step INTEGER NOT NULL DEFAULT 0,
+  max_steps INTEGER NOT NULL DEFAULT 10,
+  auto_mode BOOLEAN NOT NULL DEFAULT FALSE,
+  skill_ids JSONB NOT NULL DEFAULT '[]',
+  permissions JSONB,
+  total_duration_ms INTEGER,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  completed_at TIMESTAMP
+);
+
 -- =====================================================
 -- EDGE / IoT TABLES
 -- =====================================================
@@ -2159,6 +2180,10 @@ CREATE INDEX IF NOT EXISTS idx_coding_agent_skills_provider ON coding_agent_skil
 -- Coding agent subscriptions indexes
 CREATE INDEX IF NOT EXISTS idx_coding_agent_subs_user ON coding_agent_subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_coding_agent_subs_provider ON coding_agent_subscriptions(user_id, provider_ref);
+
+-- Orchestration runs indexes
+CREATE INDEX IF NOT EXISTS idx_orchestration_runs_user ON orchestration_runs(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orchestration_runs_status ON orchestration_runs(user_id, status);
 
 -- Edge device indexes
 CREATE INDEX IF NOT EXISTS idx_edge_devices_user ON edge_devices(user_id, created_at DESC);

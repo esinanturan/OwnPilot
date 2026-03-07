@@ -258,3 +258,118 @@ export interface ICodingAgentService {
   /** Terminate a session (kill PTY process) */
   terminateSession(sessionId: string, userId: string): boolean;
 }
+
+// =============================================================================
+// ORCHESTRATION TYPES
+// =============================================================================
+
+/** Orchestration run status */
+export type OrchestrationRunStatus =
+  | 'planning'
+  | 'running'
+  | 'waiting_user'
+  | 'paused'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
+
+/** A single step in an orchestration run */
+export interface OrchestrationStep {
+  /** Step index (0-based) */
+  index: number;
+  /** The prompt sent to the CLI tool */
+  prompt: string;
+  /** Session ID (from CodingAgentSessionManager) */
+  sessionId?: string;
+  /** Result DB record ID */
+  resultId?: string;
+  /** Step status */
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  /** Truncated output summary (for context chaining) */
+  outputSummary?: string;
+  /** Exit code from the CLI tool */
+  exitCode?: number;
+  /** Duration in ms */
+  durationMs?: number;
+  /** AI analysis verdict after this step */
+  analysis?: OrchestrationAnalysis;
+  /** Timestamp */
+  startedAt?: string;
+  completedAt?: string;
+}
+
+/** AI analysis of a CLI tool's output */
+export interface OrchestrationAnalysis {
+  /** What did the CLI tool accomplish? */
+  summary: string;
+  /** Is the overall goal achieved? */
+  goalComplete: boolean;
+  /** Were there errors or issues? */
+  hasErrors: boolean;
+  /** Error details if any */
+  errors?: string[];
+  /** Suggested next prompt for the CLI tool (null = done) */
+  nextPrompt: string | null;
+  /** Confidence 0-1 that the goal is complete */
+  confidence: number;
+  /** Should we ask the user before continuing? */
+  needsUserInput: boolean;
+  /** Question for the user (if needsUserInput) */
+  userQuestion?: string;
+}
+
+/** Input to start an orchestration run */
+export interface StartOrchestrationInput {
+  /** High-level goal description */
+  goal: string;
+  /** Which CLI tool to use */
+  provider: CodingAgentProvider;
+  /** Working directory */
+  cwd: string;
+  /** Model override for the CLI tool */
+  model?: string;
+  /** Max steps before stopping (default: 10) */
+  maxSteps?: number;
+  /** Max total time in ms (default: 30 min) */
+  maxDurationMs?: number;
+  /** Skill IDs to attach to each session */
+  skillIds?: string[];
+  /** Permission constraints */
+  permissions?: CodingAgentPermissions;
+  /** Auto-continue without asking user (full autonomy) */
+  autoMode?: boolean;
+}
+
+/** Full orchestration run state */
+export interface OrchestrationRun {
+  id: string;
+  userId: string;
+  /** High-level goal */
+  goal: string;
+  /** CLI tool provider */
+  provider: CodingAgentProvider;
+  /** Working directory */
+  cwd: string;
+  /** Model override */
+  model?: string;
+  /** Current status */
+  status: OrchestrationRunStatus;
+  /** All steps executed so far */
+  steps: OrchestrationStep[];
+  /** Current step index */
+  currentStep: number;
+  /** Max allowed steps */
+  maxSteps: number;
+  /** Auto-continue mode */
+  autoMode: boolean;
+  /** Skill IDs */
+  skillIds?: string[];
+  /** Permission constraints */
+  permissions?: CodingAgentPermissions;
+  /** Timestamps */
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  /** Total duration ms (all steps) */
+  totalDurationMs?: number;
+}

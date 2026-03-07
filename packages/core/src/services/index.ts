@@ -218,6 +218,11 @@ export type {
   CodingAgentAutonomy,
   CodingAgentPermissions,
   CodingAgentSkill,
+  OrchestrationRunStatus,
+  OrchestrationStep,
+  OrchestrationAnalysis,
+  StartOrchestrationInput,
+  OrchestrationRun,
 } from './coding-agent-service.js';
 export {
   isBuiltinProvider,

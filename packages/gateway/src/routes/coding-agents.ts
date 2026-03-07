@@ -8,7 +8,15 @@
 import { Hono } from 'hono';
 import type { CodingAgentProvider } from '@ownpilot/core';
 import { getCodingAgentService } from '../services/coding-agent-service.js';
+import {
+  startOrchestration,
+  continueOrchestration,
+  cancelOrchestration,
+  getOrchestration,
+  listOrchestrations,
+} from '../services/coding-agent-orchestrator.js';
 import { codingAgentResultsRepo } from '../db/repositories/coding-agent-results.js';
+import { orchestrationRunsRepo } from '../db/repositories/orchestration-runs.js';
 import { codingAgentPermissionsRepo } from '../db/repositories/coding-agent-permissions.js';
 import { codingAgentSkillAttachmentsRepo } from '../db/repositories/coding-agent-skill-attachments.js';
 import { codingAgentSubscriptionsRepo } from '../db/repositories/coding-agent-subscriptions.js';
@@ -677,4 +685,150 @@ codingAgentsRoutes.delete('/subscriptions/:providerRef', async (c) => {
   } catch (err) {
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
+});
+
+// =============================================================================
+// ORCHESTRATION ROUTES
+// =============================================================================
+
+/**
+ * POST /orchestrate - Start a new orchestration run
+ */
+codingAgentsRoutes.post('/orchestrate', async (c) => {
+  const userId = getUserId(c);
+  const body = await parseJsonBody<{
+    goal: string;
+    provider: string;
+    cwd: string;
+    model?: string;
+    maxSteps?: number;
+    autoMode?: boolean;
+    skillIds?: string[];
+    permissions?: Record<string, unknown>;
+  }>(c);
+
+  if (!body?.goal || !body?.provider || !body?.cwd) {
+    return apiError(
+      c,
+      { code: ERROR_CODES.VALIDATION_ERROR, message: 'goal, provider, and cwd are required' },
+      400
+    );
+  }
+
+  if (!isValidProvider(body.provider)) {
+    return apiError(
+      c,
+      { code: ERROR_CODES.VALIDATION_ERROR, message: `Invalid provider: ${body.provider}` },
+      400
+    );
+  }
+
+  try {
+    const run = await startOrchestration(
+      {
+        goal: body.goal,
+        provider: body.provider as CodingAgentProvider,
+        cwd: body.cwd,
+        model: body.model,
+        maxSteps: body.maxSteps,
+        autoMode: body.autoMode,
+        skillIds: body.skillIds,
+        permissions: body.permissions as never,
+      },
+      userId
+    );
+    return apiResponse(c, { run }, 201);
+  } catch (err) {
+    return apiError(
+      c,
+      { code: ERROR_CODES.CREATE_FAILED, message: getErrorMessage(err, 'Failed to start orchestration') },
+      500
+    );
+  }
+});
+
+/**
+ * GET /orchestrate - List orchestration runs
+ */
+codingAgentsRoutes.get('/orchestrate', async (c) => {
+  const userId = getUserId(c);
+  const { limit, offset } = getPaginationParams(c);
+  const runs = await listOrchestrations(userId, limit, offset);
+  return apiResponse(c, { runs, total: runs.length });
+});
+
+/**
+ * GET /orchestrate/:id - Get a specific orchestration run
+ */
+codingAgentsRoutes.get('/orchestrate/:id', async (c) => {
+  const userId = getUserId(c);
+  const id = c.req.param('id');
+  const run = await getOrchestration(id, userId);
+  if (!run) {
+    return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'Run not found' }, 404);
+  }
+  return apiResponse(c, { run });
+});
+
+/**
+ * POST /orchestrate/:id/continue - Continue a paused run with user input
+ */
+codingAgentsRoutes.post('/orchestrate/:id/continue', async (c) => {
+  const userId = getUserId(c);
+  const id = c.req.param('id');
+  const body = await parseJsonBody<{ prompt: string }>(c);
+
+  if (!body?.prompt) {
+    return apiError(
+      c,
+      { code: ERROR_CODES.VALIDATION_ERROR, message: 'prompt is required' },
+      400
+    );
+  }
+
+  try {
+    const run = await continueOrchestration(id, userId, body.prompt);
+    if (!run) {
+      return apiError(
+        c,
+        { code: ERROR_CODES.NOT_FOUND, message: 'Run not found or not waiting for input' },
+        404
+      );
+    }
+    return apiResponse(c, { run });
+  } catch (err) {
+    return apiError(
+      c,
+      { code: ERROR_CODES.UPDATE_FAILED, message: getErrorMessage(err, 'Failed to continue') },
+      500
+    );
+  }
+});
+
+/**
+ * POST /orchestrate/:id/cancel - Cancel an orchestration run
+ */
+codingAgentsRoutes.post('/orchestrate/:id/cancel', async (c) => {
+  const userId = getUserId(c);
+  const id = c.req.param('id');
+
+  const cancelled = await cancelOrchestration(id, userId);
+  if (!cancelled) {
+    return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'Run not found' }, 404);
+  }
+  return apiResponse(c, { cancelled: true });
+});
+
+/**
+ * DELETE /orchestrate/:id - Delete an orchestration run
+ */
+codingAgentsRoutes.delete('/orchestrate/:id', async (c) => {
+  const userId = getUserId(c);
+  const id = c.req.param('id');
+
+  const deleted = await orchestrationRunsRepo.delete(id, userId);
+  if (!deleted) {
+    return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'Run not found' }, 404);
+  }
+  return apiResponse(c, { deleted: true });
 });

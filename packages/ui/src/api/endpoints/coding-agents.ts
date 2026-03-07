@@ -360,3 +360,92 @@ export const cliProvidersApi = {
   /** Test if a CLI provider binary is installed */
   test: (id: string) => apiClient.post<CliProviderTestResult>(`/cli-providers/${id}/test`),
 };
+
+// =============================================================================
+// Orchestration types
+// =============================================================================
+
+export interface OrchestrationAnalysis {
+  summary: string;
+  goalComplete: boolean;
+  hasErrors: boolean;
+  errors?: string[];
+  nextPrompt: string | null;
+  confidence: number;
+  needsUserInput: boolean;
+  userQuestion?: string;
+}
+
+export interface OrchestrationStep {
+  index: number;
+  prompt: string;
+  sessionId?: string;
+  resultId?: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+  outputSummary?: string;
+  exitCode?: number;
+  durationMs?: number;
+  analysis?: OrchestrationAnalysis;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface OrchestrationRun {
+  id: string;
+  userId: string;
+  goal: string;
+  provider: string;
+  cwd: string;
+  model?: string;
+  status: string;
+  steps: OrchestrationStep[];
+  currentStep: number;
+  maxSteps: number;
+  autoMode: boolean;
+  skillIds?: string[];
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  totalDurationMs?: number;
+}
+
+// =============================================================================
+// Orchestration API
+// =============================================================================
+
+export const orchestrationApi = {
+  /** Start a new orchestration run */
+  start: (input: {
+    goal: string;
+    provider: string;
+    cwd: string;
+    model?: string;
+    maxSteps?: number;
+    autoMode?: boolean;
+    skillIds?: string[];
+  }) => apiClient.post<{ run: OrchestrationRun }>('/coding-agents/orchestrate', input),
+
+  /** List orchestration runs */
+  list: (limit = 20, offset = 0) =>
+    apiClient.get<{ runs: OrchestrationRun[] }>(
+      `/coding-agents/orchestrate?limit=${limit}&offset=${offset}`
+    ),
+
+  /** Get a specific run */
+  get: (id: string) =>
+    apiClient.get<{ run: OrchestrationRun }>(`/coding-agents/orchestrate/${id}`),
+
+  /** Continue a paused run with user input */
+  continue: (id: string, prompt: string) =>
+    apiClient.post<{ run: OrchestrationRun }>(`/coding-agents/orchestrate/${id}/continue`, {
+      prompt,
+    }),
+
+  /** Cancel a run */
+  cancel: (id: string) =>
+    apiClient.post<{ cancelled: boolean }>(`/coding-agents/orchestrate/${id}/cancel`),
+
+  /** Delete a run */
+  delete: (id: string) =>
+    apiClient.delete<{ deleted: boolean }>(`/coding-agents/orchestrate/${id}`),
+};

@@ -711,6 +711,16 @@ class CodingAgentService implements ICodingAgentService {
     return this.getSessionManager()?.getOutputBuffer(sessionId, userId);
   }
 
+  waitForCompletion(
+    sessionId: string,
+    userId: string,
+    timeoutMs?: number
+  ): Promise<import('@ownpilot/core').CodingAgentSession> {
+    const mgr = this.getSessionManager();
+    if (!mgr) return Promise.reject(new Error('Session manager not available'));
+    return mgr.waitForCompletion(sessionId, userId, timeoutMs);
+  }
+
   /** Build CLI args for a session based on provider and mode */
   private buildSessionArgs(input: CreateCodingSessionInput): string[] {
     const isInteractive = input.mode === 'interactive';

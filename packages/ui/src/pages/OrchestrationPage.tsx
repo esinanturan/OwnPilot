@@ -236,6 +236,17 @@ function NewRunForm({
             </select>
             <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
           </div>
+          {(() => {
+            const sel = providers.find((p) => p.provider === provider);
+            if (sel && !sel.installed && sel.installCommand) {
+              return (
+                <code className="block mt-1 text-[10px] text-amber-600 dark:text-amber-400 font-mono truncate" title={sel.installCommand}>
+                  {sel.installCommand}
+                </code>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         <div>

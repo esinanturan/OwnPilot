@@ -35,7 +35,6 @@ import { cliProvidersRepo, type CliProviderRecord } from '../db/repositories/cli
 import {
   isBinaryInstalled,
   getBinaryVersion,
-  resolveBinaryPath,
   validateCwd,
   createSanitizedEnv,
   spawnCliProcess,
@@ -80,6 +79,13 @@ const CLI_BINARIES: Record<BuiltinCodingAgentProvider, string> = {
   'claude-code': 'claude',
   codex: 'codex',
   'gemini-cli': 'gemini',
+};
+
+/** npm install commands for built-in providers */
+const INSTALL_COMMANDS: Record<BuiltinCodingAgentProvider, string> = {
+  'claude-code': 'npm install -g @anthropic-ai/claude-code',
+  codex: 'npm install -g @openai/codex',
+  'gemini-cli': 'npm install -g @google/gemini-cli',
 };
 
 /**
@@ -472,15 +478,12 @@ class CodingAgentService implements ICodingAgentService {
 
     const builtinStatuses = builtinProviders.map((provider) => {
       const binary = CLI_BINARIES[provider];
-      const resolvedPath = resolveBinaryPath(binary);
       const installed =
         provider === 'claude-code'
-          ? this.isClaudeCodeSdkInstalled() || !!resolvedPath
-          : !!resolvedPath;
+          ? this.isClaudeCodeSdkInstalled() || isBinaryInstalled(binary)
+          : isBinaryInstalled(binary);
 
       const hasApiKey = !!resolveBuiltinApiKey(provider);
-      // Use resolved path for version check (full path works with execFileSync)
-      const versionBinary = resolvedPath ?? binary;
       return {
         provider: provider as CodingAgentProvider,
         displayName: DISPLAY_NAMES[provider],
@@ -488,9 +491,9 @@ class CodingAgentService implements ICodingAgentService {
         hasApiKey,
         configured: hasApiKey,
         authMethod: AUTH_METHODS[provider],
-        version: installed ? getBinaryVersion(versionBinary) : undefined,
+        version: installed ? getBinaryVersion(binary) : undefined,
+        installCommand: INSTALL_COMMANDS[provider],
         ptyAvailable,
-        binaryPath: resolvedPath ?? undefined,
       };
     });
 
@@ -517,16 +520,16 @@ class CodingAgentService implements ICodingAgentService {
   async isAvailable(provider: CodingAgentProvider): Promise<boolean> {
     if (isBuiltinProvider(provider)) {
       if (provider === 'claude-code') {
-        return this.isClaudeCodeSdkInstalled() || !!resolveBinaryPath(CLI_BINARIES[provider]);
+        return this.isClaudeCodeSdkInstalled() || isBinaryInstalled(CLI_BINARIES[provider]);
       }
-      return !!resolveBinaryPath(CLI_BINARIES[provider]);
+      return isBinaryInstalled(CLI_BINARIES[provider]);
     }
 
     // Custom provider: check binary
     const customName = getCustomProviderName(provider);
     if (customName) {
       const cp = await cliProvidersRepo.getByName(customName);
-      return cp ? !!resolveBinaryPath(cp.binary) : false;
+      return cp ? isBinaryInstalled(cp.binary) : false;
     }
     return false;
   }
@@ -567,7 +570,7 @@ class CodingAgentService implements ICodingAgentService {
       };
     }
 
-    const binary = resolveBinaryPath(CLI_BINARIES[task.provider]) ?? CLI_BINARIES[task.provider];
+    const binary = CLI_BINARIES[task.provider];
     const cwd = task.cwd ? validateCwd(task.cwd, await getAllowedDirs()) : process.cwd();
     const timeout = Math.min(task.timeout ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS);
 
@@ -644,23 +647,22 @@ class CodingAgentService implements ICodingAgentService {
       apiKeyEnvVar = cp.apiKeyEnvVar;
       apiKey = resolveCustomApiKey(cp);
     } else if (isBuiltinProvider(provider)) {
-      // Built-in provider — resolve to full path if not on PATH
-      binary = resolveBinaryPath(CLI_BINARIES[provider]) ?? CLI_BINARIES[provider];
+      binary = CLI_BINARIES[provider];
       apiKey = resolveBuiltinApiKey(provider);
     } else {
       throw new Error(`Unknown provider: ${provider}`);
     }
 
     // All session modes require the CLI binary
-    const resolvedBinary = resolveBinaryPath(binary);
-    if (!resolvedBinary) {
+    if (!isBinaryInstalled(binary)) {
+      const installHint = INSTALL_COMMANDS[provider as BuiltinCodingAgentProvider];
       const displayName =
         customName ?? (isBuiltinProvider(provider) ? DISPLAY_NAMES[provider] : provider);
       throw new Error(
-        `${displayName} CLI not found. Install '${binary}' and ensure it's on your PATH.`
+        `${displayName} CLI ('${binary}') not found on PATH.` +
+          (installHint ? ` Install: ${installHint}` : ' Ensure the binary is on your PATH.')
       );
     }
-    binary = resolvedBinary;
 
     const allowedDirs = await getAllowedDirs();
     const cwd = input.cwd ? validateCwd(input.cwd, allowedDirs) : process.cwd();

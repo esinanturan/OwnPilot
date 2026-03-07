@@ -668,18 +668,38 @@ function NewSessionModal({
                         </div>
                       )}
                       {!s.installed && (
-                        <div className="text-[10px] text-error mt-0.5">Not installed</div>
+                        <div className="text-[10px] text-error mt-0.5" title={s.installCommand}>
+                          Not installed
+                        </div>
                       )}
                     </button>
                   );
                 })}
               </div>
-              {statuses.length > 0 && !statuses.some((s) => s.installed) && (
-                <p className="text-xs text-error mt-2 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  No providers installed. Install at least one CLI tool.
-                </p>
-              )}
+              {(() => {
+                const sel = statuses.find((s) => s.provider === provider);
+                if (sel && !sel.installed && sel.installCommand) {
+                  return (
+                    <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded text-xs">
+                      <p className="text-amber-700 dark:text-amber-400 mb-1">
+                        {sel.displayName} is not installed. Run:
+                      </p>
+                      <code className="block bg-black/20 px-2 py-1 rounded font-mono text-[11px] text-text-primary dark:text-dark-text-primary select-all">
+                        {sel.installCommand}
+                      </code>
+                    </div>
+                  );
+                }
+                if (statuses.length > 0 && !statuses.some((s) => s.installed)) {
+                  return (
+                    <p className="text-xs text-error mt-2 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      No providers installed. Install at least one CLI tool.
+                    </p>
+                  );
+                }
+                return null;
+              })()}
             </div>
 
             {/* Working directory — workspace picker or custom path */}

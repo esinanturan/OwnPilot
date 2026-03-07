@@ -17,6 +17,7 @@ export interface CodingAgentStatus {
   authMethod?: string;
   version?: string;
   ptyAvailable?: boolean;
+  installCommand?: string;
 }
 
 export interface CodingAgentTestResult {

@@ -110,8 +110,13 @@ async function analyzeOutput(
         ? output.slice(-OUTPUT_CONTEXT_LIMIT) + '\n...(truncated)'
         : output;
 
+    const now = new Date();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dateStr = `${days[now.getDay()]} ${now.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}`;
+
     const userMessage = [
-      `GOAL: ${goal}`,
+      `Current date: ${dateStr}`,
+      `\nGOAL: ${goal}`,
       prevContext ? `\nPREVIOUS STEPS:\n${prevContext}` : '',
       `\nPROMPT SENT: ${prompt}`,
       `\nCLI OUTPUT:\n${truncatedOutput}`,

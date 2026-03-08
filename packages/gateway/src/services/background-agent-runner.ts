@@ -318,6 +318,13 @@ export class BackgroundAgentRunner {
 
     parts.push(`--- Cycle ${cycleNumber} ---`);
 
+    // Current date/time context
+    const now = new Date();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    parts.push(
+      `\n## Current Time\n${days[now.getDay()]} ${now.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}`
+    );
+
     // Include persistent context if non-empty
     if (Object.keys(session.persistentContext).length > 0) {
       parts.push(

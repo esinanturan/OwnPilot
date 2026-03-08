@@ -333,6 +333,14 @@ export class SubagentRunner {
   private buildTaskMessage(): string {
     const parts: string[] = [];
 
+    // Current date/time context
+    const now = new Date();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    parts.push(
+      `Current date: ${days[now.getDay()]} ${now.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}`
+    );
+    parts.push('');
+
     parts.push('## Task');
     parts.push(this.input.task);
 

@@ -298,7 +298,7 @@ type Result<T, E = Error> = { success: true; data: T } | { success: false; error
  * Validate Content-Type header for JSON requests.
  * Returns true if Content-Type is application/json or application/*+json.
  */
-export function isJsonContentType(c: Context): boolean {
+function isJsonContentType(c: Context): boolean {
   const contentType = c.req.header('content-type');
   if (!contentType) return false;
   // Match application/json or application/vnd.api+json, etc.
@@ -312,7 +312,7 @@ export function isJsonContentType(c: Context): boolean {
  * Require JSON Content-Type header, returning 415 if not present.
  * Use this in POST/PUT/PATCH handlers that require JSON bodies.
  */
-export function requireJsonContent(c: Context): Response | null {
+function requireJsonContent(c: Context): Response | null {
   if (!isJsonContentType(c)) {
     return apiError(
       c,

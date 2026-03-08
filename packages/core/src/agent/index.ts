@@ -204,14 +204,7 @@ export {
 } from './orchestra/index.js';
 
 // Provider Presets
-export {
-  PROVIDER_PRESETS,
-  getProviderPreset,
-  listProviderPresets,
-  createProviderConfigFromPreset,
-  getDefaultModelConfig,
-  type ProviderPreset,
-} from './presets.js';
+export { PROVIDER_PRESETS, type ProviderPreset } from './presets.js';
 
 // =============================================================================
 // Multi-Provider Support (Config-driven)
@@ -322,12 +315,6 @@ export {
   getHighestPermissionLevel,
   // Class
   PermissionChecker,
-  // Factory functions
-  createPermissionChecker,
-  createRestrictiveChecker,
-  createPermissiveChecker,
-  // Middleware
-  withPermissionCheck,
 } from './permissions.js';
 
 // Code Generation with Sandbox Execution
@@ -354,7 +341,6 @@ export {
   // Functions
   withRetry,
   isRetryableError,
-  createRetryWrapper,
 } from './retry.js';
 
 // Soul System (persistent identity, heartbeat, crews, communication)

@@ -4,7 +4,7 @@
  * These providers all use the OpenAI API format but with different base URLs.
  */
 
-import type { ProviderConfig, ModelConfig } from './types.js';
+
 
 /**
  * Provider preset configuration
@@ -255,51 +255,3 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
   },
 };
 
-/**
- * Get a provider preset by ID
- */
-export function getProviderPreset(id: string): ProviderPreset | undefined {
-  return PROVIDER_PRESETS[id];
-}
-
-/**
- * List all provider presets
- */
-export function listProviderPresets(): ProviderPreset[] {
-  return Object.values(PROVIDER_PRESETS);
-}
-
-/**
- * Create a provider config from a preset
- */
-export function createProviderConfigFromPreset(
-  presetId: string,
-  apiKey: string,
-  model?: string
-): ProviderConfig | undefined {
-  const preset = PROVIDER_PRESETS[presetId];
-  if (!preset) return undefined;
-
-  return {
-    provider: preset.openaiCompatible ? 'openai' : (presetId as 'anthropic'),
-    apiKey,
-    baseUrl: preset.baseUrl,
-    defaultModel: {
-      model: model ?? preset.defaultModel,
-    },
-  };
-}
-
-/**
- * Get default model config for a preset
- */
-export function getDefaultModelConfig(presetId: string): ModelConfig | undefined {
-  const preset = PROVIDER_PRESETS[presetId];
-  if (!preset) return undefined;
-
-  return {
-    model: preset.defaultModel,
-    maxTokens: 4096,
-    temperature: 0.7,
-  };
-}

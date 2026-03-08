@@ -3,7 +3,7 @@ import { GET_LOG_MOCK } from '../test-helpers.js';
 
 vi.mock('../services/get-log.js', () => GET_LOG_MOCK);
 
-const { isRetryableError, withRetry, createRetryWrapper } = await import('./retry.js');
+const { isRetryableError, withRetry } = await import('./retry.js');
 const {
   TimeoutError,
   InternalError: _InternalError,
@@ -443,53 +443,3 @@ describe('withRetry', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// createRetryWrapper
-// ---------------------------------------------------------------------------
-
-describe('createRetryWrapper', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('returns a function that wraps operations with retry', async () => {
-    const retryFn = createRetryWrapper({
-      maxRetries: 2,
-      initialDelayMs: 100,
-      addJitter: false,
-    });
-
-    expect(typeof retryFn).toBe('function');
-
-    const operation = vi.fn().mockResolvedValue(ok('success'));
-    const result = await retryFn(operation);
-
-    expect(result).toEqual(ok('success'));
-    expect(operation).toHaveBeenCalledTimes(1);
-  });
-
-  it('passes config through to withRetry', async () => {
-    const onRetry = vi.fn();
-    const retryFn = createRetryWrapper({
-      maxRetries: 1,
-      initialDelayMs: 100,
-      addJitter: false,
-      onRetry,
-    });
-
-    const retryableError = new Error('network error');
-    const operation = vi.fn().mockResolvedValue(err(retryableError));
-
-    const promise = retryFn(operation);
-    await vi.advanceTimersByTimeAsync(200);
-    const result = await promise;
-
-    expect(result.ok).toBe(false);
-    expect(onRetry).toHaveBeenCalledTimes(1);
-    expect(operation).toHaveBeenCalledTimes(2);
-  });
-});

@@ -215,10 +215,3 @@ export async function withRetry<T>(
   );
 }
 
-/**
- * Create a retry wrapper for a provider method
- */
-export function createRetryWrapper(config?: RetryConfig) {
-  return <T, E extends Error>(operation: () => Promise<Result<T, E>>) =>
-    withRetry(operation, config);
-}

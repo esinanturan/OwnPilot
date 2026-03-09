@@ -84,6 +84,7 @@ import {
   agentMessageRoutes,
   heartbeatLogRoutes,
   agentCommandCenterRoutes,
+  cliChatRoutes,
 } from './routes/index.js';
 import {
   RATE_LIMIT_WINDOW_MS,
@@ -399,6 +400,9 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
   // CLI Tools (discovery, policies, installation for all CLI tools)
   app.route('/api/v1/cli-tools', cliToolsRoutes);
 
+  // CLI Chat Providers (use CLI subscriptions as chat providers)
+  app.route('/api/v1/cli-chat', cliChatRoutes);
+
   // Security Scanner (unified vulnerability analysis)
   app.route('/api/v1/security', securityRoutes);
 
@@ -520,6 +524,8 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
         cliProviders: '/api/v1/cli-providers',
         // CLI Tools (discovery, policies, installation)
         cliTools: '/api/v1/cli-tools',
+        // CLI Chat (use CLI subscriptions as chat providers)
+        cliChat: '/api/v1/cli-chat',
         // Security Scanner (unified vulnerability analysis)
         security: '/api/v1/security',
         // Background Agents (persistent autonomous agents)

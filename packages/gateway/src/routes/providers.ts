@@ -19,6 +19,7 @@ import {
 import { hasApiKey, getApiKeySource } from './settings.js';
 import { modelConfigsRepo } from '../db/repositories/model-configs.js';
 import { localProvidersRepo } from '../db/repositories/index.js';
+import { detectCliChatProviders } from '../services/cli-chat-provider.js';
 
 const app = new Hono();
 
@@ -299,6 +300,39 @@ app.get('/', async (c) => {
       hasOverride: false,
       configSource: 'database' as const,
       color: localProviderColors[lp.providerType] ?? '#10b981',
+      apiKeyPlaceholder: undefined,
+    });
+  }
+
+  // Include CLI chat providers (Claude CLI, Codex CLI, Gemini CLI)
+  const cliChatProviders = detectCliChatProviders();
+  const cliProviderColors: Record<string, string> = {
+    'cli-claude': '#d4a27f',
+    'cli-codex': '#10a37f',
+    'cli-gemini': '#4285f4',
+  };
+  for (const cli of cliChatProviders) {
+    if (!cli.installed) continue;
+    providers.push({
+      id: cli.id,
+      name: cli.displayName,
+      type: 'cli',
+      baseUrl: '',
+      apiKeyEnv: '',
+      docsUrl: undefined,
+      features: {
+        streaming: cli.binary === 'claude', // Only Claude CLI supports true streaming
+        toolUse: false, // CLI providers don't support tool calling
+        vision: false,
+        jsonMode: false,
+        systemMessage: true,
+      },
+      modelCount: cli.models.length,
+      isConfigured: cli.authenticated,
+      isEnabled: true,
+      hasOverride: false,
+      configSource: 'database' as const, // CLI providers are auto-detected
+      color: cliProviderColors[cli.id] ?? '#666666',
       apiKeyPlaceholder: undefined,
     });
   }

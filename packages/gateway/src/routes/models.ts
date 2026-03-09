@@ -18,6 +18,7 @@ import {
 } from '@ownpilot/core';
 import { modelConfigsRepo } from '../db/repositories/model-configs.js';
 import { localProvidersRepo } from '../db/repositories/index.js';
+import { detectCliChatProviders } from '../services/cli-chat-provider.js';
 import {
   getUserId,
   apiResponse,
@@ -119,6 +120,26 @@ app.get('/', async (c) => {
         outputPrice: 0,
         capabilities: lm.capabilities ?? ['chat', 'streaming'],
         recommended: false,
+      });
+    }
+  }
+
+  // Include models from CLI chat providers (Claude CLI, Codex CLI, Gemini CLI)
+  const cliChatProviders = detectCliChatProviders();
+  for (const cli of cliChatProviders) {
+    if (!cli.installed) continue;
+    configuredProviders.push(cli.id);
+    for (const modelId of cli.models) {
+      allModels.push({
+        id: modelId,
+        name: modelId,
+        provider: cli.id,
+        description: `Via ${cli.displayName} (subscription-based, no API key)`,
+        contextWindow: 200000,
+        inputPrice: 0, // Included in subscription
+        outputPrice: 0,
+        capabilities: ['chat', ...(cli.binary === 'claude' ? ['streaming'] : [])],
+        recommended: modelId === cli.defaultModel,
       });
     }
   }

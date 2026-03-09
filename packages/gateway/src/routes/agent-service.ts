@@ -88,6 +88,12 @@ import {
   AGENT_DEFAULT_MAX_TOOL_CALLS,
   AI_META_TOOL_NAMES,
 } from '../config/defaults.js';
+import {
+  isCliChatProvider,
+  getCliBinaryFromProviderId,
+  createCliChatProvider,
+  getCliChatProviderDefinition,
+} from '../services/cli-chat-provider.js';
 
 const log = getLog('AgentService');
 
@@ -425,14 +431,29 @@ async function createChatAgentInstance(
   cacheKey: string,
   fallback?: { provider: string; model: string }
 ): Promise<Agent> {
-  const apiKey = await getProviderApiKey(provider);
-  if (!apiKey) {
-    throw new Error(`API key not configured for provider: ${provider}`);
+  // ── CLI Chat Provider path ──
+  // CLI providers (cli-claude, cli-codex, cli-gemini) use login-based auth
+  // and don't require API keys. They spawn CLI processes for completions.
+  const isCliProvider = isCliChatProvider(provider);
+
+  let apiKey: string | undefined;
+  if (!isCliProvider) {
+    apiKey = await getProviderApiKey(provider);
+    if (!apiKey) {
+      throw new Error(`API key not configured for provider: ${provider}`);
+    }
   }
 
-  const providerConfig = loadProviderConfig(provider);
+  const providerConfig = isCliProvider ? null : loadProviderConfig(provider);
   const baseUrl = providerConfig?.baseUrl;
-  const providerType = NATIVE_PROVIDERS.has(provider) ? provider : 'openai';
+
+  // For CLI providers, map to the underlying core provider type
+  const cliDef = isCliProvider ? getCliChatProviderDefinition(provider) : null;
+  const providerType = isCliProvider
+    ? (cliDef?.coreProvider ?? 'openai')
+    : NATIVE_PROVIDERS.has(provider)
+      ? provider
+      : 'openai';
 
   const tools = new ToolRegistry();
   registerAllTools(tools);
@@ -502,11 +523,13 @@ async function createChatAgentInstance(
   const memoryMaxTokens = Math.floor(ctxWindow * 0.75);
 
   const config: AgentConfig = {
-    name: `Personal Assistant (${provider})`,
+    name: isCliProvider
+      ? `Personal Assistant (${cliDef?.displayName ?? provider})`
+      : `Personal Assistant (${provider})`,
     systemPrompt: enhancedPrompt,
     provider: {
       provider: providerType as AIProvider,
-      apiKey,
+      apiKey: apiKey ?? 'cli-no-key',
       baseUrl,
       headers: providerConfig?.headers,
     },
@@ -515,16 +538,51 @@ async function createChatAgentInstance(
       maxTokens: AGENT_DEFAULT_MAX_TOKENS,
       temperature: AGENT_DEFAULT_TEMPERATURE,
     },
-    maxTurns: AGENT_DEFAULT_MAX_TURNS,
-    maxToolCalls: AGENT_DEFAULT_MAX_TOOL_CALLS,
-    tools: chatMetaToolFilter,
+    // CLI providers handle tool calling internally via ToolBridge (prompt-based),
+    // so the agent loop itself doesn't need to do tool calling rounds.
+    maxTurns: isCliProvider ? 1 : AGENT_DEFAULT_MAX_TURNS,
+    maxToolCalls: isCliProvider ? 0 : AGENT_DEFAULT_MAX_TOOL_CALLS,
+    tools: isCliProvider ? [] : chatMetaToolFilter,
     requestApproval: createApprovalCallback(),
     memory: { maxTokens: memoryMaxTokens },
   };
 
-  // Build FallbackProvider if a backup model is configured
+  // Build provider instance
   let providerInstance: IProvider | undefined;
-  if (fallback) {
+
+  if (isCliProvider) {
+    // CLI provider: spawn CLI process for completions
+    const cliBinary = getCliBinaryFromProviderId(provider);
+    if (!cliBinary) {
+      throw new Error(`Unknown CLI chat provider: ${provider}`);
+    }
+    // Build a curated tool list for the ToolBridge prompt injection.
+    // We pass tool definitions (schemas) — not meta-tools — so the model
+    // can call them directly via <tool_call> blocks.
+    const metaNames = new Set<string>(AI_META_TOOL_NAMES);
+    const bridgeToolDefs = toolDefs.filter(
+      (t) => !metaNames.has(t.name)
+    );
+
+    providerInstance = createCliChatProvider({
+      binary: cliBinary,
+      model,
+      apiKey: apiKey ?? undefined,
+      toolBridge: bridgeToolDefs.length > 0
+        ? {
+            tools,
+            toolDefinitions: bridgeToolDefs,
+            conversationId: `cli_chat_${provider}_${model}`,
+            userId: 'default',
+            maxRounds: 6,
+          }
+        : undefined,
+    });
+    log.info(
+      `Created CLI chat provider: ${provider} (${cliBinary}) model=${model} tools=${bridgeToolDefs.length}`
+    );
+  } else if (fallback) {
+    // Build FallbackProvider if a backup model is configured
     try {
       const fbApiKey = await getProviderApiKey(fallback.provider);
       if (fbApiKey) {
@@ -533,7 +591,7 @@ async function createChatAgentInstance(
         providerInstance = createFallbackProvider({
           primary: {
             provider: providerType as AIProvider,
-            apiKey,
+            apiKey: apiKey!,
             baseUrl,
             headers: providerConfig?.headers,
           },

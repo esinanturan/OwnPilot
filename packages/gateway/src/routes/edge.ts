@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import type { EdgeDeviceType, EdgeDeviceStatus } from '@ownpilot/core';
 import { getEdgeService } from '../services/edge-service.js';
 import { getEdgeMqttClient } from '../services/edge-mqtt-client.js';
+import { createCircuitBreakerMiddleware } from '../middleware/circuit-breaker.js';
 import {
   getUserId,
   apiResponse,
@@ -22,6 +23,15 @@ import {
 } from './helpers.js';
 
 export const edgeRoutes = new Hono();
+
+// Apply circuit breaker to MQTT-dependent routes
+// Protects against cascading failures when MQTT broker is unavailable
+edgeRoutes.use('/mqtt/*', createCircuitBreakerMiddleware({
+  failureThreshold: 3,
+  resetTimeoutMs: 30000,
+  successThreshold: 2,
+  failureStatusCodes: [500, 502, 503, 504],
+}));
 
 const VALID_TYPES = ['raspberry-pi', 'esp32', 'arduino', 'custom'] as const;
 const VALID_STATUSES = ['online', 'offline', 'error'] as const;

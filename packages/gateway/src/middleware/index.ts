@@ -14,3 +14,13 @@ export { errorHandler, notFoundHandler } from './error-handler.js';
 export { auditMiddleware } from './audit.js';
 export { uiSessionMiddleware } from './ui-session.js';
 export { pagination, type PaginationParams, type PaginationConfig } from './pagination.js';
+export {
+  createCircuitBreakerMiddleware,
+  createServiceCircuitBreaker,
+  CircuitBreakerError,
+  getCircuitBreakerStats,
+  resetAllCircuits,
+  stopAllCircuitBreakers,
+  type CircuitBreakerConfig,
+  type CircuitState,
+} from './circuit-breaker.js';

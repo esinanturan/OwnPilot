@@ -734,6 +734,28 @@ CREATE TABLE IF NOT EXISTS plugins (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- User Extensions (native tool bundles / AgentSkills.io packages)
+CREATE TABLE IF NOT EXISTS user_extensions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL DEFAULT 'default',
+  name TEXT NOT NULL,
+  version TEXT NOT NULL DEFAULT '1.0.0',
+  description TEXT,
+  category TEXT NOT NULL DEFAULT 'general',
+  format TEXT NOT NULL DEFAULT 'ownpilot',
+  icon TEXT,
+  author_name TEXT,
+  manifest JSONB NOT NULL DEFAULT '{}',
+  status TEXT NOT NULL DEFAULT 'enabled' CHECK(status IN ('enabled', 'disabled', 'error')),
+  source_path TEXT,
+  settings JSONB NOT NULL DEFAULT '{}',
+  error_message TEXT,
+  tool_count INTEGER NOT NULL DEFAULT 0,
+  trigger_count INTEGER NOT NULL DEFAULT 0,
+  installed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- =====================================================
 -- LOCAL AI PROVIDERS
 -- =====================================================
@@ -944,6 +966,12 @@ CREATE INDEX IF NOT EXISTS idx_custom_table_schemas_name ON custom_table_schemas
 CREATE INDEX IF NOT EXISTS idx_custom_table_schemas_owner ON custom_table_schemas(owner_plugin_id);
 CREATE INDEX IF NOT EXISTS idx_custom_table_schemas_protected ON custom_table_schemas(is_protected);
 CREATE INDEX IF NOT EXISTS idx_custom_data_records_table ON custom_data_records(table_id);
+
+-- User Extensions indexes
+CREATE INDEX IF NOT EXISTS idx_user_extensions_user ON user_extensions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_extensions_name ON user_extensions(user_id, name);
+CREATE INDEX IF NOT EXISTS idx_user_extensions_status ON user_extensions(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_extensions_user_name ON user_extensions(user_id, name);
 
 -- Config Center indexes
 CREATE INDEX IF NOT EXISTS idx_config_services_name ON config_services(name);

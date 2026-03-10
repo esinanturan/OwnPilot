@@ -52,6 +52,35 @@ pnpm run typecheck    # TypeScript type checking
 
 PostgreSQL via pg adapter. Repositories in `packages/gateway/src/db/repositories/`. Adapter abstraction in `packages/gateway/src/db/adapters/`.
 
+### Migration Best Practices
+
+**Critical:** All migrations must be idempotent (`IF NOT EXISTS` / `IF EXISTS`).
+
+**Pattern for new tables:**
+1. Add `CREATE TABLE IF NOT EXISTS` to `001_initial_schema.sql` (for fresh installs)
+2. Add same `CREATE TABLE IF NOT EXISTS` to your migration file (for existing installs)
+3. Never assume table exists - always use `IF NOT EXISTS`
+
+**Example (009_skills_platform.sql):**
+```sql
+-- Create table if not exists (idempotent)
+CREATE TABLE IF NOT EXISTS user_extensions (...);
+
+-- Alter table (idempotent)
+ALTER TABLE user_extensions ADD COLUMN IF NOT EXISTS npm_package TEXT;
+```
+
+**Testing migrations:**
+```bash
+# Fresh install test
+docker run -d --name test-db -p 35432:5432 \
+  -e POSTGRES_USER=testuser \
+  -e POSTGRES_PASSWORD=testpass \
+  -e POSTGRES_DB=testdb \
+  -v "$(pwd)/packages/gateway/src/db/migrations/postgres:/docker-entrypoint-initdb.d" \
+  pgvector/pgvector:pg16
+```
+
 ## Conventions
 
 - Barrel exports via `index.ts` in each module

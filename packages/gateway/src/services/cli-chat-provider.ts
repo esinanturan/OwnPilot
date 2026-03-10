@@ -282,8 +282,11 @@ function parseCodexOutput(stdout: string): string {
   for (const line of lines) {
     try {
       const parsed = JSON.parse(line) as Record<string, unknown>;
+      if (parsed.type === 'ownpilot_tool_intent' || parsed.type === 'ownpilot_final_response') {
+        result = line;
+      }
       // Standard message format
-      if (parsed.type === 'message' && parsed.role === 'assistant') {
+      else if (parsed.type === 'message' && parsed.role === 'assistant') {
         result = String(parsed.content ?? '');
       }
       // message.completed with nested message object
@@ -325,6 +328,9 @@ function parseCodexOutput(stdout: string): string {
 function parseGeminiOutput(stdout: string): string {
   try {
     const parsed = JSON.parse(stdout) as Record<string, unknown>;
+    if (parsed.type === 'ownpilot_tool_intent' || parsed.type === 'ownpilot_final_response') {
+      return stdout.trim();
+    }
     return String(parsed.response ?? parsed.content ?? parsed.text ?? stdout);
   } catch {
     return stdout.trim();

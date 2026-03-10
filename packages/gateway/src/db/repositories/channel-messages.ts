@@ -20,8 +20,13 @@ export interface ChannelMessage {
   contentType: string;
   attachments?: Array<{
     type: string;
-    url: string;
+    url?: string;
+    assetId?: string;
+    path?: string;
+    mimeType?: string;
+    size?: number;
     name?: string;
+    expiresAt?: string;
   }>;
   replyToId?: string;
   conversationId?: string;

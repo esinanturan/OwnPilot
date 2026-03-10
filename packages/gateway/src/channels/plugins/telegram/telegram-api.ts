@@ -12,6 +12,7 @@ import type { Message } from 'grammy/types';
 import { TelegramApprovalHandler } from './approval-handler.js';
 import { TelegramProgressManager } from './progress-manager.js';
 import { downloadTelegramAttachments } from './file-handler.js';
+import { channelAssetStore } from '../../../services/channel-asset-store.js';
 import {
   type ChannelPluginAPI,
   type ChannelConnectionStatus,
@@ -622,6 +623,16 @@ export class TelegramChannelAPI implements ChannelPluginAPI {
       }
     } else {
       attachments = this.extractAttachments(message);
+    }
+
+    if (attachments.length > 0) {
+      attachments = await channelAssetStore.persistIncomingAttachments({
+        messageId: `${this.pluginId}:${message.message_id}`,
+        channelPluginId: this.pluginId,
+        platform: 'telegram',
+        platformChatId: chatId,
+        attachments,
+      });
     }
 
     const normalized: ChannelIncomingMessage = {

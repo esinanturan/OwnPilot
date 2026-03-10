@@ -39,6 +39,7 @@ import { MAX_MESSAGE_CHAT_MAP_SIZE } from '../../../config/defaults.js';
 import { splitMessage } from '../../utils/message-utils.js';
 import { getSessionDir, clearSession } from './session-store.js';
 import { wsGateway } from '../../../ws/server.js';
+import { channelAssetStore } from '../../../services/channel-asset-store.js';
 
 const log = getLog('WhatsApp');
 const WHATSAPP_MAX_LENGTH = 4096;
@@ -88,8 +89,6 @@ const baileysLogger = pino({
 interface WhatsAppBaileysConfig {
   /** Own phone number in international format without + (e.g. 905551234567) */
   my_phone: string;
-  /** Comma-separated phone numbers allowed to trigger AI responses. Empty = allow all. */
-  allowed_users?: string;
 }
 
 // ============================================================================
@@ -136,9 +135,6 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
   private isReconnecting = false;
   private consecutive440Count = 0;
 
-  // Access control: allowed phone numbers (empty = allow all)
-  private allowedUsers = new Set<string>();
-
   // Anti-ban: message cache for getMessage callback (retry/decryption)
   private messageCache = new Map<string, proto.IMessage>();
 
@@ -175,14 +171,6 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
       log.debug(
         'WhatsApp: my_phone not configured — will auto-detect from sock.user.id on connect'
       );
-    }
-    // Parse allowed_users: comma-separated phone numbers
-    const allowedStr = config.allowed_users ? String(config.allowed_users) : '';
-    if (allowedStr.trim()) {
-      for (const phone of allowedStr.split(',')) {
-        const cleaned = phone.trim().replace(/\D/g, '');
-        if (cleaned) this.allowedUsers.add(cleaned);
-      }
     }
   }
 
@@ -280,11 +268,16 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
             continue;
           }
 
-          const isSelf = this.isSelfChat(msg.key.remoteJid);
-          // Skip our own messages — EXCEPT self-chat (user messaging themselves)
-          if (msg.key.fromMe && !isSelf) continue;
+          const effectiveJid = this.resolveIncomingJid(msg.key);
+          const isSelf = this.isSelfChat(effectiveJid);
+          if (!isSelf) {
+            log.debug(
+              `[WhatsApp] Skipping non-self realtime message from ${effectiveJid ?? msg.key.remoteJid}`
+            );
+            continue;
+          }
           // In self-chat, skip messages the bot sent (prevent infinite loop)
-          if (isSelf && msg.key.id && this.sentMessageIds.has(msg.key.id)) continue;
+          if (msg.key.id && this.sentMessageIds.has(msg.key.id)) continue;
 
           // Track as processed BEFORE handling (idempotency)
           if (msgId) {
@@ -333,7 +326,7 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
               const rows: Array<Parameters<typeof messagesRepo.createBatch>[0][number]> = [];
 
               for (const msg of messages) {
-                const remoteJid = msg.key?.remoteJid;
+                const remoteJid = this.resolveIncomingJid(msg.key);
                 if (!remoteJid) continue;
 
                 const isGroup = remoteJid.endsWith('@g.us');
@@ -345,7 +338,7 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
 
                 // Skip our own outbound messages (except self-chat)
                 const isSelf = this.isSelfChat(remoteJid);
-                if (msg.key.fromMe && !isSelf) continue;
+                if (!isSelf) continue;
 
                 const messageId = msg.key.id ?? '';
                 if (!messageId) continue;
@@ -394,7 +387,7 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
                   id: `${this.pluginId}:${messageId}`,
                   channelId: this.pluginId,
                   externalId: messageId,
-                  direction: 'inbound' as const,
+                  direction: msg.key.fromMe ? ('outbound' as const) : ('inbound' as const),
                   senderId: phone,
                   senderName: msg.pushName || phone,
                   content: text,
@@ -984,6 +977,18 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
     this.messageCache.set(id, message);
   }
 
+  private async downloadAttachmentData(msg: WAMessage): Promise<Uint8Array | undefined> {
+    try {
+      const buffer = await downloadMediaMessage(msg, 'buffer', {});
+      if (buffer instanceof Buffer) {
+        return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+      }
+    } catch {
+      // Download failed — metadata-only fallback
+    }
+    return undefined;
+  }
+
   /** Enforce rate limits: global 20/min + per-JID 3s gap. Waits if needed. */
   private async enforceRateLimit(jid: string): Promise<void> {
     const now = Date.now();
@@ -1067,51 +1072,8 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
     log.info(
       `[WhatsApp] handleIncomingMessage called — jid: ${msg.key.remoteJid}, pushName: ${msg.pushName}`
     );
-    let remoteJid = msg.key.remoteJid;
+    let remoteJid = this.resolveIncomingJid(msg.key);
     if (!remoteJid) return;
-
-    // =========================================================================
-    // LID Resolution (INACTIVE — uncomment to enable)
-    // =========================================================================
-    // WhatsApp's Linked ID system: since 2024, some messages arrive with
-    // @lid JID (e.g. 179203903344808@lid) instead of @s.whatsapp.net.
-    // LID is an internal device identifier, NOT a phone number.
-    //
-    // WHEN TO ACTIVATE:
-    //   - Scenario A: Auto-reply opened to other users (not just self-chat)
-    //     and some users' messages arrive as @lid → phone lookup needed
-    //   - Scenario B: Group messages enabled and participant JIDs are @lid
-    //   - Scenario C: LID-only contacts can't be matched to allowed_users
-    //
-    // HOW IT WORKS (Evolution API pattern, line 1478-1479 of
-    //   ~/evolution-api-src/src/api/integrations/channel/whatsapp/
-    //   whatsapp.baileys.service.ts):
-    //   Baileys provides two JIDs per message:
-    //     key.remoteJid    = 179203903344808@lid        (device/linked ID)
-    //     key.remoteJidAlt = PHONE_NUMBER@s.whatsapp.net (real phone number)
-    //   Swap remoteJid with remoteJidAlt so downstream (allowed_users filter,
-    //   channel_users DB, AI pipeline) always sees the phone number.
-    //
-    // TO ACTIVATE: Remove the block comment markers (/* */) below.
-    //   No other changes needed — the rest of the pipeline uses remoteJid.
-    //
-    // REFERENCE:
-    //   Evolution API: inline swap (remoteJidAlt → remoteJid)
-    //   WAHA: SQLite LID→Phone store (more robust but heavier)
-    //   OwnPilot: could add PostgreSQL whatsapp_lid_map table if needed
-    // =========================================================================
-    /*
-    if (remoteJid.endsWith('@lid')) {
-      const altJid = (msg.key as Record<string, unknown>).remoteJidAlt as string | undefined;
-      if (altJid && altJid.endsWith('@s.whatsapp.net')) {
-        log.info(`[WhatsApp] LID resolved: ${remoteJid} → ${altJid}`);
-        remoteJid = altJid;
-      } else {
-        log.info(`[WhatsApp] LID without remoteJidAlt — skipping ${remoteJid}`);
-        return;
-      }
-    }
-    */
 
     // SAFETY: Only process DMs (@s.whatsapp.net) and groups (@g.us).
     // Skip: broadcasts (@broadcast), LID (@lid), newsletter (@newsletter), status (@s.whatsapp.net status)
@@ -1137,9 +1099,8 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
     const participantJid = isGroup ? msg.key.participant! : remoteJid;
     const phone = this.phoneFromJid(participantJid);
 
-    // Access control — if allowed_users is set, ONLY those users get AI responses (DM only)
-    if (!isGroup && this.allowedUsers.size > 0 && !this.allowedUsers.has(phone)) {
-      log.info(`[WhatsApp] Skipping message from ${phone} (not in allowed_users)`);
+    if (!isGroup && !this.isSelfChat(remoteJid)) {
+      log.info(`[WhatsApp] Skipping non-self DM from ${phone}`);
       return;
     }
 
@@ -1159,32 +1120,27 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
     // Image messages
     else if (m.imageMessage) {
       text = m.imageMessage.caption ?? '';
+      const data = await this.downloadAttachmentData(msg);
       attachments.push({
         type: 'image',
         mimeType: m.imageMessage.mimetype ?? 'image/jpeg',
+        data,
       });
     }
     // Document messages
     else if (m.documentMessage) {
       text = m.documentMessage.caption ?? '';
+      const data = await this.downloadAttachmentData(msg);
       attachments.push({
         type: 'file',
         mimeType: m.documentMessage.mimetype ?? 'application/octet-stream',
         filename: m.documentMessage.fileName ?? undefined,
+        data,
       });
     }
     // Audio messages — download binary for auto-transcription
     else if (m.audioMessage) {
-      let audioData: Uint8Array | undefined;
-      try {
-        const buffer = await downloadMediaMessage(msg, 'buffer', {});
-        // buffer is Buffer | null; Buffer extends Uint8Array
-        if (buffer instanceof Buffer) {
-          audioData = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-        }
-      } catch {
-        // Download failed — metadata-only fallback
-      }
+      const audioData = await this.downloadAttachmentData(msg);
       attachments.push({
         type: 'audio',
         mimeType: m.audioMessage.mimetype ?? 'audio/ogg',
@@ -1194,9 +1150,11 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
     // Video messages
     else if (m.videoMessage) {
       text = m.videoMessage.caption ?? '';
+      const data = await this.downloadAttachmentData(msg);
       attachments.push({
         type: 'video',
         mimeType: m.videoMessage.mimetype ?? 'video/mp4',
+        data,
       });
     }
 
@@ -1204,6 +1162,21 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
     if (!text && attachments.length === 0) return;
 
     const messageId = msg.key.id ?? '';
+
+    if (attachments.length > 0) {
+      const platformChatId = isGroup ? remoteJid : phone;
+      attachments.splice(
+        0,
+        attachments.length,
+        ...(await channelAssetStore.persistIncomingAttachments({
+          messageId: `${this.pluginId}:${messageId}`,
+          channelPluginId: this.pluginId,
+          platform: 'whatsapp',
+          platformChatId,
+          attachments,
+        }))
+      );
+    }
 
     const sender: ChannelUser = {
       platformUserId: phone,
@@ -1273,6 +1246,27 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
   /** Extract phone number from a WhatsApp JID. */
   private phoneFromJid(jid: string): string {
     return jid.split('@')[0]?.split(':')[0] ?? jid;
+  }
+
+  /**
+   * Resolve incoming Baileys JIDs.
+   * Prefer remoteJidAlt when WhatsApp sends a temporary @lid identifier.
+   */
+  private resolveIncomingJid(key: {
+    remoteJid?: string | null;
+    remoteJidAlt?: string | null;
+  }): string | null {
+    const remoteJid = typeof key.remoteJid === 'string' ? key.remoteJid : null;
+    if (!remoteJid) return null;
+    if (!remoteJid.endsWith('@lid')) return remoteJid;
+
+    const altJid = typeof key.remoteJidAlt === 'string' ? key.remoteJidAlt : null;
+    if (altJid && altJid.endsWith('@s.whatsapp.net')) {
+      log.info(`[WhatsApp] LID resolved: ${remoteJid} -> ${altJid}`);
+      return altJid;
+    }
+
+    return remoteJid;
   }
 
   /**

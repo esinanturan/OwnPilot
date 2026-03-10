@@ -40,7 +40,6 @@ import {
   createCliChatProvider,
 } from './cli-chat-provider.js';
 import { isBinaryInstalled } from './binary-utils.js';
-import type { EventEmitter } from 'events';
 import { platform } from 'node:os';
 import { ToolRegistry } from '@ownpilot/core';
 
@@ -50,7 +49,7 @@ const IS_WIN = platform() === 'win32';
 // Helpers
 // =============================================================================
 
-interface MockProcess extends Partial<EventEmitter> {
+interface MockProcess {
   stdin: { write: ReturnType<typeof vi.fn>; end: ReturnType<typeof vi.fn> };
   stdout: { on: ReturnType<typeof vi.fn> };
   stderr: { on: ReturnType<typeof vi.fn> };
@@ -411,17 +410,18 @@ describe('CliChatProvider', () => {
           description: 'List tasks',
           parameters: { type: 'object', properties: { status: { type: 'string' } } },
         },
-        async (args) => ({ content: `tasks for ${String(args.status ?? 'all')}` }),
-        'core'
+        async (args) => ({ content: `tasks for ${String(args.status ?? 'all')}` })
       );
 
       mockSpawn
         .mockReturnValueOnce(
           createMockProcess(
-            '<tool_call>\n{"name":"core.list_tasks","arguments":{"status":"pending"}}\n</tool_call>'
+            '{"type":"ownpilot_tool_intent","calls":[{"name":"core.list_tasks","arguments":{"status":"pending"}}]}'
           )
         )
-        .mockReturnValueOnce(createMockProcess('Pending tasks loaded.'));
+        .mockReturnValueOnce(
+          createMockProcess('{"type":"ownpilot_final_response","content":"Pending tasks loaded."}')
+        );
 
       const provider = new CliChatProvider({
         binary: 'gemini',

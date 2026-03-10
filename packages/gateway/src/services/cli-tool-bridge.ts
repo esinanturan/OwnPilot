@@ -3,13 +3,13 @@
  *
  * Enables tool calling for CLI-backed chat providers by:
  * 1. Injecting tool definitions into the prompt as structured text
- * 2. Instructing the model to output <tool_call> blocks
- * 3. Parsing CLI output for tool call markers
+ * 2. Instructing the model to output a strict JSON envelope
+ * 3. Parsing CLI output into either tool intents or a final response
  * 4. Executing tools via OwnPilot's ToolRegistry
  * 5. Re-invoking the CLI with results until the model stops calling tools
  *
  * This makes CLI providers (Claude CLI, Codex CLI, Gemini CLI) support
- * the same tool ecosystem as native API providers, using prompt engineering
+ * the same tool ecosystem as native API providers, using a structured bridge
  * instead of native function calling.
  */
 
@@ -26,11 +26,13 @@ const log = getLog('ToolBridge');
 /** Maximum tool-calling rounds before forcing stop */
 const MAX_TOOL_ROUNDS = 8;
 
-/** Markers for tool call detection in model output */
-const TOOL_CALL_OPEN = '<tool_call>';
-const TOOL_CALL_CLOSE = '</tool_call>';
-const TOOL_RESULT_OPEN = '<tool_result>';
-const TOOL_RESULT_CLOSE = '</tool_result>';
+/** Repair attempts when the provider returns invalid bridge output */
+const MAX_REPAIR_ATTEMPTS = 2;
+
+/** Envelope type names used by the CLI bridge contract */
+const TOOL_INTENT_TYPE = 'ownpilot_tool_intent';
+const FINAL_RESPONSE_TYPE = 'ownpilot_final_response';
+const TOOL_RESULTS_TYPE = 'ownpilot_tool_results';
 
 // =============================================================================
 // Types
@@ -64,6 +66,22 @@ export interface ParsedToolCall {
   arguments: Record<string, unknown>;
 }
 
+interface ToolResultsEnvelope {
+  type: typeof TOOL_RESULTS_TYPE;
+  results: Array<{
+    toolCallId: string;
+    isError: boolean;
+    content: string;
+  }>;
+}
+
+interface ParsedBridgeResponse {
+  kind: 'tool_intent' | 'final_response' | 'invalid';
+  toolCalls: ParsedToolCall[];
+  cleanContent: string;
+  error?: string;
+}
+
 export interface ToolBridgeResult {
   /** Final text response (tool calls stripped) */
   content: string;
@@ -81,7 +99,7 @@ export interface ToolBridgeResult {
 
 /**
  * Build tool definitions section for injection into the prompt.
- * Uses a compact format that LLMs understand well.
+ * Uses a compact strict-output contract instead of tag parsing.
  */
 export function buildToolPromptSection(
   tools: readonly ToolDefinition[],
@@ -101,16 +119,15 @@ export function buildToolPromptSection(
   }
 
   lines.push(
-    'You have access to the following tools. To use a tool, respond with a JSON block wrapped in <tool_call> tags.',
-    'You may call multiple tools in a single response. After calling tools, you will receive results in <tool_result> tags, then continue your response.',
-    '',
-    'Format:',
-    '<tool_call>',
-    '{"name": "tool_name", "arguments": {"param1": "value1"}}',
-    '</tool_call>',
+    'You have access to the following tools.',
+    'Your response MUST be exactly one valid JSON object and nothing else.',
+    `If you need tools, respond with {"type":"${TOOL_INTENT_TYPE}","calls":[{"name":"tool_name","arguments":{"param1":"value1"}}]}.`,
+    `If you are ready to answer the user, respond with {"type":"${FINAL_RESPONSE_TYPE}","content":"your response"}.`,
+    'You may call multiple tools in a single response by adding more entries to calls.',
+    'After tool calls, you will receive tool results and must again respond with exactly one valid JSON object.',
     '',
     'CRITICAL: Never call OwnPilot HTTP endpoints directly (for example /api/v1/tasks or /api/v1/mcp/serve).',
-    'CRITICAL: Do not describe tools instead of using them. Emit <tool_call> when tool use is needed.',
+    'CRITICAL: Do not describe tools instead of using them. Return a tool intent JSON object when tool use is needed.',
     'IMPORTANT: Only call tools when necessary. When you have enough information, respond directly without tool calls.',
     '',
     '### Tool Definitions',
@@ -145,12 +162,16 @@ export function buildToolPromptSection(
 export function formatToolResults(results: ToolResult[]): string {
   if (results.length === 0) return '';
 
-  const sections = results.map((r) => {
-    const status = r.isError ? ' status="error"' : '';
-    return `${TOOL_RESULT_OPEN}${status}\n<id>${r.toolCallId}</id>\n${r.content}\n${TOOL_RESULT_CLOSE}`;
-  });
+  const envelope: ToolResultsEnvelope = {
+    type: TOOL_RESULTS_TYPE,
+    results: results.map((r) => ({
+      toolCallId: r.toolCallId,
+      isError: r.isError ?? false,
+      content: r.content,
+    })),
+  };
 
-  return sections.join('\n\n');
+  return JSON.stringify(envelope, null, 2);
 }
 
 // =============================================================================
@@ -158,8 +179,8 @@ export function formatToolResults(results: ToolResult[]): string {
 // =============================================================================
 
 /**
- * Parse model output to extract tool calls and clean text.
- * Returns parsed tool calls and the text content with tool_call blocks removed.
+ * Parse legacy tagged tool calls from a model output.
+ * Kept as a compatibility parser while the bridge standardizes on JSON envelopes.
  */
 export function parseToolCalls(output: string): {
   toolCalls: ParsedToolCall[];
@@ -169,10 +190,7 @@ export function parseToolCalls(output: string): {
   let cleanContent = output;
 
   // Find all <tool_call>...</tool_call> blocks
-  const regex = new RegExp(
-    `${escapeRegex(TOOL_CALL_OPEN)}\\s*([\\s\\S]*?)\\s*${escapeRegex(TOOL_CALL_CLOSE)}`,
-    'g'
-  );
+  const regex = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
 
   let match;
   while ((match = regex.exec(output)) !== null) {
@@ -199,8 +217,170 @@ export function parseToolCalls(output: string): {
   return { toolCalls, cleanContent };
 }
 
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function parseBridgeEnvelope(output: string): ParsedBridgeResponse {
+  const parsedJson = parseLooseJsonObject(output);
+  if (parsedJson && typeof parsedJson === 'object' && !Array.isArray(parsedJson)) {
+    const envelope = parsedJson as Record<string, unknown>;
+    if (envelope.type === TOOL_INTENT_TYPE) {
+      const calls = Array.isArray(envelope.calls) ? envelope.calls : [];
+      const parsedCalls = calls.flatMap((call) => {
+        if (!call || typeof call !== 'object') return [];
+        const rec = call as Record<string, unknown>;
+        if (typeof rec.name !== 'string') return [];
+        const args =
+          rec.arguments && typeof rec.arguments === 'object' && !Array.isArray(rec.arguments)
+            ? (rec.arguments as Record<string, unknown>)
+            : {};
+        return [{ name: rec.name, arguments: args }];
+      });
+      return {
+        kind: 'tool_intent',
+        toolCalls: parsedCalls,
+        cleanContent: '',
+        error:
+          parsedCalls.length === 0 ? 'Tool intent envelope contained no valid calls' : undefined,
+      };
+    }
+
+    if (envelope.type === FINAL_RESPONSE_TYPE && typeof envelope.content === 'string') {
+      return {
+        kind: 'final_response',
+        toolCalls: [],
+        cleanContent: envelope.content,
+      };
+    }
+  }
+
+  const legacy = parseToolCalls(output);
+  if (legacy.toolCalls.length > 0) {
+    return {
+      kind: 'tool_intent',
+      toolCalls: legacy.toolCalls,
+      cleanContent: legacy.cleanContent,
+    };
+  }
+
+  return {
+    kind: 'invalid',
+    toolCalls: [],
+    cleanContent: '',
+    error: 'Expected a valid OwnPilot bridge JSON object',
+  };
+}
+
+function parseLooseJsonObject(output: string): unknown {
+  const trimmed = output.trim();
+  if (!trimmed) return null;
+
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const candidates = fenced ? [fenced[1]!.trim()] : [trimmed];
+  if (!fenced) {
+    const extracted = extractFirstJsonObject(trimmed);
+    if (extracted) candidates.push(extracted);
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // Keep trying other candidates.
+    }
+  }
+
+  return null;
+}
+
+function extractFirstJsonObject(text: string): string | null {
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+
+    if (start === -1) {
+      if (char === '{') {
+        start = i;
+        depth = 1;
+        inString = false;
+        escaped = false;
+      }
+      continue;
+    }
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === '{') {
+      depth += 1;
+      continue;
+    }
+    if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return text.slice(start, i + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
+async function completeWithRepair(
+  messages: readonly Message[],
+  completeFn: (messages: readonly Message[]) => Promise<string>
+): Promise<ParsedBridgeResponse> {
+  let currentMessages = [...messages];
+
+  for (let attempt = 0; attempt <= MAX_REPAIR_ATTEMPTS; attempt += 1) {
+    const rawOutput = await completeFn(currentMessages);
+    const parsed = parseBridgeEnvelope(rawOutput);
+    if (parsed.kind !== 'invalid') {
+      return parsed;
+    }
+
+    if (attempt === MAX_REPAIR_ATTEMPTS) {
+      return parsed;
+    }
+
+    log.warn(`ToolBridge repair attempt ${attempt + 1}: ${parsed.error ?? 'invalid output'}`);
+    currentMessages = [
+      ...currentMessages,
+      { role: 'assistant', content: rawOutput },
+      {
+        role: 'user',
+        content:
+          `Your last response did not follow the OwnPilot bridge contract. ` +
+          `Reply again with exactly one valid JSON object and no surrounding prose. ` +
+          `Use either {"type":"${TOOL_INTENT_TYPE}","calls":[...]} or ` +
+          `{"type":"${FINAL_RESPONSE_TYPE}","content":"..."}.`,
+      },
+    ];
+  }
+
+  return {
+    kind: 'invalid',
+    toolCalls: [],
+    cleanContent: '',
+    error: 'Bridge output repair exhausted',
+  };
 }
 
 // =============================================================================
@@ -319,7 +499,11 @@ export function appendToolResults(
     : '';
   newMessages.push({
     role: 'user',
-    content: `${workspaceReminder}Here are the results of your tool calls:\n\n${resultsText}\n\nPlease continue your response based on these results. If you need more tools, use <tool_call> again. Otherwise, provide your final answer.`,
+    content:
+      `${workspaceReminder}Here are the results of your tool calls as JSON:\n\n${resultsText}\n\n` +
+      `Now respond with exactly one valid JSON object and nothing else. ` +
+      `If you need more tools, return {"type":"${TOOL_INTENT_TYPE}","calls":[...]}. ` +
+      `Otherwise return {"type":"${FINAL_RESPONSE_TYPE}","content":"..."}.`,
   });
 
   return newMessages;
@@ -357,18 +541,19 @@ export async function runToolBridgeLoop(
 
     // Call the CLI
     log.info(`ToolBridge round ${rounds}: calling CLI...`);
-    const rawOutput = await completeFn(currentMessages);
+    const parsed = await completeWithRepair(currentMessages, completeFn);
 
-    // Parse for tool calls
-    const { toolCalls: parsedCalls, cleanContent } = parseToolCalls(rawOutput);
+    if (parsed.kind === 'invalid') {
+      throw new Error(parsed.error ?? 'Invalid ToolBridge output');
+    }
 
-    if (parsedCalls.length === 0) {
-      // No tool calls — we're done
-      finalContent = cleanContent || rawOutput;
+    if (parsed.kind === 'final_response') {
+      finalContent = parsed.cleanContent;
       log.info(`ToolBridge completed after ${rounds} round(s), no more tool calls`);
       break;
     }
 
+    const parsedCalls = parsed.toolCalls;
     log.info(`ToolBridge round ${rounds}: found ${parsedCalls.length} tool call(s)`);
     config.onToolCallsParsed?.(parsedCalls, rounds);
 
@@ -378,11 +563,16 @@ export async function runToolBridgeLoop(
     allToolResults.push(...results);
 
     // Build next round's messages with results
-    currentMessages = appendToolResults(currentMessages, rawOutput, results, config.workspaceDir);
+    currentMessages = appendToolResults(
+      currentMessages,
+      JSON.stringify({ type: TOOL_INTENT_TYPE, calls: parsedCalls }, null, 2),
+      results,
+      config.workspaceDir
+    );
 
     // If this is the last allowed round, the clean content is what we have
     if (round === maxRounds - 1) {
-      finalContent = cleanContent || `[Tool calling stopped after ${maxRounds} rounds]`;
+      finalContent = `[Tool calling stopped after ${maxRounds} rounds]`;
       log.warn(`ToolBridge hit max rounds (${maxRounds}), stopping`);
     }
   }

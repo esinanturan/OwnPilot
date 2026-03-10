@@ -21,15 +21,15 @@ vi.mock('../../../services/log.js', () => ({
 const mockMarkdownToTelegramHtml = vi.hoisted(() =>
   vi.fn((text: string) => `<html>${text}</html>`)
 );
-const mockSplitMessage = vi.hoisted(() => vi.fn((text: string) => [text]));
+const mockSplitMessage = vi.hoisted(() => vi.fn((text: string, _limit: number) => [text]));
 const mockPlatformLimits = vi.hoisted(() => ({ telegram: 4096 }));
 
 vi.mock('../../utils/markdown-telegram.js', () => ({
-  markdownToTelegramHtml: (...args: unknown[]) => mockMarkdownToTelegramHtml(...args),
+  markdownToTelegramHtml: (text: string) => mockMarkdownToTelegramHtml(text),
 }));
 
 vi.mock('../../utils/message-utils.js', () => ({
-  splitMessage: (...args: unknown[]) => mockSplitMessage(...args),
+  splitMessage: (text: string, limit: number) => mockSplitMessage(text, limit),
   PLATFORM_MESSAGE_LIMITS: mockPlatformLimits,
 }));
 
@@ -374,6 +374,33 @@ describe('TelegramProgressManager', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(mockLogDebug).toHaveBeenCalledWith('Progress edit failed', { error });
     });
+
+    it('skips immediate duplicate updates', async () => {
+      const pm = new TelegramProgressManager(bot as never, '12345');
+      await pm.start();
+      vi.advanceTimersByTime(3000);
+
+      pm.update('same text');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(bot.api.editMessageText).toHaveBeenCalledTimes(1);
+
+      bot.api.editMessageText.mockClear();
+      vi.advanceTimersByTime(3000);
+      pm.update('same text');
+      expect(bot.api.editMessageText).not.toHaveBeenCalled();
+    });
+
+    it('skips duplicate queued updates', async () => {
+      const pm = new TelegramProgressManager(bot as never, '12345');
+      await pm.start();
+
+      pm.update('queued text');
+      pm.update('queued text');
+
+      vi.advanceTimersByTime(3000);
+      expect(bot.api.editMessageText).toHaveBeenCalledTimes(1);
+      expect(bot.api.editMessageText).toHaveBeenCalledWith('12345', 100, 'queued text');
+    });
   });
 
   // =========================================================================
@@ -560,6 +587,21 @@ describe('TelegramProgressManager', () => {
       bot.api.editMessageText.mockClear();
       await pm.finish('single part');
       expect(bot.api.editMessageText).toHaveBeenCalledTimes(1);
+      expect(bot.api.sendMessage).not.toHaveBeenCalled();
+    });
+
+    it('skips final edit when final text matches current progress text', async () => {
+      const pm = new TelegramProgressManager(bot as never, '12345');
+      await pm.start();
+      bot.api.sendMessage.mockClear();
+      vi.advanceTimersByTime(3000);
+      pm.update('same final');
+      await vi.advanceTimersByTimeAsync(0);
+
+      bot.api.editMessageText.mockClear();
+      await pm.finish('same final');
+
+      expect(bot.api.editMessageText).not.toHaveBeenCalled();
       expect(bot.api.sendMessage).not.toHaveBeenCalled();
     });
 

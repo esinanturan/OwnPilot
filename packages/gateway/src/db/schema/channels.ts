@@ -52,6 +52,25 @@ CREATE TABLE IF NOT EXISTS channel_verification_tokens (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   used_at TIMESTAMP
 );
+
+-- Temporary stored channel attachments for later processing
+CREATE TABLE IF NOT EXISTS channel_assets (
+  id TEXT PRIMARY KEY,
+  channel_message_id TEXT NOT NULL,
+  channel_plugin_id TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  platform_chat_id TEXT NOT NULL,
+  conversation_id TEXT REFERENCES conversations(id) ON DELETE SET NULL,
+  type TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  filename TEXT,
+  size BIGINT,
+  storage_path TEXT,
+  sha256 TEXT,
+  metadata JSONB NOT NULL DEFAULT '{}',
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
 `;
 
 export const CHANNELS_MIGRATIONS_SQL = `
@@ -120,6 +139,9 @@ CREATE INDEX IF NOT EXISTS idx_channel_sessions_conversation ON channel_sessions
 CREATE INDEX IF NOT EXISTS idx_channel_verification_token ON channel_verification_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_channel_verification_user ON channel_verification_tokens(ownpilot_user_id);
 CREATE INDEX IF NOT EXISTS idx_channel_verification_expires ON channel_verification_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_channel_assets_message ON channel_assets(channel_message_id);
+CREATE INDEX IF NOT EXISTS idx_channel_assets_conversation ON channel_assets(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_channel_assets_expires ON channel_assets(expires_at);
 
 -- Extension indexes
 CREATE INDEX IF NOT EXISTS idx_user_extensions_user ON user_extensions(user_id);

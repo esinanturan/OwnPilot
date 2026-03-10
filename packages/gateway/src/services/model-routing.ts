@@ -21,11 +21,12 @@ const PREFIX = 'model_routing:';
 // Types
 // ---------------------------------------------------------------------------
 
-export type RoutingProcess = 'chat' | 'channel' | 'pulse' | 'subagent';
+export type RoutingProcess = 'chat' | 'channel' | 'channel_media' | 'pulse' | 'subagent';
 
 export const VALID_PROCESSES: readonly RoutingProcess[] = [
   'chat',
   'channel',
+  'channel_media',
   'pulse',
   'subagent',
 ] as const;
@@ -39,8 +40,10 @@ export interface ProcessRouting {
 
 export interface ResolvedRouting extends ProcessRouting {
   /** Where the primary provider/model came from */
-  source: 'process' | 'global' | 'first-configured';
+  source: 'process' | 'channel' | 'global' | 'first-configured';
 }
+
+export type ChannelRoutingKind = 'default' | 'media';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -52,6 +55,29 @@ export function isValidProcess(p: string): p is RoutingProcess {
 
 function settingKey(process: RoutingProcess, field: string): string {
   return `${PREFIX}${process}:${field}`;
+}
+
+function channelScope(pluginId: string, kind: ChannelRoutingKind = 'default'): string {
+  return kind === 'media' ? `channel_plugin_media:${pluginId}` : `channel_plugin:${pluginId}`;
+}
+
+function scopedSettingKey(scope: string, field: string): string {
+  return `${PREFIX}${scope}:${field}`;
+}
+
+function hasConfiguredValue(routing: ProcessRouting): boolean {
+  return Boolean(
+    routing.provider || routing.model || routing.fallbackProvider || routing.fallbackModel
+  );
+}
+
+function mergeRouting(override: ProcessRouting, base: ProcessRouting): ProcessRouting {
+  return {
+    provider: override.provider ?? base.provider,
+    model: override.model ?? base.model,
+    fallbackProvider: override.fallbackProvider ?? base.fallbackProvider,
+    fallbackModel: override.fallbackModel ?? base.fallbackModel,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -78,8 +104,22 @@ export function getAllRouting(): Record<RoutingProcess, ProcessRouting> {
   return {
     chat: getProcessRouting('chat'),
     channel: getProcessRouting('channel'),
+    channel_media: getProcessRouting('channel_media'),
     pulse: getProcessRouting('pulse'),
     subagent: getProcessRouting('subagent'),
+  };
+}
+
+export function getChannelScopedRouting(
+  pluginId: string,
+  kind: ChannelRoutingKind = 'default'
+): ProcessRouting {
+  const scope = channelScope(pluginId, kind);
+  return {
+    provider: settingsRepo.get<string>(scopedSettingKey(scope, 'provider')),
+    model: settingsRepo.get<string>(scopedSettingKey(scope, 'model')),
+    fallbackProvider: settingsRepo.get<string>(scopedSettingKey(scope, 'fallback_provider')),
+    fallbackModel: settingsRepo.get<string>(scopedSettingKey(scope, 'fallback_model')),
   };
 }
 
@@ -105,6 +145,31 @@ export function getChannelRouting(): ProcessRouting {
   };
 }
 
+async function finalizeResolved(
+  routing: ProcessRouting,
+  source: ResolvedRouting['source']
+): Promise<ResolvedRouting> {
+  let provider: string | null = routing.provider;
+  let model: string | null = routing.model;
+  let resolvedSource = source;
+
+  if (provider) {
+    model = model ?? (await getDefaultModel(provider));
+  } else {
+    provider = await getDefaultProvider();
+    model = routing.model ?? (await getDefaultModel(provider ?? undefined));
+    resolvedSource = provider ? 'global' : 'first-configured';
+  }
+
+  return {
+    provider,
+    model,
+    fallbackProvider: routing.fallbackProvider,
+    fallbackModel: routing.fallbackModel,
+    source: resolvedSource,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Resolution (async — may need DB for global defaults)
 // ---------------------------------------------------------------------------
@@ -119,30 +184,44 @@ export function getChannelRouting(): ProcessRouting {
  */
 export async function resolveForProcess(process: RoutingProcess): Promise<ResolvedRouting> {
   const routing = process === 'channel' ? getChannelRouting() : getProcessRouting(process);
+  return finalizeResolved(routing, 'process');
+}
 
-  let provider: string | null;
-  let model: string | null;
-  let source: ResolvedRouting['source'];
+export async function resolveForChannel(
+  pluginId: string,
+  options?: { hasMedia?: boolean }
+): Promise<ResolvedRouting> {
+  const baseChannel = getChannelRouting();
+  const pluginDefault = getChannelScopedRouting(pluginId, 'default');
 
-  if (routing.provider) {
-    // Process-specific primary
-    provider = routing.provider;
-    model = routing.model ?? (await getDefaultModel(routing.provider));
-    source = 'process';
-  } else {
-    // Waterfall to global default
-    provider = await getDefaultProvider();
-    model = routing.model ?? (await getDefaultModel(provider ?? undefined));
-    source = provider ? 'global' : 'first-configured';
+  if (options?.hasMedia) {
+    const processMedia = getProcessRouting('channel_media');
+    const pluginMedia = getChannelScopedRouting(pluginId, 'media');
+
+    if (hasConfiguredValue(pluginMedia)) {
+      return finalizeResolved(
+        mergeRouting(pluginMedia, hasConfiguredValue(pluginDefault) ? pluginDefault : processMedia),
+        'channel'
+      );
+    }
+
+    if (hasConfiguredValue(pluginDefault)) {
+      return finalizeResolved(
+        mergeRouting(pluginDefault, hasConfiguredValue(processMedia) ? processMedia : baseChannel),
+        'channel'
+      );
+    }
+
+    if (hasConfiguredValue(processMedia)) {
+      return finalizeResolved(mergeRouting(processMedia, baseChannel), 'process');
+    }
   }
 
-  return {
-    provider,
-    model,
-    fallbackProvider: routing.fallbackProvider,
-    fallbackModel: routing.fallbackModel,
-    source,
-  };
+  if (hasConfiguredValue(pluginDefault)) {
+    return finalizeResolved(mergeRouting(pluginDefault, baseChannel), 'channel');
+  }
+
+  return resolveForProcess('channel');
 }
 
 // ---------------------------------------------------------------------------
@@ -179,10 +258,39 @@ export async function setProcessRouting(
   log.info(`Updated routing for ${process}: ${JSON.stringify(routing)}`);
 }
 
+export async function setChannelScopedRouting(
+  pluginId: string,
+  routing: Partial<ProcessRouting>,
+  kind: ChannelRoutingKind = 'default'
+): Promise<void> {
+  const scope = channelScope(pluginId, kind);
+  for (const [field, dbField] of Object.entries(FIELD_MAP)) {
+    const value = routing[field as keyof ProcessRouting];
+    if (value !== undefined) {
+      const key = scopedSettingKey(scope, dbField);
+      if (value === null || value === '') {
+        await settingsRepo.delete(key);
+      } else {
+        await settingsRepo.set(key, value);
+      }
+    }
+  }
+
+  log.info(`Updated routing for ${scope}: ${JSON.stringify(routing)}`);
+}
+
 /**
  * Clear all routing config for a process (reverts to global default).
  */
 export async function clearProcessRouting(process: RoutingProcess): Promise<void> {
   await settingsRepo.deleteByPrefix(`${PREFIX}${process}:`);
   log.info(`Cleared routing for ${process}`);
+}
+
+export async function clearChannelScopedRouting(
+  pluginId: string,
+  kind: ChannelRoutingKind = 'default'
+): Promise<void> {
+  await settingsRepo.deleteByPrefix(`${PREFIX}${channelScope(pluginId, kind)}:`);
+  log.info(`Cleared routing for ${channelScope(pluginId, kind)}`);
 }

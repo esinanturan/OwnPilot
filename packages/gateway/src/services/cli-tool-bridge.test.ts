@@ -81,8 +81,8 @@ describe('buildToolPromptSection', () => {
 
   it('should include tool_call format instructions', () => {
     const section = buildToolPromptSection(SAMPLE_TOOLS);
-    expect(section).toContain('<tool_call>');
-    expect(section).toContain('</tool_call>');
+    expect(section).toContain('ownpilot_tool_intent');
+    expect(section).toContain('ownpilot_final_response');
     expect(section).toContain('Available Tools');
   });
 
@@ -101,8 +101,7 @@ describe('buildToolPromptSection', () => {
 
 describe('parseToolCalls', () => {
   it('should parse a single tool call', () => {
-    const output = `Let me search for that.
-<tool_call>
+    const output = `<tool_call>
 {"name": "core.search_web", "arguments": {"query": "weather today"}}
 </tool_call>`;
 
@@ -110,12 +109,11 @@ describe('parseToolCalls', () => {
     expect(toolCalls).toHaveLength(1);
     expect(toolCalls[0]!.name).toBe('core.search_web');
     expect(toolCalls[0]!.arguments).toEqual({ query: 'weather today' });
-    expect(cleanContent).toBe('Let me search for that.');
+    expect(cleanContent).toBe('');
   });
 
   it('should parse multiple tool calls', () => {
-    const output = `I'll search and save.
-<tool_call>
+    const output = `<tool_call>
 {"name": "core.search_web", "arguments": {"query": "test"}}
 </tool_call>
 <tool_call>
@@ -126,7 +124,7 @@ describe('parseToolCalls', () => {
     expect(toolCalls).toHaveLength(2);
     expect(toolCalls[0]!.name).toBe('core.search_web');
     expect(toolCalls[1]!.name).toBe('core.add_memory');
-    expect(cleanContent).toContain("I'll search and save.");
+    expect(cleanContent).toBe('');
   });
 
   it('should return empty array when no tool calls', () => {
@@ -172,16 +170,16 @@ describe('formatToolResults', () => {
       { toolCallId: 'tc_1', content: 'Found 3 results', isError: false },
     ];
     const formatted = formatToolResults(results);
-    expect(formatted).toContain('<tool_result>');
+    expect(formatted).toContain('"type": "ownpilot_tool_results"');
     expect(formatted).toContain('tc_1');
     expect(formatted).toContain('Found 3 results');
-    expect(formatted).not.toContain('status="error"');
+    expect(formatted).toContain('"isError": false');
   });
 
   it('should format error result with status', () => {
     const results: ToolResult[] = [{ toolCallId: 'tc_2', content: 'Network error', isError: true }];
     const formatted = formatToolResults(results);
-    expect(formatted).toContain('status="error"');
+    expect(formatted).toContain('"isError": true');
     expect(formatted).toContain('Network error');
   });
 
@@ -246,7 +244,7 @@ describe('appendToolResults', () => {
     expect(newMessages[2]!.role).toBe('assistant');
     expect(newMessages[2]!.content).toBe('Let me search...');
     expect(newMessages[3]!.role).toBe('user');
-    expect(newMessages[3]!.content as string).toContain('tool_result');
+    expect(newMessages[3]!.content as string).toContain('ownpilot_tool_results');
     expect(newMessages[3]!.content as string).toContain('cats are cute');
   });
 });
@@ -273,13 +271,14 @@ describe('runToolBridgeLoop', () => {
       },
       async (args) => ({
         content: `Results for: ${args.query}`,
-      }),
-      'core'
+      })
     );
   });
 
   it('should complete in one round when no tool calls', async () => {
-    const completeFn = vi.fn().mockResolvedValue('Hello! I can help you.');
+    const completeFn = vi
+      .fn()
+      .mockResolvedValue('{"type":"ownpilot_final_response","content":"Hello! I can help you."}');
 
     const result = await runToolBridgeLoop([{ role: 'user', content: 'Hi' }], completeFn, {
       tools: mockRegistry,
@@ -298,13 +297,18 @@ describe('runToolBridgeLoop', () => {
       .fn()
       // Round 1: model calls a tool
       .mockResolvedValueOnce(
-        `Let me search.
-<tool_call>
-{"name": "core.search_web", "arguments": {"query": "cats"}}
-</tool_call>`
+        JSON.stringify({
+          type: 'ownpilot_tool_intent',
+          calls: [{ name: 'core.search_web', arguments: { query: 'cats' } }],
+        })
       )
       // Round 2: model responds with final answer
-      .mockResolvedValueOnce('Based on the search, cats are great pets!');
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          type: 'ownpilot_final_response',
+          content: 'Based on the search, cats are great pets!',
+        })
+      );
 
     const result = await runToolBridgeLoop(
       [{ role: 'user', content: 'Tell me about cats' }],
@@ -328,9 +332,10 @@ describe('runToolBridgeLoop', () => {
   it('should stop at max rounds', async () => {
     // Always return a tool call
     const completeFn = vi.fn().mockResolvedValue(
-      `<tool_call>
-{"name": "core.search_web", "arguments": {"query": "loop"}}
-</tool_call>`
+      JSON.stringify({
+        type: 'ownpilot_tool_intent',
+        calls: [{ name: 'core.search_web', arguments: { query: 'loop' } }],
+      })
     );
 
     const result = await runToolBridgeLoop(
@@ -363,22 +368,26 @@ describe('runToolBridgeLoop', () => {
       },
       async (args) => ({
         content: `Saved: ${args.content}`,
-      }),
-      'core'
+      })
     );
 
     const completeFn = vi
       .fn()
       .mockResolvedValueOnce(
-        `Let me do both.
-<tool_call>
-{"name": "core.search_web", "arguments": {"query": "weather"}}
-</tool_call>
-<tool_call>
-{"name": "core.add_memory", "arguments": {"content": "check weather daily"}}
-</tool_call>`
+        JSON.stringify({
+          type: 'ownpilot_tool_intent',
+          calls: [
+            { name: 'core.search_web', arguments: { query: 'weather' } },
+            { name: 'core.add_memory', arguments: { content: 'check weather daily' } },
+          ],
+        })
       )
-      .mockResolvedValueOnce('Done! Weather is sunny and I saved your reminder.');
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          type: 'ownpilot_final_response',
+          content: 'Done! Weather is sunny and I saved your reminder.',
+        })
+      );
 
     const result = await runToolBridgeLoop(
       [{ role: 'user', content: 'Search weather and save a reminder' }],
@@ -400,11 +409,14 @@ describe('runToolBridgeLoop', () => {
     const completeFn = vi
       .fn()
       .mockResolvedValueOnce(
-        `<tool_call>
-{"name": "core.search_web", "arguments": {"query": "test"}}
-</tool_call>`
+        JSON.stringify({
+          type: 'ownpilot_tool_intent',
+          calls: [{ name: 'core.search_web', arguments: { query: 'test' } }],
+        })
       )
-      .mockResolvedValueOnce('Final answer.');
+      .mockResolvedValueOnce(
+        JSON.stringify({ type: 'ownpilot_final_response', content: 'Final answer.' })
+      );
 
     await runToolBridgeLoop([{ role: 'user', content: 'Search' }], completeFn, {
       tools: mockRegistry,
@@ -416,7 +428,7 @@ describe('runToolBridgeLoop', () => {
     const secondCallMessages = completeFn.mock.calls[1]![0] as Message[];
     const lastUserMsg = secondCallMessages[secondCallMessages.length - 1]!;
     expect(lastUserMsg.role).toBe('user');
-    expect(lastUserMsg.content as string).toContain('tool_result');
+    expect(lastUserMsg.content as string).toContain('ownpilot_tool_results');
     expect(lastUserMsg.content as string).toContain('Results for: test');
   });
 
@@ -424,11 +436,14 @@ describe('runToolBridgeLoop', () => {
     const completeFn = vi
       .fn()
       .mockResolvedValueOnce(
-        `<tool_call>
-{"name": "core.search_web", "arguments": {"query": "test"}}
-</tool_call>`
+        JSON.stringify({
+          type: 'ownpilot_tool_intent',
+          calls: [{ name: 'core.search_web', arguments: { query: 'test' } }],
+        })
       )
-      .mockResolvedValueOnce('Final answer.');
+      .mockResolvedValueOnce(
+        JSON.stringify({ type: 'ownpilot_final_response', content: 'Final answer.' })
+      );
 
     await runToolBridgeLoop([{ role: 'user', content: 'Search' }], completeFn, {
       tools: mockRegistry,
@@ -446,7 +461,9 @@ describe('runToolBridgeLoop', () => {
   });
 
   it('should inject tool definitions into first call messages', async () => {
-    const completeFn = vi.fn().mockResolvedValue('No tools needed.');
+    const completeFn = vi
+      .fn()
+      .mockResolvedValue('{"type":"ownpilot_final_response","content":"No tools needed."}');
 
     await runToolBridgeLoop(
       [
@@ -479,18 +496,23 @@ describe('runToolBridgeLoop', () => {
       },
       async () => {
         throw new Error('Tool crashed!');
-      },
-      'core'
+      }
     );
 
     const completeFn = vi
       .fn()
       .mockResolvedValueOnce(
-        `<tool_call>
-{"name": "core.fail_tool", "arguments": {}}
-</tool_call>`
+        JSON.stringify({
+          type: 'ownpilot_tool_intent',
+          calls: [{ name: 'core.fail_tool', arguments: {} }],
+        })
       )
-      .mockResolvedValueOnce('I see the tool failed. Let me try something else.');
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          type: 'ownpilot_final_response',
+          content: 'I see the tool failed. Let me try something else.',
+        })
+      );
 
     const result = await runToolBridgeLoop(
       [{ role: 'user', content: 'Do something' }],
@@ -523,11 +545,12 @@ describe('runToolBridgeLoop', () => {
     const completeFn = vi
       .fn()
       .mockResolvedValueOnce(
-        `<tool_call>
-{"name": "core.search_web", "arguments": {"query": "cats"}}
-</tool_call>`
+        JSON.stringify({
+          type: 'ownpilot_tool_intent',
+          calls: [{ name: 'core.search_web', arguments: { query: 'cats' } }],
+        })
       )
-      .mockResolvedValueOnce('Done.');
+      .mockResolvedValueOnce(JSON.stringify({ type: 'ownpilot_final_response', content: 'Done.' }));
 
     await runToolBridgeLoop([{ role: 'user', content: 'Search cats' }], completeFn, {
       tools: mockRegistry,
@@ -552,5 +575,35 @@ describe('runToolBridgeLoop', () => {
       expect.objectContaining({ name: 'core.search_web' }),
       expect.objectContaining({ content: expect.stringContaining('Results for: cats') })
     );
+  });
+
+  it('repairs invalid bridge output before continuing', async () => {
+    const completeFn = vi
+      .fn()
+      .mockResolvedValueOnce('I will use a tool now.')
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          type: 'ownpilot_tool_intent',
+          calls: [{ name: 'core.search_web', arguments: { query: 'cats' } }],
+        })
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({ type: 'ownpilot_final_response', content: 'Cats summary.' })
+      );
+
+    const result = await runToolBridgeLoop([{ role: 'user', content: 'Search cats' }], completeFn, {
+      tools: mockRegistry,
+      toolDefinitions: SAMPLE_TOOLS,
+      conversationId: 'test-conv',
+    });
+
+    expect(result.content).toBe('Cats summary.');
+    expect(result.toolCalls).toHaveLength(1);
+    expect(completeFn).toHaveBeenCalledTimes(3);
+
+    const repairedMessages = completeFn.mock.calls[1]![0] as Message[];
+    const lastMessage = repairedMessages[repairedMessages.length - 1]!;
+    expect(lastMessage.role).toBe('user');
+    expect(lastMessage.content as string).toContain('exactly one valid JSON object');
   });
 });

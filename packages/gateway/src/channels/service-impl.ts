@@ -57,6 +57,7 @@ import {
   processViaBus as processViaBusImpl,
   processDirectAgent as processDirectAgentImpl,
 } from './channel-ai-routing.js';
+import { channelAssetStore } from '../services/channel-asset-store.js';
 
 const log = getLog('ChannelService');
 
@@ -509,8 +510,13 @@ export class ChannelServiceImpl implements IChannelService {
               message.attachments && message.attachments.length > 0 ? 'attachment' : 'text',
             attachments: message.attachments?.map((a) => ({
               type: a.type,
-              url: a.url ?? '',
+              url: a.url,
+              assetId: a.assetId,
+              path: a.path,
+              mimeType: a.mimeType,
+              size: a.size,
               name: a.filename,
+              expiresAt: a.expiresAt,
             })),
             replyToId: message.replyToId,
             metadata: message.metadata,
@@ -734,11 +740,17 @@ export class ChannelServiceImpl implements IChannelService {
           senderId: message.sender.platformUserId,
           senderName: message.sender.displayName,
           content: message.text,
-          contentType: 'text',
+          contentType:
+            message.attachments && message.attachments.length > 0 ? 'attachment' : 'text',
           attachments: message.attachments?.map((a) => ({
             type: a.type,
-            url: a.url ?? '',
+            url: a.url,
+            assetId: a.assetId,
+            path: a.path,
+            mimeType: a.mimeType,
+            size: a.size,
             name: a.filename,
+            expiresAt: a.expiresAt,
           })),
           replyToId: message.replyToId,
           metadata: message.metadata,
@@ -827,6 +839,20 @@ export class ChannelServiceImpl implements IChannelService {
         this.messagesRepo
           .linkConversation(savedInboundId, session.conversationId)
           .catch((err) => log.warn('Failed to backfill inbound conversation_id', { error: err }));
+      }
+
+      const assetIds =
+        message.attachments
+          ?.map((attachment) => attachment.assetId)
+          .filter(
+            (assetId): assetId is string => typeof assetId === 'string' && assetId.length > 0
+          ) ?? [];
+      if (session.conversationId && assetIds.length > 0) {
+        channelAssetStore
+          .linkConversation(assetIds, session.conversationId)
+          .catch((err) =>
+            log.warn('Failed to link channel assets to conversation', { error: err })
+          );
       }
 
       // Register/touch in unified ISessionService
@@ -994,16 +1020,22 @@ export class ChannelServiceImpl implements IChannelService {
     channelUser: { ownpilotUserId: string },
     progress?: { update(text: string): void }
   ): Promise<string> {
-    return processViaBusImpl(bus, message, session, channelUser, {
-      sessionsRepo: this.sessionsRepo,
-      getChannel: (id) => this.getChannel(id),
-    }, progress);
+    return processViaBusImpl(
+      bus,
+      message,
+      session,
+      channelUser,
+      {
+        sessionsRepo: this.sessionsRepo,
+        getChannel: (id) => this.getChannel(id),
+      },
+      progress
+    );
   }
 
   private async processDirectAgent(message: ChannelIncomingMessage): Promise<string> {
     return processDirectAgentImpl(message);
   }
-
 
   // ==========================================================================
   // Private Methods

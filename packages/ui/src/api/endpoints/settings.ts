@@ -26,10 +26,12 @@ export interface ProcessRouting {
 }
 
 export interface ResolvedRouting extends ProcessRouting {
-  source: 'process' | 'global' | 'first-configured';
+  source: 'process' | 'channel' | 'global' | 'first-configured';
 }
 
-export type RoutingProcess = 'chat' | 'channel' | 'pulse' | 'subagent';
+export type RoutingProcess = 'chat' | 'channel' | 'channel_media' | 'pulse' | 'subagent';
+
+export type ChannelRoutingKind = 'default' | 'media';
 
 export interface ModelRoutingData {
   routing: Record<RoutingProcess, ProcessRouting>;
@@ -41,6 +43,17 @@ export interface ProcessRoutingData {
   resolved: ResolvedRouting;
 }
 
+export interface ChannelRoutingEntry {
+  pluginId: string;
+  platform: string;
+  name: string;
+  status: string;
+  routing: ProcessRouting;
+  resolved: ResolvedRouting;
+  mediaRouting: ProcessRouting;
+  mediaResolved: ResolvedRouting;
+}
+
 // ---- Model Routing API ----
 
 export const modelRoutingApi = {
@@ -50,6 +63,24 @@ export const modelRoutingApi = {
     apiClient.put<ProcessRoutingData>(`/model-routing/${process}`, data),
   clear: (process: RoutingProcess) =>
     apiClient.delete<{ cleared: boolean }>(`/model-routing/${process}`),
+  getChannels: () => apiClient.get<{ channels: ChannelRoutingEntry[] }>('/model-routing/channels'),
+  getChannel: (pluginId: string, kind: ChannelRoutingKind = 'default') =>
+    apiClient.get<ProcessRoutingData & { kind: ChannelRoutingKind }>(
+      `/model-routing/channels/${pluginId}?kind=${kind}`
+    ),
+  updateChannel: (
+    pluginId: string,
+    data: Partial<ProcessRouting>,
+    kind: ChannelRoutingKind = 'default'
+  ) =>
+    apiClient.put<ProcessRoutingData & { kind: ChannelRoutingKind }>(
+      `/model-routing/channels/${pluginId}?kind=${kind}`,
+      data
+    ),
+  clearChannel: (pluginId: string, kind: ChannelRoutingKind = 'default') =>
+    apiClient.delete<{ cleared: boolean; kind: ChannelRoutingKind }>(
+      `/model-routing/channels/${pluginId}?kind=${kind}`
+    ),
 };
 
 // ---- Settings API ----

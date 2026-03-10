@@ -2,7 +2,7 @@
  * Model Routing Settings Page
  *
  * Configure per-process AI provider/model routing with optional fallback.
- * Processes: Chat, Telegram, Pulse & Triggers (scheduler shares pulse config).
+ * Processes: chat, channels, channel media, pulse, and subagents.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -23,6 +23,8 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import {
   modelRoutingApi,
   modelsApi,
+  type ChannelRoutingEntry,
+  type ChannelRoutingKind,
   type ProcessRouting,
   type ResolvedRouting,
   type RoutingProcess,
@@ -52,6 +54,11 @@ const PROCESSES: Array<{
     description: 'Messages received through channels (Telegram, Discord, WhatsApp, Slack)',
   },
   {
+    id: 'channel_media',
+    label: 'Channel Media',
+    description: 'Attachment-heavy channel messages such as image, audio, video, and files',
+  },
+  {
     id: 'pulse',
     label: 'Pulse & Triggers',
     description: 'Scheduled tasks, trigger actions, and autonomy engine',
@@ -68,6 +75,13 @@ interface ProcessCardState {
   resolved: ResolvedRouting;
   isDirty: boolean;
   isSaving: boolean;
+}
+
+interface ChannelCardState extends ChannelRoutingEntry {
+  isDirty: boolean;
+  isSaving: boolean;
+  isMediaDirty: boolean;
+  isMediaSaving: boolean;
 }
 
 const emptyRouting: ProcessRouting = {
@@ -92,9 +106,16 @@ export function ModelRoutingPage() {
   const [states, setStates] = useState<Record<RoutingProcess, ProcessCardState>>({
     chat: { routing: emptyRouting, resolved: emptyResolved, isDirty: false, isSaving: false },
     channel: { routing: emptyRouting, resolved: emptyResolved, isDirty: false, isSaving: false },
+    channel_media: {
+      routing: emptyRouting,
+      resolved: emptyResolved,
+      isDirty: false,
+      isSaving: false,
+    },
     pulse: { routing: emptyRouting, resolved: emptyResolved, isDirty: false, isSaving: false },
     subagent: { routing: emptyRouting, resolved: emptyResolved, isDirty: false, isSaving: false },
   });
+  const [channelStates, setChannelStates] = useState<Record<string, ChannelCardState>>({});
 
   // Derived: unique configured provider list for dropdowns
   const providerOptions = useMemo(() => {
@@ -111,9 +132,10 @@ export function ModelRoutingPage() {
   const loadData = useCallback(async () => {
     try {
       setError(null);
-      const [routingData, modelsData] = await Promise.all([
+      const [routingData, modelsData, channelRoutingData] = await Promise.all([
         modelRoutingApi.getAll(),
         modelsApi.list(),
+        modelRoutingApi.getChannels(),
       ]);
 
       setModels(modelsData.models);
@@ -129,6 +151,18 @@ export function ModelRoutingPage() {
         };
       }
       setStates(newStates);
+
+      const nextChannelStates: Record<string, ChannelCardState> = {};
+      for (const channel of channelRoutingData.channels) {
+        nextChannelStates[channel.pluginId] = {
+          ...channel,
+          isDirty: false,
+          isSaving: false,
+          isMediaDirty: false,
+          isMediaSaving: false,
+        };
+      }
+      setChannelStates(nextChannelStates);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load model routing data');
     } finally {
@@ -151,6 +185,36 @@ export function ModelRoutingPage() {
           isDirty: true,
         },
       }));
+    },
+    []
+  );
+
+  const updateChannelField = useCallback(
+    (
+      pluginId: string,
+      kind: ChannelRoutingKind,
+      field: keyof ProcessRouting,
+      value: string | null
+    ) => {
+      setChannelStates((prev) => {
+        const current = prev[pluginId];
+        if (!current) return prev;
+        return {
+          ...prev,
+          [pluginId]:
+            kind === 'media'
+              ? {
+                  ...current,
+                  mediaRouting: { ...current.mediaRouting, [field]: value || null },
+                  isMediaDirty: true,
+                }
+              : {
+                  ...current,
+                  routing: { ...current.routing, [field]: value || null },
+                  isDirty: true,
+                },
+        };
+      });
     },
     []
   );
@@ -205,6 +269,104 @@ export function ModelRoutingPage() {
         toast.success('Routing cleared — using global default');
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to clear routing');
+      }
+    },
+    [toast]
+  );
+
+  const handleChannelSave = useCallback(
+    async (pluginId: string, kind: ChannelRoutingKind = 'default') => {
+      setChannelStates((prev) => {
+        const current = prev[pluginId];
+        if (!current) return prev;
+        return {
+          ...prev,
+          [pluginId]:
+            kind === 'media' ? { ...current, isMediaSaving: true } : { ...current, isSaving: true },
+        };
+      });
+
+      try {
+        const current = channelStates[pluginId];
+        if (!current) return;
+        const result = await modelRoutingApi.updateChannel(
+          pluginId,
+          kind === 'media' ? current.mediaRouting : current.routing,
+          kind
+        );
+        setChannelStates((prev) => {
+          const existing = prev[pluginId];
+          if (!existing) return prev;
+          return {
+            ...prev,
+            [pluginId]:
+              kind === 'media'
+                ? {
+                    ...existing,
+                    mediaRouting: result.routing,
+                    mediaResolved: result.resolved,
+                    isMediaDirty: false,
+                    isMediaSaving: false,
+                  }
+                : {
+                    ...existing,
+                    routing: result.routing,
+                    resolved: result.resolved,
+                    isDirty: false,
+                    isSaving: false,
+                  },
+          };
+        });
+        toast.success('Channel routing saved');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to save channel routing');
+        setChannelStates((prev) => {
+          const existing = prev[pluginId];
+          if (!existing) return prev;
+          return {
+            ...prev,
+            [pluginId]:
+              kind === 'media'
+                ? { ...existing, isMediaSaving: false }
+                : { ...existing, isSaving: false },
+          };
+        });
+      }
+    },
+    [channelStates, toast]
+  );
+
+  const handleChannelClear = useCallback(
+    async (pluginId: string, kind: ChannelRoutingKind = 'default') => {
+      try {
+        await modelRoutingApi.clearChannel(pluginId, kind);
+        const result = await modelRoutingApi.getChannel(pluginId, kind);
+        setChannelStates((prev) => {
+          const existing = prev[pluginId];
+          if (!existing) return prev;
+          return {
+            ...prev,
+            [pluginId]:
+              kind === 'media'
+                ? {
+                    ...existing,
+                    mediaRouting: result.routing,
+                    mediaResolved: result.resolved,
+                    isMediaDirty: false,
+                    isMediaSaving: false,
+                  }
+                : {
+                    ...existing,
+                    routing: result.routing,
+                    resolved: result.resolved,
+                    isDirty: false,
+                    isSaving: false,
+                  },
+          };
+        });
+        toast.success('Channel routing cleared');
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Failed to clear channel routing');
       }
     },
     [toast]
@@ -301,10 +463,23 @@ export function ModelRoutingPage() {
               },
             ]}
             steps={[
-              { title: 'Define routing rules', detail: 'Choose a provider and model for each process — chat, channels, pulse, subagents.' },
-              { title: 'Set model preferences', detail: 'Pick from your configured providers and their available models.' },
-              { title: 'Configure fallbacks', detail: 'Add a fallback provider and model for automatic failover.' },
-              { title: 'Monitor performance', detail: 'Check the effective routing for each process and adjust as needed.' },
+              {
+                title: 'Define routing rules',
+                detail:
+                  'Choose a provider and model for each process — chat, channels, pulse, subagents.',
+              },
+              {
+                title: 'Set model preferences',
+                detail: 'Pick from your configured providers and their available models.',
+              },
+              {
+                title: 'Configure fallbacks',
+                detail: 'Add a fallback provider and model for automatic failover.',
+              },
+              {
+                title: 'Monitor performance',
+                detail: 'Check the effective routing for each process and adjust as needed.',
+              },
             ]}
             quickActions={[
               {
@@ -335,160 +510,343 @@ export function ModelRoutingPage() {
       )}
 
       {activeTab === 'routing' && !isLoading && !error && (
-      <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-4xl space-y-6 p-6">
-      {/* Process Cards */}
-      {PROCESSES.map((proc) => {
-        const state = states[proc.id];
-        const hasProcessConfig = state.routing.provider || state.routing.model;
-        const resolvedSource = state.resolved.source;
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-4xl space-y-6 p-6">
+            {/* Process Cards */}
+            {PROCESSES.map((proc) => {
+              const state = states[proc.id];
+              const hasProcessConfig = state.routing.provider || state.routing.model;
+              const resolvedSource = state.resolved.source;
 
-        return (
-          <div
-            key={proc.id}
-            className="rounded-xl border border-border dark:border-dark-border bg-bg-secondary dark:bg-dark-bg-secondary p-5"
-          >
-            {/* Card Header */}
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary">
-                  {proc.label}
-                </h2>
-                <p className="text-sm text-text-muted dark:text-dark-text-muted">
-                  {proc.description}
-                </p>
+              return (
+                <div
+                  key={proc.id}
+                  className="rounded-xl border border-border dark:border-dark-border bg-bg-secondary dark:bg-dark-bg-secondary p-5"
+                >
+                  {/* Card Header */}
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary">
+                        {proc.label}
+                      </h2>
+                      <p className="text-sm text-text-muted dark:text-dark-text-muted">
+                        {proc.description}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        resolvedSource === 'process'
+                          ? 'bg-primary/10 text-primary'
+                          : 'bg-gray-500/20 text-gray-600 dark:text-gray-400'
+                      }`}
+                    >
+                      {resolvedSource === 'process' ? 'Process Config' : 'Global Default'}
+                    </span>
+                  </div>
+
+                  {/* Primary Model */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-1.5">
+                      Primary Model
+                    </label>
+                    <div className="flex gap-3">
+                      <select
+                        className={selectClasses}
+                        value={state.routing.provider ?? ''}
+                        onChange={(e) => {
+                          updateField(proc.id, 'provider', e.target.value);
+                          updateField(proc.id, 'model', null);
+                        }}
+                      >
+                        <option value="">Default (global)</option>
+                        {providerOptions.map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className={selectClasses}
+                        value={state.routing.model ?? ''}
+                        onChange={(e) => updateField(proc.id, 'model', e.target.value)}
+                      >
+                        <option value="">Default</option>
+                        {getModelsForProvider(state.routing.provider).map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Fallback Model */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-1.5">
+                      Fallback Model{' '}
+                      <span className="font-normal text-text-muted dark:text-dark-text-muted">
+                        (automatic failover)
+                      </span>
+                    </label>
+                    <div className="flex gap-3">
+                      <select
+                        className={selectClasses}
+                        value={state.routing.fallbackProvider ?? ''}
+                        onChange={(e) => {
+                          updateField(proc.id, 'fallbackProvider', e.target.value);
+                          updateField(proc.id, 'fallbackModel', null);
+                        }}
+                      >
+                        <option value="">None</option>
+                        {providerOptions.map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        className={selectClasses}
+                        value={state.routing.fallbackModel ?? ''}
+                        onChange={(e) => updateField(proc.id, 'fallbackModel', e.target.value)}
+                        disabled={!state.routing.fallbackProvider}
+                      >
+                        <option value="">None</option>
+                        {getModelsForProvider(state.routing.fallbackProvider).map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Resolved Info */}
+                  <div className="mb-4 rounded-lg border border-border dark:border-dark-border bg-bg-tertiary dark:bg-dark-bg-tertiary px-3 py-2">
+                    <p className="text-xs text-text-muted dark:text-dark-text-muted">
+                      <span className="font-medium text-text-secondary dark:text-dark-text-secondary">
+                        Effective:
+                      </span>{' '}
+                      {state.resolved.provider
+                        ? `${state.resolved.provider} / ${state.resolved.model ?? 'default model'}`
+                        : 'No provider configured'}
+                      {state.resolved.fallbackProvider && (
+                        <>
+                          {' '}
+                          &rarr; fallback: {state.resolved.fallbackProvider} /{' '}
+                          {state.resolved.fallbackModel}
+                        </>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex justify-end gap-2">
+                    {hasProcessConfig && (
+                      <button
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border dark:border-dark-border rounded-lg text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary transition-colors"
+                        onClick={() => handleClear(proc.id)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Clear
+                      </button>
+                    )}
+                    <button
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => handleSave(proc.id)}
+                      disabled={!state.isDirty || state.isSaving}
+                    >
+                      {state.isSaving ? (
+                        <LoadingSpinner size="sm" />
+                      ) : (
+                        <Check className="h-3.5 w-3.5" />
+                      )}
+                      Save
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {Object.values(channelStates).length > 0 && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary">
+                    Per-Channel Overrides
+                  </h3>
+                  <p className="text-sm text-text-muted dark:text-dark-text-muted">
+                    Override routing for a specific channel. Empty values inherit from the shared
+                    channel routes above.
+                  </p>
+                </div>
+                {Object.values(channelStates).map((channel) => (
+                  <div
+                    key={channel.pluginId}
+                    className="rounded-xl border border-border dark:border-dark-border bg-bg-secondary dark:bg-dark-bg-secondary p-5"
+                  >
+                    <div className="mb-4">
+                      <h3 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary">
+                        {channel.name}
+                      </h3>
+                      <p className="text-sm text-text-muted dark:text-dark-text-muted">
+                        {channel.pluginId} · {channel.platform} · {channel.status}
+                      </p>
+                    </div>
+                    {[
+                      {
+                        title: 'Messages',
+                        kind: 'default' as const,
+                        routing: channel.routing,
+                        resolved: channel.resolved,
+                        isDirty: channel.isDirty,
+                        isSaving: channel.isSaving,
+                      },
+                      {
+                        title: 'Media Messages',
+                        kind: 'media' as const,
+                        routing: channel.mediaRouting,
+                        resolved: channel.mediaResolved,
+                        isDirty: channel.isMediaDirty,
+                        isSaving: channel.isMediaSaving,
+                      },
+                    ].map((section) => {
+                      const hasConfig =
+                        section.routing.provider ||
+                        section.routing.model ||
+                        section.routing.fallbackProvider ||
+                        section.routing.fallbackModel;
+
+                      return (
+                        <div
+                          key={section.kind}
+                          className="mb-4 rounded-lg border border-border dark:border-dark-border p-4 last:mb-0"
+                        >
+                          <div className="mb-3 text-sm font-medium text-text-primary dark:text-dark-text-primary">
+                            {section.title}
+                          </div>
+                          <div className="mb-3 flex gap-3">
+                            <select
+                              className={selectClasses}
+                              value={section.routing.provider ?? ''}
+                              onChange={(e) => {
+                                updateChannelField(
+                                  channel.pluginId,
+                                  section.kind,
+                                  'provider',
+                                  e.target.value
+                                );
+                                updateChannelField(channel.pluginId, section.kind, 'model', null);
+                              }}
+                            >
+                              <option value="">Inherit</option>
+                              {providerOptions.map((p) => (
+                                <option key={p} value={p}>
+                                  {p}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              className={selectClasses}
+                              value={section.routing.model ?? ''}
+                              onChange={(e) =>
+                                updateChannelField(
+                                  channel.pluginId,
+                                  section.kind,
+                                  'model',
+                                  e.target.value
+                                )
+                              }
+                            >
+                              <option value="">Default</option>
+                              {getModelsForProvider(section.routing.provider).map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="mb-3 flex gap-3">
+                            <select
+                              className={selectClasses}
+                              value={section.routing.fallbackProvider ?? ''}
+                              onChange={(e) => {
+                                updateChannelField(
+                                  channel.pluginId,
+                                  section.kind,
+                                  'fallbackProvider',
+                                  e.target.value
+                                );
+                                updateChannelField(
+                                  channel.pluginId,
+                                  section.kind,
+                                  'fallbackModel',
+                                  null
+                                );
+                              }}
+                            >
+                              <option value="">None</option>
+                              {providerOptions.map((p) => (
+                                <option key={p} value={p}>
+                                  {p}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              className={selectClasses}
+                              value={section.routing.fallbackModel ?? ''}
+                              onChange={(e) =>
+                                updateChannelField(
+                                  channel.pluginId,
+                                  section.kind,
+                                  'fallbackModel',
+                                  e.target.value
+                                )
+                              }
+                              disabled={!section.routing.fallbackProvider}
+                            >
+                              <option value="">None</option>
+                              {getModelsForProvider(section.routing.fallbackProvider).map((m) => (
+                                <option key={m.id} value={m.id}>
+                                  {m.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="mb-3 rounded-lg border border-border dark:border-dark-border bg-bg-tertiary dark:bg-dark-bg-tertiary px-3 py-2 text-xs text-text-muted dark:text-dark-text-muted">
+                            Effective: {section.resolved.provider ?? 'No provider configured'}
+                            {section.resolved.model ? ` / ${section.resolved.model}` : ''}
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            {hasConfig && (
+                              <button
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border dark:border-dark-border rounded-lg text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary transition-colors"
+                                onClick={() => handleChannelClear(channel.pluginId, section.kind)}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                                Clear
+                              </button>
+                            )}
+                            <button
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={() => handleChannelSave(channel.pluginId, section.kind)}
+                              disabled={!section.isDirty || section.isSaving}
+                            >
+                              {section.isSaving ? (
+                                <LoadingSpinner size="sm" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5" />
+                              )}
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
-              <span
-                className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  resolvedSource === 'process'
-                    ? 'bg-primary/10 text-primary'
-                    : 'bg-gray-500/20 text-gray-600 dark:text-gray-400'
-                }`}
-              >
-                {resolvedSource === 'process' ? 'Process Config' : 'Global Default'}
-              </span>
-            </div>
-
-            {/* Primary Model */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-1.5">
-                Primary Model
-              </label>
-              <div className="flex gap-3">
-                <select
-                  className={selectClasses}
-                  value={state.routing.provider ?? ''}
-                  onChange={(e) => {
-                    updateField(proc.id, 'provider', e.target.value);
-                    updateField(proc.id, 'model', null);
-                  }}
-                >
-                  <option value="">Default (global)</option>
-                  {providerOptions.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className={selectClasses}
-                  value={state.routing.model ?? ''}
-                  onChange={(e) => updateField(proc.id, 'model', e.target.value)}
-                >
-                  <option value="">Default</option>
-                  {getModelsForProvider(state.routing.provider).map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Fallback Model */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-1.5">
-                Fallback Model{' '}
-                <span className="font-normal text-text-muted dark:text-dark-text-muted">
-                  (automatic failover)
-                </span>
-              </label>
-              <div className="flex gap-3">
-                <select
-                  className={selectClasses}
-                  value={state.routing.fallbackProvider ?? ''}
-                  onChange={(e) => {
-                    updateField(proc.id, 'fallbackProvider', e.target.value);
-                    updateField(proc.id, 'fallbackModel', null);
-                  }}
-                >
-                  <option value="">None</option>
-                  {providerOptions.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className={selectClasses}
-                  value={state.routing.fallbackModel ?? ''}
-                  onChange={(e) => updateField(proc.id, 'fallbackModel', e.target.value)}
-                  disabled={!state.routing.fallbackProvider}
-                >
-                  <option value="">None</option>
-                  {getModelsForProvider(state.routing.fallbackProvider).map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Resolved Info */}
-            <div className="mb-4 rounded-lg border border-border dark:border-dark-border bg-bg-tertiary dark:bg-dark-bg-tertiary px-3 py-2">
-              <p className="text-xs text-text-muted dark:text-dark-text-muted">
-                <span className="font-medium text-text-secondary dark:text-dark-text-secondary">
-                  Effective:
-                </span>{' '}
-                {state.resolved.provider
-                  ? `${state.resolved.provider} / ${state.resolved.model ?? 'default model'}`
-                  : 'No provider configured'}
-                {state.resolved.fallbackProvider && (
-                  <>
-                    {' '}
-                    &rarr; fallback: {state.resolved.fallbackProvider} /{' '}
-                    {state.resolved.fallbackModel}
-                  </>
-                )}
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-2">
-              {hasProcessConfig && (
-                <button
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border dark:border-dark-border rounded-lg text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary transition-colors"
-                  onClick={() => handleClear(proc.id)}
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Clear
-                </button>
-              )}
-              <button
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => handleSave(proc.id)}
-                disabled={!state.isDirty || state.isSaving}
-              >
-                {state.isSaving ? <LoadingSpinner size="sm" /> : <Check className="h-3.5 w-3.5" />}
-                Save
-              </button>
-            </div>
+            )}
           </div>
-        );
-      })}
-      </div>
-      </div>
+        </div>
       )}
     </div>
   );

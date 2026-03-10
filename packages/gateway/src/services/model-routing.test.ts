@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---------------------------------------------------------------------------
 
 const mockSettingsRepo = {
-  get: vi.fn(() => null),
+  get: vi.fn((_: string) => null as string | null),
   set: vi.fn(async () => {}),
   delete: vi.fn(async () => true),
   deleteByPrefix: vi.fn(async () => 0),
@@ -22,12 +22,12 @@ vi.mock('../db/repositories/index.js', () => ({
 import * as repoModule from '../db/repositories/index.js';
 (repoModule as Record<string, unknown>).settingsRepo = mockSettingsRepo;
 
-const mockGetDefaultProvider = vi.fn(async () => 'openai');
-const mockGetDefaultModel = vi.fn(async () => 'gpt-4o');
+const mockGetDefaultProvider = vi.fn(async () => 'openai' as string | null);
+const mockGetDefaultModel = vi.fn(async (_provider?: string) => 'gpt-4o' as string | null);
 
 vi.mock('../routes/settings.js', () => ({
-  getDefaultProvider: (...args: unknown[]) => mockGetDefaultProvider(...args),
-  getDefaultModel: (...args: unknown[]) => mockGetDefaultModel(...args),
+  getDefaultProvider: () => mockGetDefaultProvider(),
+  getDefaultModel: (provider?: string) => mockGetDefaultModel(provider),
 }));
 
 vi.mock('./log.js', () => ({
@@ -44,10 +44,14 @@ import {
   getAllRouting,
   resolveForProcess,
   setProcessRouting,
+  setChannelScopedRouting,
   clearProcessRouting,
+  clearChannelScopedRouting,
   isValidProcess,
   VALID_PROCESSES,
   getChannelRouting,
+  getChannelScopedRouting,
+  resolveForChannel,
 } from './model-routing.js';
 
 // ---------------------------------------------------------------------------
@@ -67,6 +71,7 @@ describe('model-routing', () => {
     it('returns true for valid processes', () => {
       expect(isValidProcess('chat')).toBe(true);
       expect(isValidProcess('channel')).toBe(true);
+      expect(isValidProcess('channel_media')).toBe(true);
       expect(isValidProcess('pulse')).toBe(true);
     });
 
@@ -79,7 +84,7 @@ describe('model-routing', () => {
 
   describe('VALID_PROCESSES', () => {
     it('contains exactly 4 processes', () => {
-      expect(VALID_PROCESSES).toEqual(['chat', 'channel', 'pulse', 'subagent']);
+      expect(VALID_PROCESSES).toEqual(['chat', 'channel', 'channel_media', 'pulse', 'subagent']);
     });
   });
 
@@ -135,6 +140,7 @@ describe('model-routing', () => {
       const result = getAllRouting();
       expect(result).toHaveProperty('chat');
       expect(result).toHaveProperty('channel');
+      expect(result).toHaveProperty('channel_media');
       expect(result).toHaveProperty('pulse');
     });
   });
@@ -168,8 +174,8 @@ describe('model-routing', () => {
 
     it('returns source=first-configured when no global default', async () => {
       mockSettingsRepo.get.mockReturnValue(null);
-      mockGetDefaultProvider.mockResolvedValue(null);
-      mockGetDefaultModel.mockResolvedValue(null);
+      mockGetDefaultProvider.mockImplementation(async () => null);
+      mockGetDefaultModel.mockImplementation(async () => null);
 
       const result = await resolveForProcess('chat');
       expect(result.provider).toBeNull();
@@ -294,6 +300,71 @@ describe('model-routing', () => {
       expect(result.model).toBe('gpt-4o');
       expect(result.fallbackProvider).toBe('anthropic');
       expect(result.fallbackModel).toBe('claude-3');
+    });
+  });
+
+  describe('channel-scoped routing', () => {
+    it('reads plugin-scoped channel routing keys', () => {
+      mockSettingsRepo.get.mockImplementation((key: string) => {
+        if (key === 'model_routing:channel_plugin:channel.telegram:provider') return 'openai';
+        if (key === 'model_routing:channel_plugin:channel.telegram:model') return 'gpt-4o';
+        return null;
+      });
+
+      const result = getChannelScopedRouting('channel.telegram');
+      expect(result.provider).toBe('openai');
+      expect(result.model).toBe('gpt-4o');
+    });
+
+    it('writes and clears plugin-scoped media routing keys', async () => {
+      await setChannelScopedRouting(
+        'channel.whatsapp',
+        { provider: 'google', model: 'gemini-2.5-flash' },
+        'media'
+      );
+      expect(mockSettingsRepo.set).toHaveBeenCalledWith(
+        'model_routing:channel_plugin_media:channel.whatsapp:provider',
+        'google'
+      );
+      expect(mockSettingsRepo.set).toHaveBeenCalledWith(
+        'model_routing:channel_plugin_media:channel.whatsapp:model',
+        'gemini-2.5-flash'
+      );
+
+      await clearChannelScopedRouting('channel.whatsapp', 'media');
+      expect(mockSettingsRepo.deleteByPrefix).toHaveBeenCalledWith(
+        'model_routing:channel_plugin_media:channel.whatsapp:'
+      );
+    });
+
+    it('prefers channel-specific routing over shared channel routing', async () => {
+      mockSettingsRepo.get.mockImplementation((key: string) => {
+        if (key === 'model_routing:channel:provider') return 'anthropic';
+        if (key === 'model_routing:channel:model') return 'claude-shared';
+        if (key === 'model_routing:channel_plugin:channel.telegram:provider') return 'openai';
+        if (key === 'model_routing:channel_plugin:channel.telegram:model') return 'gpt-4o';
+        return null;
+      });
+
+      const result = await resolveForChannel('channel.telegram');
+      expect(result.provider).toBe('openai');
+      expect(result.model).toBe('gpt-4o');
+      expect(result.source).toBe('channel');
+    });
+
+    it('uses channel_media routing for attachment-heavy messages', async () => {
+      mockSettingsRepo.get.mockImplementation((key: string) => {
+        if (key === 'model_routing:channel:provider') return 'anthropic';
+        if (key === 'model_routing:channel:model') return 'claude-text';
+        if (key === 'model_routing:channel_media:provider') return 'google';
+        if (key === 'model_routing:channel_media:model') return 'gemini-2.5-flash';
+        return null;
+      });
+
+      const result = await resolveForChannel('channel.whatsapp', { hasMedia: true });
+      expect(result.provider).toBe('google');
+      expect(result.model).toBe('gemini-2.5-flash');
+      expect(result.source).toBe('process');
     });
   });
 });

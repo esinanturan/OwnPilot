@@ -94,6 +94,10 @@ export interface ChannelAttachment {
   type: 'image' | 'audio' | 'video' | 'file';
   /** Remote URL */
   url?: string;
+  /** Temporary stored asset ID */
+  assetId?: string;
+  /** Temporary local storage path */
+  path?: string;
   /** Binary data */
   data?: Uint8Array;
   /** MIME type */
@@ -102,6 +106,8 @@ export interface ChannelAttachment {
   filename?: string;
   /** Size in bytes */
   size?: number;
+  /** Expiration time for temporary stored assets */
+  expiresAt?: string;
 }
 
 // ============================================================================

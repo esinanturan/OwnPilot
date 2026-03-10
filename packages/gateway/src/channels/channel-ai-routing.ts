@@ -44,14 +44,16 @@ export async function processViaBus(
   progress?: { update(text: string): void }
 ): Promise<string> {
   const { getOrCreateChatAgent, isDemoMode } = await import('../routes/agents.js');
-  const { resolveForProcess } = await import('../services/model-routing.js');
+  const { resolveForChannel } = await import('../services/model-routing.js');
 
   // Demo mode short-circuit (bus isn't needed for demo)
   if (await isDemoMode()) {
     return demoModeReply(message.text);
   }
 
-  const routing = await resolveForProcess('channel');
+  const routing = await resolveForChannel(message.channelPluginId, {
+    hasMedia: Boolean(message.attachments?.length),
+  });
   const fallback =
     routing.fallbackProvider && routing.fallbackModel
       ? { provider: routing.fallbackProvider, model: routing.fallbackModel }
@@ -72,8 +74,7 @@ export async function processViaBus(
       activeConversationId = newConv.id;
 
       // Persist to DB before updating the FK on channel_sessions
-      const { createConversationsRepository } =
-        await import('../db/repositories/conversations.js');
+      const { createConversationsRepository } = await import('../db/repositories/conversations.js');
       const conversationsRepo = createConversationsRepository();
       await conversationsRepo.create({
         id: activeConversationId,
@@ -198,13 +199,15 @@ export async function processViaBus(
  */
 export async function processDirectAgent(message: ChannelIncomingMessage): Promise<string> {
   const { getOrCreateChatAgent, isDemoMode } = await import('../routes/agents.js');
-  const { resolveForProcess } = await import('../services/model-routing.js');
+  const { resolveForChannel } = await import('../services/model-routing.js');
 
   if (await isDemoMode()) {
     return demoModeReply(message.text);
   }
 
-  const routing = await resolveForProcess('channel');
+  const routing = await resolveForChannel(message.channelPluginId, {
+    hasMedia: Boolean(message.attachments?.length),
+  });
   const fallback =
     routing.fallbackProvider && routing.fallbackModel
       ? { provider: routing.fallbackProvider, model: routing.fallbackModel }

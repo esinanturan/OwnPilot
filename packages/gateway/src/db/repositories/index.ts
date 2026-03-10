@@ -35,6 +35,13 @@ export {
 } from './channel-messages.js';
 
 export {
+  ChannelAssetsRepository,
+  createChannelAssetsRepository,
+  channelAssetsRepo,
+  type ChannelAssetRecord,
+} from './channel-assets.js';
+
+export {
   CostsRepository,
   createCostsRepository,
   type Cost,

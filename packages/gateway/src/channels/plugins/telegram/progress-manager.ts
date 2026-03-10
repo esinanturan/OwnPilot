@@ -27,6 +27,7 @@ export class TelegramProgressManager {
   private pendingText: string | null = null;
   private pendingTimer: ReturnType<typeof setTimeout> | null = null;
   private finished = false;
+  private currentText: string | null = null;
 
   constructor(bot: Bot, chatId: string, parseMode?: string) {
     this.bot = bot;
@@ -43,6 +44,7 @@ export class TelegramProgressManager {
       const sent = await this.bot.api.sendMessage(this.chatId, initialText);
       this.messageId = sent.message_id;
       this.lastEditTime = Date.now();
+      this.currentText = initialText;
       return String(sent.message_id);
     } catch (err) {
       log.warn('Failed to send initial progress message', { error: err });
@@ -56,6 +58,7 @@ export class TelegramProgressManager {
    */
   update(text: string): void {
     if (this.finished || !this.messageId) return;
+    if (text === this.currentText || text === this.pendingText) return;
 
     const now = Date.now();
     const elapsed = now - this.lastEditTime;
@@ -107,12 +110,16 @@ export class TelegramProgressManager {
     }
 
     const parts = splitMessage(htmlText, PLATFORM_MESSAGE_LIMITS.telegram!);
+    const firstPart = parts[0]!;
 
     // Edit the first part into the existing progress message
     try {
-      const options: Record<string, unknown> = {};
-      if (this.parseMode) options.parse_mode = this.parseMode;
-      await this.bot.api.editMessageText(this.chatId, this.messageId, parts[0]!, options);
+      if (firstPart !== this.currentText) {
+        const options: Record<string, unknown> = {};
+        if (this.parseMode) options.parse_mode = this.parseMode;
+        await this.bot.api.editMessageText(this.chatId, this.messageId, firstPart, options);
+        this.currentText = firstPart;
+      }
     } catch (err) {
       log.debug('Failed to edit progress → final message, sending fresh', { error: err });
       // If edit fails (e.g. text unchanged), send as new message
@@ -150,11 +157,11 @@ export class TelegramProgressManager {
     }
     if (this.messageId) {
       try {
-        await this.bot.api.editMessageText(
-          this.chatId,
-          this.messageId,
-          '\u26a0\ufe0f Processing cancelled.'
-        );
+        const cancelText = '\u26a0\ufe0f Processing cancelled.';
+        if (this.currentText !== cancelText) {
+          await this.bot.api.editMessageText(this.chatId, this.messageId, cancelText);
+          this.currentText = cancelText;
+        }
       } catch {
         /* best effort */
       }
@@ -172,10 +179,16 @@ export class TelegramProgressManager {
 
   private doEdit(text: string): void {
     if (!this.messageId || this.finished) return;
+    if (text === this.currentText) return;
     this.lastEditTime = Date.now();
-    this.bot.api.editMessageText(this.chatId, this.messageId, text).catch((err) => {
-      log.debug('Progress edit failed', { error: err });
-    });
+    this.bot.api
+      .editMessageText(this.chatId, this.messageId, text)
+      .then(() => {
+        this.currentText = text;
+      })
+      .catch((err) => {
+        log.debug('Progress edit failed', { error: err });
+      });
   }
 
   private async sendFresh(text: string): Promise<string> {
@@ -191,6 +204,7 @@ export class TelegramProgressManager {
         if (this.parseMode) options.parse_mode = this.parseMode;
         const sent = await this.bot.api.sendMessage(this.chatId, part, options);
         lastId = String(sent.message_id);
+        this.currentText = part;
       } catch (err) {
         log.warn('Failed to send fresh message', { error: err });
       }

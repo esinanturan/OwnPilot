@@ -13,6 +13,8 @@ export type {
   ProcessRouting,
   ResolvedRouting,
   RoutingProcess,
+  ChannelRoutingKind,
+  ChannelRoutingEntry,
   ModelRoutingData,
   ProcessRoutingData,
 } from './settings';

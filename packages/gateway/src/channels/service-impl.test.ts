@@ -141,6 +141,7 @@ vi.mock('../routes/agents.js', () => ({
 
 vi.mock('../services/model-routing.js', () => ({
   resolveForProcess: mockResolveForProcess,
+  resolveForChannel: mockResolveForProcess,
 }));
 
 vi.mock('../routes/settings.js', () => ({
@@ -1656,7 +1657,7 @@ describe('ChannelServiceImpl', () => {
       it('should resolve provider and model via model routing', async () => {
         await service.processIncomingMessage(message);
 
-        expect(mockResolveForProcess).toHaveBeenCalledWith('channel');
+        expect(mockResolveForProcess).toHaveBeenCalledWith('test-plugin', { hasMedia: false });
       });
 
       it('should load session conversation onto agent for context continuity', async () => {

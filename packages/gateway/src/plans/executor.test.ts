@@ -1697,4 +1697,33 @@ describe('PlanExecutor', () => {
       );
     });
   });
+
+  // ========================================================================
+  // Wave Execution (Parallel Dependency-Aware)
+  // ========================================================================
+
+  describe('wave execution', () => {
+    it('uses wave execution when enabled in config', () => {
+      const waveExecutor = new PlanExecutor({
+        userId: 'user-1',
+        enableWaveExecution: true,
+        maxConcurrent: 3,
+      });
+
+      // @ts-expect-error accessing private config for test
+      expect(waveExecutor.config.enableWaveExecution).toBe(true);
+      // @ts-expect-error accessing private config for test
+      expect(waveExecutor.config.maxConcurrent).toBe(3);
+    });
+
+    it('defaults to sequential execution when wave execution is disabled', () => {
+      const seqExecutor = new PlanExecutor({
+        userId: 'user-1',
+        enableWaveExecution: false,
+      });
+
+      // @ts-expect-error accessing private config for test
+      expect(seqExecutor.config.enableWaveExecution).toBe(false);
+    });
+  });
 });

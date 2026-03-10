@@ -42,6 +42,8 @@ export interface ExecutorConfig {
   verbose?: boolean;
   /** Autonomy level (0-4) */
   autonomyLevel?: number;
+  /** Enable wave-based execution for dependency-aware parallelism */
+  enableWaveExecution?: boolean;
 }
 
 interface StepExecutionContext {
@@ -107,6 +109,7 @@ export class PlanExecutor extends EventEmitter {
       defaultTimeout: config.defaultTimeout ?? PLAN_STEP_TIMEOUT_MS,
       verbose: config.verbose ?? false,
       autonomyLevel: config.autonomyLevel ?? 1,
+      enableWaveExecution: config.enableWaveExecution ?? false,
     };
     this.planService = getServiceRegistry().get(Services.Plan);
     this.registerDefaultHandlers();
@@ -337,6 +340,156 @@ export class PlanExecutor extends EventEmitter {
   // ============================================================================
 
   private async executeSteps(
+    planId: string,
+    results: Map<string, unknown>,
+    signal: AbortSignal
+  ): Promise<void> {
+    if (this.config.enableWaveExecution) {
+      return this.executeStepsInWaves(planId, results, signal);
+    }
+    return this.executeStepsSequential(planId, results, signal);
+  }
+
+  /**
+   * Wave-based execution: executes independent steps in parallel waves
+   * Respects dependency graph for optimal parallelization
+   */
+  private async executeStepsInWaves(
+    planId: string,
+    results: Map<string, unknown>,
+    signal: AbortSignal
+  ): Promise<void> {
+    let waveNum = 0;
+
+    while (true) {
+      // Yield to event loop
+      await new Promise((r) => setTimeout(r, 0));
+
+      // Check for abort
+      if (signal.aborted) {
+        throw new Error('Plan execution aborted');
+      }
+
+      // Check for pause
+      if (this.pausedPlans.has(planId)) {
+        return;
+      }
+
+      // Get current plan state
+      const plan = await this.planService.getPlan(this.config.userId, planId);
+      if (!plan) {
+        throw new Error(`Plan ${planId} was deleted during execution`);
+      }
+
+      // Get all pending steps
+      const pendingSteps = await this.planService.getStepsByStatus(
+        this.config.userId,
+        planId,
+        'pending'
+      );
+
+      if (pendingSteps.length === 0) {
+        // All steps completed or no runnable steps
+        const allSteps = await this.planService.getSteps(this.config.userId, planId);
+        const hasPendingOrRunning = allSteps.some(
+          (s) => s.status === 'pending' || s.status === 'running'
+        );
+
+        if (!hasPendingOrRunning) {
+          await this.planService.updatePlan(this.config.userId, planId, { status: 'completed' });
+          await this.planService.recalculateProgress(this.config.userId, planId);
+          return;
+        }
+
+        // Some steps might be waiting for dependencies - check for deadlock
+        const hasRunnableSteps = allSteps.some(
+          (s) => s.status === 'pending' && s.dependencies.length === 0
+        );
+        if (!hasRunnableSteps) {
+          // Check if all remaining pending steps have unmet dependencies
+          const blockedSteps = allSteps.filter(
+            (s) => s.status === 'pending' && s.dependencies.length > 0
+          );
+          const allBlocked = blockedSteps.every(
+            (s) => !s.dependencies.some((depId) => {
+              const depStep = allSteps.find((step) => step.id === depId);
+              return depStep?.status === 'completed';
+            })
+          );
+          if (allBlocked && blockedSteps.length > 0) {
+            for (const s of blockedSteps) {
+              await this.planService.updateStep(this.config.userId, s.id, { status: 'blocked' });
+            }
+            await this.planService.updatePlan(this.config.userId, planId, {
+              status: 'failed',
+              error: 'Dependency deadlock: all pending steps have unmet dependencies',
+            });
+            throw new Error('Dependency deadlock: all pending steps have unmet dependencies');
+          }
+        }
+
+        // Wait and retry
+        await new Promise((r) => setTimeout(r, PLAN_STALL_RETRY_MS));
+        continue;
+      }
+
+      // Find ready steps (all dependencies met)
+      const readySteps: PlanStep[] = [];
+      for (const step of pendingSteps) {
+        if (await this.planService.areDependenciesMet(this.config.userId, step.id)) {
+          readySteps.push(step);
+        }
+      }
+
+      if (readySteps.length === 0) {
+        // No ready steps yet, wait for running steps to complete
+        await new Promise((r) => setTimeout(r, PLAN_STALL_RETRY_MS));
+        continue;
+      }
+
+      // Execute this wave
+      waveNum++;
+      this.log(`Wave ${waveNum}: executing ${readySteps.length} step(s) in parallel`);
+
+      // Execute steps in parallel with concurrency limit
+      const executingSteps = new Set<string>();
+      const stepPromises: Promise<void>[] = [];
+
+      for (const step of readySteps) {
+        // Respect maxConcurrent
+        while (executingSteps.size >= this.config.maxConcurrent) {
+          await new Promise((r) => setTimeout(r, 10));
+        }
+
+        executingSteps.add(step.id);
+        const promise = this.executeStep(planId, step, results, signal)
+          .then(() => {
+            executingSteps.delete(step.id);
+          })
+          .catch((error) => {
+            executingSteps.delete(step.id);
+            throw error;
+          });
+        stepPromises.push(promise);
+      }
+
+      // Wait for all steps in this wave to complete
+      await Promise.all(stepPromises);
+
+      // Update progress
+      await this.planService.recalculateProgress(this.config.userId, planId);
+
+      // Check if plan should pause
+      if (this.pausedPlans.has(planId)) {
+        return;
+      }
+    }
+  }
+
+  /**
+   * Sequential execution: original implementation
+   */
+  private async executeStepsSequential(
     planId: string,
     results: Map<string, unknown>,
     signal: AbortSignal

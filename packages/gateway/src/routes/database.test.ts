@@ -134,7 +134,7 @@ describe('Database Routes', () => {
 
     app = new Hono();
     app.onError(errorHandler);
-    app.route('/database', databaseRoutes);
+    app.route('/db', databaseRoutes);
     vi.clearAllMocks();
 
     // Set admin key (read at request time by route middleware)
@@ -173,7 +173,7 @@ describe('Database Routes', () => {
       mockExistsSync.mockReturnValue(false);
       mockReaddir.mockResolvedValue([]);
 
-      const res = await app.request('/database/status');
+      const res = await app.request('/db/status');
 
       expect(res.status).toBe(200);
     });
@@ -185,7 +185,7 @@ describe('Database Routes', () => {
         .mockResolvedValueOnce({ version: 'PostgreSQL 16.1' });
       mockAdapter.query.mockResolvedValue([]);
 
-      const res = await app.request('/database/stats');
+      const res = await app.request('/db/stats');
 
       expect(res.status).toBe(200);
     });
@@ -193,7 +193,7 @@ describe('Database Routes', () => {
 
   // ─── GET /status ─────────────────────────────────────────────
 
-  describe('GET /database/status', () => {
+  describe('GET /db/status', () => {
     it('should return connected status with stats', async () => {
       mockAdapter.queryOne
         .mockResolvedValueOnce({ size: '15 MB' })
@@ -201,7 +201,7 @@ describe('Database Routes', () => {
       mockExistsSync.mockReturnValue(false); // No legacy data
       mockReaddir.mockResolvedValue([]);
 
-      const res = await app.request('/database/status', {
+      const res = await app.request('/db/status', {
         headers: adminHeaders(),
       });
 
@@ -219,7 +219,7 @@ describe('Database Routes', () => {
     it('should return disconnected status', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await app.request('/database/status', {
+      const res = await app.request('/db/status', {
         headers: adminHeaders(),
       });
 
@@ -236,7 +236,7 @@ describe('Database Routes', () => {
         return false;
       });
 
-      const res = await app.request('/database/status', {
+      const res = await app.request('/db/status', {
         headers: adminHeaders(),
       });
 
@@ -251,7 +251,7 @@ describe('Database Routes', () => {
       mockReaddir.mockResolvedValue(['backup-2024.sql', 'backup-2024.dump', 'other.txt'] as never);
       mockStat.mockResolvedValue({ size: 2048, mtime: new Date('2024-06-15') });
 
-      const res = await app.request('/database/status', {
+      const res = await app.request('/db/status', {
         headers: adminHeaders(),
       });
 
@@ -266,9 +266,9 @@ describe('Database Routes', () => {
 
   // ─── POST /backup ────────────────────────────────────────────
 
-  describe('POST /database/backup', () => {
+  describe('POST /db/backup', () => {
     it('should start backup and return 202', async () => {
-      const res = await app.request('/database/backup', {
+      const res = await app.request('/db/backup', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({ format: 'sql' }),
@@ -286,7 +286,7 @@ describe('Database Routes', () => {
     it('should return 400 when PostgreSQL is not connected', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await app.request('/database/backup', {
+      const res = await app.request('/db/backup', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({}),
@@ -300,9 +300,9 @@ describe('Database Routes', () => {
 
   // ─── POST /restore ───────────────────────────────────────────
 
-  describe('POST /database/restore', () => {
+  describe('POST /db/restore', () => {
     it('should return 400 when filename is missing', async () => {
-      const res = await app.request('/database/restore', {
+      const res = await app.request('/db/restore', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({}),
@@ -316,7 +316,7 @@ describe('Database Routes', () => {
     it('should return 404 when backup file not found', async () => {
       mockExistsSync.mockReturnValue(false);
 
-      const res = await app.request('/database/restore', {
+      const res = await app.request('/db/restore', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({ filename: 'missing.sql' }),
@@ -330,7 +330,7 @@ describe('Database Routes', () => {
     it('should start restore and return 202', async () => {
       mockExistsSync.mockReturnValue(true);
 
-      const res = await app.request('/database/restore', {
+      const res = await app.request('/db/restore', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({ filename: 'backup-2024.sql' }),
@@ -345,11 +345,11 @@ describe('Database Routes', () => {
 
   // ─── DELETE /backup/:filename ────────────────────────────────
 
-  describe('DELETE /database/backup/:filename', () => {
+  describe('DELETE /db/backup/:filename', () => {
     it('should return 404 when backup file not found', async () => {
       mockExistsSync.mockReturnValue(false);
 
-      const res = await app.request('/database/backup/missing.sql', {
+      const res = await app.request('/db/backup/missing.sql', {
         method: 'DELETE',
         headers: adminHeaders(),
       });
@@ -362,7 +362,7 @@ describe('Database Routes', () => {
     it('should delete backup file', async () => {
       mockExistsSync.mockReturnValue(true);
 
-      const res = await app.request('/database/backup/old-backup.sql', {
+      const res = await app.request('/db/backup/old-backup.sql', {
         method: 'DELETE',
         headers: adminHeaders(),
       });
@@ -379,7 +379,7 @@ describe('Database Routes', () => {
         throw new Error('Permission denied');
       });
 
-      const res = await app.request('/database/backup/locked.sql', {
+      const res = await app.request('/db/backup/locked.sql', {
         method: 'DELETE',
         headers: adminHeaders(),
       });
@@ -393,9 +393,9 @@ describe('Database Routes', () => {
 
   // ─── POST /maintenance ──────────────────────────────────────
 
-  describe('POST /database/maintenance', () => {
+  describe('POST /db/maintenance', () => {
     it('should start vacuum maintenance and return 202', async () => {
-      const res = await app.request('/database/maintenance', {
+      const res = await app.request('/db/maintenance', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({ type: 'vacuum' }),
@@ -408,7 +408,7 @@ describe('Database Routes', () => {
     });
 
     it('should default to vacuum when type not specified', async () => {
-      const res = await app.request('/database/maintenance', {
+      const res = await app.request('/db/maintenance', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({}),
@@ -422,7 +422,7 @@ describe('Database Routes', () => {
     it('should return 400 when not connected', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await app.request('/database/maintenance', {
+      const res = await app.request('/db/maintenance', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({}),
@@ -436,7 +436,7 @@ describe('Database Routes', () => {
 
   // ─── GET /stats ─────────────────────────────────────────────
 
-  describe('GET /database/stats', () => {
+  describe('GET /db/stats', () => {
     it('should return detailed database statistics', async () => {
       mockAdapter.queryOne
         .mockResolvedValueOnce({ size: '50 MB', raw_size: '52428800' })
@@ -447,7 +447,7 @@ describe('Database Routes', () => {
         { table_name: 'messages', row_count: '500', size: '2 MB' },
       ]);
 
-      const res = await app.request('/database/stats', {
+      const res = await app.request('/db/stats', {
         headers: adminHeaders(),
       });
 
@@ -466,7 +466,7 @@ describe('Database Routes', () => {
     it('should return 500 when not connected', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await app.request('/database/stats', {
+      const res = await app.request('/db/stats', {
         headers: adminHeaders(),
       });
 
@@ -478,9 +478,9 @@ describe('Database Routes', () => {
 
   // ─── GET /operation/status ──────────────────────────────────
 
-  describe('GET /database/operation/status', () => {
+  describe('GET /db/operation/status', () => {
     it('should return operation status', async () => {
-      const res = await app.request('/database/operation/status', {
+      const res = await app.request('/db/operation/status', {
         headers: adminHeaders(),
       });
 
@@ -493,7 +493,7 @@ describe('Database Routes', () => {
 
   // ─── GET /export ────────────────────────────────────────────
 
-  describe('GET /database/export', () => {
+  describe('GET /db/export', () => {
     it('should export data as JSON', async () => {
       // Table exists check
       mockAdapter.queryOne
@@ -502,7 +502,7 @@ describe('Database Routes', () => {
       // Query returns rows for first table only (others won't exist)
       mockAdapter.query.mockResolvedValueOnce([{ id: '1', name: 'test' }]);
 
-      const res = await app.request('/database/export?tables=settings', {
+      const res = await app.request('/db/export?tables=settings', {
         headers: adminHeaders(),
       });
 
@@ -515,7 +515,7 @@ describe('Database Routes', () => {
     });
 
     it('should return 400 for invalid table names', async () => {
-      const res = await app.request('/database/export?tables=invalid_table_xyz', {
+      const res = await app.request('/db/export?tables=invalid_table_xyz', {
         headers: adminHeaders(),
       });
 
@@ -527,7 +527,7 @@ describe('Database Routes', () => {
     it('should return 500 when not connected', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await app.request('/database/export', {
+      const res = await app.request('/db/export', {
         headers: adminHeaders(),
       });
 
@@ -539,9 +539,9 @@ describe('Database Routes', () => {
 
   // ─── POST /import ───────────────────────────────────────────
 
-  describe('POST /database/import', () => {
+  describe('POST /db/import', () => {
     it('should return 400 when data is missing tables', async () => {
-      const res = await app.request('/database/import', {
+      const res = await app.request('/db/import', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({ data: {} }),
@@ -553,7 +553,7 @@ describe('Database Routes', () => {
     });
 
     it('should return 400 when no valid tables in import', async () => {
-      const res = await app.request('/database/import', {
+      const res = await app.request('/db/import', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({
@@ -567,7 +567,7 @@ describe('Database Routes', () => {
     });
 
     it('should start import and return 202', async () => {
-      const res = await app.request('/database/import', {
+      const res = await app.request('/db/import', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({
@@ -588,7 +588,7 @@ describe('Database Routes', () => {
     it('should return 500 when not connected', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await app.request('/database/import', {
+      const res = await app.request('/db/import', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({
@@ -602,14 +602,14 @@ describe('Database Routes', () => {
 
   // ─── POST /export/save ──────────────────────────────────────
 
-  describe('POST /database/export/save', () => {
+  describe('POST /db/export/save', () => {
     it('should save export to file', async () => {
       mockAdapter.queryOne
         .mockResolvedValueOnce({ exists: true })
         .mockResolvedValueOnce({ version: 'PostgreSQL 16' });
       mockAdapter.query.mockResolvedValue([]);
 
-      const res = await app.request('/database/export/save', {
+      const res = await app.request('/db/export/save', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({}),
@@ -624,7 +624,7 @@ describe('Database Routes', () => {
     it('should return 500 when not connected', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await app.request('/database/export/save', {
+      const res = await app.request('/db/export/save', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({}),
@@ -638,9 +638,9 @@ describe('Database Routes', () => {
 
   // ─── POST /migrate-schema ──────────────────────────────────
 
-  describe('POST /database/migrate-schema', () => {
+  describe('POST /db/migrate-schema', () => {
     it('should run schema migration successfully', async () => {
-      const res = await app.request('/database/migrate-schema', {
+      const res = await app.request('/db/migrate-schema', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({}),
@@ -654,7 +654,7 @@ describe('Database Routes', () => {
     it('should return 500 when not connected', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await app.request('/database/migrate-schema', {
+      const res = await app.request('/db/migrate-schema', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({}),
@@ -668,11 +668,11 @@ describe('Database Routes', () => {
 
   // ─── POST /migrate ────────────────────────────────────────
 
-  describe('POST /database/migrate', () => {
+  describe('POST /db/migrate', () => {
     it('should return 400 when PostgreSQL is not connected', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await app.request('/database/migrate', {
+      const res = await app.request('/db/migrate', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({}),
@@ -686,7 +686,7 @@ describe('Database Routes', () => {
     it('should return 400 when no legacy SQLite data found', async () => {
       mockExistsSync.mockReturnValue(false);
 
-      const res = await app.request('/database/migrate', {
+      const res = await app.request('/db/migrate', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({}),
@@ -700,7 +700,7 @@ describe('Database Routes', () => {
     it('should start migration and return 202', async () => {
       mockExistsSync.mockReturnValue(true);
 
-      const res = await app.request('/database/migrate', {
+      const res = await app.request('/db/migrate', {
         method: 'POST',
         headers: jsonAdminHeaders(),
         body: JSON.stringify({ dryRun: true }),

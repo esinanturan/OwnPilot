@@ -15,9 +15,12 @@ export interface DatabaseStatus {
 }
 
 export interface BackupInfo {
-  name: string;
+  filename: string;
   size: number;
-  created: string;
+  sizeHuman: string;
+  createdAt: string;
+  modifiedAt: string;
+  type: 'sql' | 'custom' | 'json';
 }
 
 export interface DatabaseStats {

@@ -47,13 +47,6 @@ function formatUptime(seconds: number): string {
   return parts.join(' ');
 }
 
-// Format file size
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-}
 
 // Category color map for tool dependency badges
 const CATEGORY_COLORS: Record<string, string> = {
@@ -70,12 +63,12 @@ export function SystemPage() {
   const { confirm } = useDialog();
   const toast = useToast();
 
-  type TabId = 'home' | 'system';
-  const TAB_LABELS: Record<TabId, string> = { home: 'Home', system: 'System' };
+  type TabId = 'home' | 'system' | 'database';
+  const TAB_LABELS: Record<TabId, string> = { home: 'Home', system: 'System', database: 'Database' };
 
   const tabParam = searchParams.get('tab') as TabId | null;
   const activeTab: TabId =
-    tabParam && (['home', 'system'] as string[]).includes(tabParam) ? tabParam : 'home';
+    tabParam && (['home', 'system', 'database'] as string[]).includes(tabParam) ? tabParam : 'home';
   const setTab = (tab: TabId) => {
     const params = new URLSearchParams(searchParams);
     params.set('tab', tab);
@@ -109,6 +102,7 @@ export function SystemPage() {
   const [dbOperationResult, setDbOperationResult] = useState<'success' | 'failure' | null>(null);
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [dbStats, setDbStats] = useState<DatabaseStats | null>(null);
+  const [adminKey, setAdminKey] = useState<string>('');
 
   // Track active poll timers for cleanup
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,10 +125,11 @@ export function SystemPage() {
   const loadSystemStatus = async () => {
     setIsLoadingSystem(true);
     try {
-      const [healthData, dbStatusData, statsData] = await Promise.all([
+      const [healthData, _dbStatusData, statsData, backupsData] = await Promise.all([
         systemApi.health(),
         systemApi.databaseStatus(),
         systemApi.databaseStats().catch(() => null),
+        systemApi.listBackups().catch(() => null),
       ]);
 
       setSandboxStatus(healthData.sandbox ?? null);
@@ -142,7 +137,7 @@ export function SystemPage() {
       setSystemVersion(healthData.version);
       setSystemUptime(healthData.uptime);
 
-      setBackups(dbStatusData.backups || []);
+      setBackups(backupsData?.backups || []);
 
       if (statsData) {
         setDbStats(statsData);
@@ -178,7 +173,7 @@ export function SystemPage() {
     setDbOperationResult(null);
 
     try {
-      await systemApi.databaseOperation(endpoint, body);
+      await systemApi.databaseOperation(endpoint, body, adminKey || undefined);
       setDbOperationOutput([`${operationType} started...`]);
 
       // Poll for status — uses ref-based cancellation for unmount safety
@@ -223,7 +218,7 @@ export function SystemPage() {
     if (!(await confirm({ message: `Delete backup "${filename}"?`, variant: 'danger' }))) return;
 
     try {
-      await systemApi.deleteBackup(filename);
+      await systemApi.deleteBackup(filename, adminKey || undefined);
       toast.success('Backup deleted');
       loadSystemStatus();
     } catch {
@@ -260,7 +255,7 @@ export function SystemPage() {
 
       {/* Tab Bar */}
       <div className="flex border-b border-border dark:border-dark-border px-6">
-        {(['home', 'system'] as TabId[]).map((tab) => (
+        {(['home', 'system', 'database'] as TabId[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setTab(tab)}
@@ -271,6 +266,7 @@ export function SystemPage() {
             }`}
           >
             {tab === 'home' && <Home className="w-3.5 h-3.5" />}
+            {tab === 'database' && <Database className="w-3.5 h-3.5" />}
             {TAB_LABELS[tab]}
           </button>
         ))}
@@ -761,218 +757,6 @@ export function SystemPage() {
               )}
             </section>
 
-            {/* Database Status */}
-            <section className="p-6 bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-xl">
-              <h3 className="text-base font-medium text-text-primary dark:text-dark-text-primary flex items-center gap-2 mb-4">
-                <Database className="w-5 h-5" />
-                Database
-              </h3>
-
-              {databaseStatus ? (
-                <div className="space-y-4">
-                  {/* Database Type & Stats */}
-                  <div className="flex items-center justify-between p-4 bg-bg-tertiary dark:bg-dark-bg-tertiary rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Database className="w-5 h-5 text-info" />
-                      <div>
-                        <p className="font-medium text-text-primary dark:text-dark-text-primary">
-                          PostgreSQL Database
-                        </p>
-                        <p className="text-sm text-text-muted dark:text-dark-text-muted">
-                          {dbStats
-                            ? `${dbStats.database.size} • ${dbStats.tables.length} tables`
-                            : 'Production-ready relational database'}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="px-3 py-1 text-sm font-medium rounded-full bg-info/10 text-info">
-                      PostgreSQL
-                    </span>
-                  </div>
-
-                  {/* Connection Status */}
-                  <div className="flex items-center justify-between p-4 bg-bg-tertiary dark:bg-dark-bg-tertiary rounded-lg">
-                    <div className="flex items-center gap-3">
-                      {databaseStatus.connected ? (
-                        <CheckCircle2 className="w-5 h-5 text-success" />
-                      ) : (
-                        <XCircle className="w-5 h-5 text-error" />
-                      )}
-                      <div>
-                        <p className="font-medium text-text-primary dark:text-dark-text-primary">
-                          Connection Status
-                        </p>
-                        <p className="text-sm text-text-muted dark:text-dark-text-muted">
-                          {databaseStatus.host ? `Host: ${databaseStatus.host}` : 'Connecting...'}
-                          {dbStats &&
-                            ` • ${dbStats.connections.active}/${dbStats.connections.max} connections`}
-                        </p>
-                      </div>
-                    </div>
-                    <span
-                      className={`text-sm font-medium ${databaseStatus.connected ? 'text-success' : 'text-error'}`}
-                    >
-                      {databaseStatus.connected ? 'Connected' : 'Disconnected'}
-                    </span>
-                  </div>
-
-                  {/* Connection Help */}
-                  {!databaseStatus.connected && (
-                    <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-medium text-warning">Database Not Connected</p>
-                          <p className="text-sm text-text-muted dark:text-dark-text-muted mt-1">
-                            Make sure PostgreSQL is running and configured correctly.
-                          </p>
-                          <p className="text-sm text-text-muted dark:text-dark-text-muted mt-2">
-                            Start PostgreSQL with:{' '}
-                            <code className="bg-bg-tertiary dark:bg-dark-bg-tertiary px-1 rounded">
-                              docker compose -f docker-compose.db.yml up -d
-                            </code>
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Backup & Maintenance */}
-                  {databaseStatus.connected && (
-                    <div className="p-4 bg-bg-tertiary dark:bg-dark-bg-tertiary rounded-lg space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Download className="w-5 h-5 text-primary" />
-                          <div>
-                            <p className="font-medium text-text-primary dark:text-dark-text-primary">
-                              Backup & Maintenance
-                            </p>
-                            <p className="text-sm text-text-muted dark:text-dark-text-muted">
-                              Create backups and optimize database
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={createBackup}
-                            disabled={dbOperationRunning}
-                            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 transition-colors"
-                          >
-                            {dbOperationRunning && dbOperationType === 'Backup' ? (
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Download className="w-4 h-4" />
-                            )}
-                            Backup
-                          </button>
-                          <button
-                            onClick={() => runMaintenance('vacuum')}
-                            disabled={dbOperationRunning}
-                            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-lg hover:border-primary disabled:opacity-50 transition-colors"
-                            title="VACUUM - reclaim storage"
-                          >
-                            {dbOperationRunning && dbOperationType.includes('vacuum') ? (
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Wrench className="w-4 h-4" />
-                            )}
-                            Optimize
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Backups List */}
-                      {backups.length > 0 && (
-                        <div className="border-t border-border dark:border-dark-border pt-4">
-                          <p className="text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-2">
-                            Available Backups ({backups.length})
-                          </p>
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {backups.map((backup) => (
-                              <div
-                                key={backup.name}
-                                className="flex items-center justify-between p-2 bg-bg-primary dark:bg-dark-bg-primary rounded-lg"
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-mono text-text-primary dark:text-dark-text-primary truncate">
-                                    {backup.name}
-                                  </p>
-                                  <p className="text-xs text-text-muted dark:text-dark-text-muted">
-                                    {formatSize(backup.size)} •{' '}
-                                    {new Date(backup.created).toLocaleString()}
-                                  </p>
-                                </div>
-                                <div className="flex gap-1 ml-2">
-                                  <button
-                                    onClick={() => restoreBackup(backup.name)}
-                                    disabled={dbOperationRunning}
-                                    className="p-1.5 text-primary hover:bg-primary/10 rounded disabled:opacity-50"
-                                    title="Restore this backup"
-                                  >
-                                    <Upload className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => deleteBackup(backup.name)}
-                                    disabled={dbOperationRunning}
-                                    className="p-1.5 text-error hover:bg-error/10 rounded disabled:opacity-50"
-                                    title="Delete this backup"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Operation Output */}
-                      {dbOperationOutput.length > 0 && (
-                        <div className="border-t border-border dark:border-dark-border pt-4">
-                          <div className="p-3 bg-bg-primary dark:bg-dark-bg-primary rounded-lg max-h-32 overflow-y-auto">
-                            <pre className="text-xs font-mono text-text-muted dark:text-dark-text-muted whitespace-pre-wrap">
-                              {dbOperationOutput.join('\n')}
-                            </pre>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Operation Result */}
-                      {dbOperationResult && (
-                        <div
-                          className={`flex items-center gap-2 p-3 rounded-lg ${
-                            dbOperationResult === 'success'
-                              ? 'bg-success/10 text-success'
-                              : 'bg-error/10 text-error'
-                          }`}
-                        >
-                          {dbOperationResult === 'success' ? (
-                            <>
-                              <CheckCircle2 className="w-4 h-4" />
-                              <span className="text-sm font-medium">
-                                {dbOperationType} completed successfully!
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="w-4 h-4" />
-                              <span className="text-sm font-medium">
-                                {dbOperationType} failed. Check output above.
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-text-muted dark:text-dark-text-muted">
-                  <p>Unable to load database status</p>
-                </div>
-              )}
-            </section>
-
             {/* System Information */}
             <section className="p-6 bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-xl">
               <h3 className="text-base font-medium text-text-primary dark:text-dark-text-primary mb-4">
@@ -1041,6 +825,348 @@ export function SystemPage() {
                 </p>
               </div>
             </section>
+          </div>
+        </div>
+      )}
+
+      {/* Database Tab */}
+      {activeTab === 'database' && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-4xl mx-auto space-y-6">
+            {/* Page Title */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-medium text-text-primary dark:text-dark-text-primary flex items-center gap-2">
+                  <Database className="w-5 h-5" />
+                  Database Management
+                </h3>
+                <p className="text-sm text-text-muted dark:text-dark-text-muted mt-1">
+                  PostgreSQL backup, restore, maintenance, and monitoring
+                </p>
+              </div>
+              <button
+                onClick={loadSystemStatus}
+                disabled={isLoadingSystem}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-bg-tertiary dark:bg-dark-bg-tertiary border border-border dark:border-dark-border rounded-lg hover:border-primary transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoadingSystem ? 'animate-spin' : ''}`} />
+                Refresh
+              </button>
+            </div>
+
+            {/* Admin Key Input */}
+            <section className="p-4 bg-warning/5 border border-warning/20 rounded-xl">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-text-primary dark:text-dark-text-primary mb-1">
+                    Admin Key
+                  </label>
+                  <p className="text-xs text-text-muted dark:text-dark-text-muted">
+                    Required for backup, restore, and maintenance operations. Set ADMIN_KEY env var
+                    on server.
+                  </p>
+                </div>
+                <div className="w-64">
+                  <input
+                    type="password"
+                    value={adminKey}
+                    onChange={(e) => setAdminKey(e.target.value)}
+                    placeholder="Enter admin key..."
+                    className="w-full px-3 py-2 text-sm bg-bg-primary dark:bg-dark-bg-primary border border-border dark:border-dark-border rounded-lg focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* Database Status */}
+            <section className="p-6 bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-xl">
+              <h3 className="text-base font-medium text-text-primary dark:text-dark-text-primary flex items-center gap-2 mb-4">
+                <Activity className="w-5 h-5" />
+                Connection Status
+              </h3>
+
+              {databaseStatus ? (
+                <div className="space-y-4">
+                  {/* Database Type & Stats */}
+                  <div className="flex items-center justify-between p-4 bg-bg-tertiary dark:bg-dark-bg-tertiary rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <Database className="w-5 h-5 text-info" />
+                      <div>
+                        <p className="font-medium text-text-primary dark:text-dark-text-primary">
+                          PostgreSQL Database
+                        </p>
+                        <p className="text-sm text-text-muted dark:text-dark-text-muted">
+                          {dbStats
+                            ? `${dbStats.database.size} • ${dbStats.tables.length} tables • ${dbStats.version}`
+                            : 'Production-ready relational database'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="px-3 py-1 text-sm font-medium rounded-full bg-info/10 text-info">
+                      PostgreSQL
+                    </span>
+                  </div>
+
+                  {/* Connection Status */}
+                  <div className="flex items-center justify-between p-4 bg-bg-tertiary dark:bg-dark-bg-tertiary rounded-lg">
+                    <div className="flex items-center gap-3">
+                      {databaseStatus.connected ? (
+                        <CheckCircle2 className="w-5 h-5 text-success" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-error" />
+                      )}
+                      <div>
+                        <p className="font-medium text-text-primary dark:text-dark-text-primary">
+                          Connection Status
+                        </p>
+                        <p className="text-sm text-text-muted dark:text-dark-text-muted">
+                          {databaseStatus.host ? `Host: ${databaseStatus.host}` : 'Connecting...'}
+                          {dbStats &&
+                            ` • ${dbStats.connections.active}/${dbStats.connections.max} connections`}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-sm font-medium ${databaseStatus.connected ? 'text-success' : 'text-error'}`}
+                    >
+                      {databaseStatus.connected ? 'Connected' : 'Disconnected'}
+                    </span>
+                  </div>
+
+                  {/* Connection Help */}
+                  {!databaseStatus.connected && (
+                    <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-warning">Database Not Connected</p>
+                          <p className="text-sm text-text-muted dark:text-dark-text-muted mt-1">
+                            Make sure PostgreSQL is running and configured correctly.
+                          </p>
+                          <p className="text-sm text-text-muted dark:text-dark-text-muted mt-2">
+                            Start PostgreSQL with:{' '}
+                            <code className="bg-bg-tertiary dark:bg-dark-bg-tertiary px-1 rounded">
+                              docker compose -f docker-compose.db.yml up -d
+                            </code>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-text-muted dark:text-dark-text-muted">
+                  <p>Unable to load database status</p>
+                </div>
+              )}
+            </section>
+
+            {/* Backup & Restore */}
+            {databaseStatus?.connected && (
+              <section className="p-6 bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-xl">
+                <h3 className="text-base font-medium text-text-primary dark:text-dark-text-primary flex items-center gap-2 mb-4">
+                  <Download className="w-5 h-5" />
+                  Backup & Restore
+                </h3>
+
+                <div className="p-4 bg-bg-tertiary dark:bg-dark-bg-tertiary rounded-lg space-y-4">
+                  {/* Actions */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-text-primary dark:text-dark-text-primary">
+                        Database Backups
+                      </p>
+                      <p className="text-sm text-text-muted dark:text-dark-text-muted">
+                        Create SQL backups or restore from existing backups
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={createBackup}
+                        disabled={dbOperationRunning}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 transition-colors"
+                      >
+                        {dbOperationRunning && dbOperationType === 'Backup' ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                        Create Backup
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Backups List */}
+                  {backups.length > 0 && (
+                    <div className="border-t border-border dark:border-dark-border pt-4">
+                      <p className="text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-3">
+                        Available Backups ({backups.length})
+                      </p>
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {backups.map((backup) => (
+                          <div
+                            key={backup.filename}
+                            className="flex items-center justify-between p-3 bg-bg-primary dark:bg-dark-bg-primary rounded-lg"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-mono text-text-primary dark:text-dark-text-primary truncate">
+                                {backup.filename}
+                              </p>
+                              <p className="text-xs text-text-muted dark:text-dark-text-muted">
+                                {backup.sizeHuman} • {backup.type.toUpperCase()} •{' '}
+                                {new Date(backup.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                            <div className="flex gap-1 ml-2">
+                              <a
+                                href={systemApi.downloadBackup(backup.filename)}
+                                download={backup.filename}
+                                className="p-2 text-info hover:bg-info/10 rounded-lg transition-colors"
+                                title="Download backup"
+                              >
+                                <Download className="w-4 h-4" />
+                              </a>
+                              <button
+                                onClick={() => restoreBackup(backup.filename)}
+                                disabled={dbOperationRunning}
+                                className="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50"
+                                title="Restore backup"
+                              >
+                                <Upload className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => deleteBackup(backup.filename)}
+                                disabled={dbOperationRunning}
+                                className="p-2 text-error hover:bg-error/10 rounded-lg transition-colors disabled:opacity-50"
+                                title="Delete backup"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {backups.length === 0 && !dbOperationRunning && (
+                    <div className="border-t border-border dark:border-dark-border pt-4">
+                      <div className="p-4 bg-bg-primary dark:bg-dark-bg-primary rounded-lg text-center">
+                        <Database className="w-8 h-8 text-text-muted mx-auto mb-2" />
+                        <p className="text-sm text-text-muted dark:text-dark-text-muted">
+                          No backups available. Create your first backup above.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Maintenance */}
+            {databaseStatus?.connected && (
+              <section className="p-6 bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-xl">
+                <h3 className="text-base font-medium text-text-primary dark:text-dark-text-primary flex items-center gap-2 mb-4">
+                  <Wrench className="w-5 h-5" />
+                  Maintenance
+                </h3>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* VACUUM */}
+                  <div className="p-4 bg-bg-tertiary dark:bg-dark-bg-tertiary rounded-lg">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium text-text-primary dark:text-dark-text-primary">
+                          VACUUM
+                        </p>
+                        <p className="text-sm text-text-muted dark:text-dark-text-muted mt-1">
+                          Reclaim storage and optimize table performance
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => runMaintenance('vacuum')}
+                        disabled={dbOperationRunning}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-lg hover:border-primary disabled:opacity-50 transition-colors"
+                      >
+                        {dbOperationRunning && dbOperationType.includes('vacuum') ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Wrench className="w-4 h-4" />
+                        )}
+                        Run
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ANALYZE */}
+                  <div className="p-4 bg-bg-tertiary dark:bg-dark-bg-tertiary rounded-lg">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium text-text-primary dark:text-dark-text-primary">
+                          ANALYZE
+                        </p>
+                        <p className="text-sm text-text-muted dark:text-dark-text-muted mt-1">
+                          Update statistics for query optimizer
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => runMaintenance('analyze')}
+                        disabled={dbOperationRunning}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-lg hover:border-primary disabled:opacity-50 transition-colors"
+                      >
+                        {dbOperationRunning && dbOperationType.includes('analyze') ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Activity className="w-4 h-4" />
+                        )}
+                        Run
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Operation Output */}
+            {dbOperationOutput.length > 0 && (
+              <section className="p-6 bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-xl">
+                <h3 className="text-base font-medium text-text-primary dark:text-dark-text-primary mb-4">
+                  Operation Output
+                </h3>
+                <div className="p-4 bg-bg-primary dark:bg-dark-bg-primary rounded-lg">
+                  <pre className="text-xs font-mono text-text-muted dark:text-dark-text-muted whitespace-pre-wrap max-h-48 overflow-y-auto">
+                    {dbOperationOutput.join('\n')}
+                  </pre>
+                </div>
+
+                {/* Operation Result */}
+                {dbOperationResult && (
+                  <div
+                    className={`flex items-center gap-2 p-3 mt-4 rounded-lg ${
+                      dbOperationResult === 'success'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-error/10 text-error'
+                    }`}
+                  >
+                    {dbOperationResult === 'success' ? (
+                      <>
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span className="font-medium">
+                          {dbOperationType} completed successfully!
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-5 h-5" />
+                        <span className="font-medium">
+                          {dbOperationType} failed. Check output above.
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
           </div>
         </div>
       )}

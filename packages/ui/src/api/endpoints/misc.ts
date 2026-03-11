@@ -141,15 +141,19 @@ export const systemApi = {
       database?: DatabaseStatus;
     }>('/health'),
   toolDependencies: () => apiClient.get<ToolDependenciesResponse>('/health/tool-dependencies'),
-  databaseStatus: () => apiClient.get<{ backups: BackupInfo[] }>('/database/status'),
-  databaseStats: () => apiClient.get<DatabaseStats>('/database/stats'),
-  databaseOperation: (endpoint: string, body?: Record<string, unknown>) =>
-    apiClient.post<Record<string, unknown>>(`/database/${endpoint}`, body),
+  databaseStatus: () => apiClient.get<{ backups: BackupInfo[] }>('/db/status'),
+  databaseStats: () => apiClient.get<DatabaseStats>('/db/stats'),
+  databaseOperation: (endpoint: string, body?: Record<string, unknown>, adminKey?: string) =>
+    apiClient.post<Record<string, unknown>>(`/db/${endpoint}`, body, adminKey ? { headers: { 'X-Admin-Key': adminKey } } : undefined),
   databaseOperationStatus: () =>
     apiClient.get<{ output: string[]; isRunning: boolean; lastResult?: string }>(
-      '/database/operation/status'
+      '/db/operation/status'
     ),
-  deleteBackup: (filename: string) => apiClient.delete<void>(`/database/backup/${filename}`),
+  deleteBackup: (filename: string, adminKey?: string) =>
+    apiClient.delete<void>(`/db/backup/${filename}`, adminKey ? { headers: { 'X-Admin-Key': adminKey } } : undefined),
+  listBackups: () =>
+    apiClient.get<{ backups: BackupInfo[]; count: number; backupDir: string }>('/db/backups'),
+  downloadBackup: (filename: string) => `/api/v1/db/backups/${encodeURIComponent(filename)}/download`,
 };
 
 // ---- Debug / Logs ----

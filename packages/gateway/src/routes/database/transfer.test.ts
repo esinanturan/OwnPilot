@@ -72,7 +72,7 @@ import { transferRoutes } from './transfer.js';
 // ---------------------------------------------------------------------------
 function createApp() {
   const app = new Hono();
-  app.route('/database', transferRoutes);
+  app.route('/db', transferRoutes);
   app.onError((err, c) => {
     return c.json({ success: false, error: { code: 'INTERNAL', message: err.message } }, 500);
   });
@@ -127,9 +127,9 @@ describe('Transfer Routes', () => {
   });
 
   // =========================================================================
-  // GET /database/export
+  // GET /db/export
   // =========================================================================
-  describe('GET /database/export', () => {
+  describe('GET /db/export', () => {
     it('returns 200 with JSON payload when adapter is connected', async () => {
       // queryOne: EXISTS check → true, then SELECT version()
       mockAdapter.queryOne
@@ -137,7 +137,7 @@ describe('Transfer Routes', () => {
         .mockResolvedValueOnce({ exists: true })
         .mockResolvedValueOnce({ version: 'PostgreSQL 15.0' });
 
-      const res = await app.request('/database/export');
+      const res = await app.request('/db/export');
       expect(res.status).toBe(200);
 
       const json = JSON.parse(await res.text());
@@ -153,7 +153,7 @@ describe('Transfer Routes', () => {
         .mockResolvedValueOnce({ version: 'PostgreSQL 15.5' });
       mockAdapter.query.mockResolvedValue([{ id: 1 }, { id: 2 }]);
 
-      const res = await app.request('/database/export');
+      const res = await app.request('/db/export');
       const json = JSON.parse(await res.text());
 
       expect(json.database.version).toBe('PostgreSQL 15.5');
@@ -167,7 +167,7 @@ describe('Transfer Routes', () => {
         .mockResolvedValueOnce({ exists: true })
         .mockResolvedValueOnce({ version: 'PostgreSQL 15.0' });
 
-      const res = await app.request('/database/export');
+      const res = await app.request('/db/export');
       expect(res.headers.get('Content-Disposition')).toMatch(
         /attachment; filename="ownpilot-export-/
       );
@@ -176,7 +176,7 @@ describe('Transfer Routes', () => {
     it('returns 500 when adapter.isConnected() returns false', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await app.request('/database/export');
+      const res = await app.request('/db/export');
       expect(res.status).toBe(500);
       const json = await res.json();
       expect(json.error.code).toBe('EXPORT_FAILED');
@@ -187,7 +187,7 @@ describe('Transfer Routes', () => {
         throw new Error('Invalid table name');
       });
 
-      const res = await app.request('/database/export?tables=invalid1,invalid2');
+      const res = await app.request('/db/export?tables=invalid1,invalid2');
       expect(res.status).toBe(400);
       const json = await res.json();
       expect(json.error.code).toBe('INVALID_TABLES');
@@ -200,7 +200,7 @@ describe('Transfer Routes', () => {
         .mockResolvedValueOnce({ exists: false })
         .mockResolvedValueOnce({ version: 'PostgreSQL 15.0' });
 
-      const res = await app.request('/database/export');
+      const res = await app.request('/db/export');
       const json = JSON.parse(await res.text());
 
       expect(json.tableCount).toBe(0);
@@ -217,7 +217,7 @@ describe('Transfer Routes', () => {
         .mockRejectedValueOnce(new Error('Permission denied'))
         .mockResolvedValueOnce([{ id: 1 }]);
 
-      const res = await app.request('/database/export');
+      const res = await app.request('/db/export');
       const json = JSON.parse(await res.text());
 
       expect(json.errors).toBeDefined();
@@ -238,7 +238,7 @@ describe('Transfer Routes', () => {
         .mockResolvedValueOnce({ version: 'PostgreSQL 15.0' });
       mockAdapter.query.mockResolvedValue([{ id: 1 }]);
 
-      const res = await app.request('/database/export?tables=users,conversations');
+      const res = await app.request('/db/export?tables=users,conversations');
       expect(res.status).toBe(200);
       const json = JSON.parse(await res.text());
       // Only 'users' is in the result (conversations was invalid)
@@ -255,7 +255,7 @@ describe('Transfer Routes', () => {
         .mockResolvedValueOnce([{ id: 1, name: 'Alice' }])
         .mockResolvedValueOnce([{ id: 2, name: 'Bob' }]);
 
-      const res = await app.request('/database/export');
+      const res = await app.request('/db/export');
       const json = JSON.parse(await res.text());
 
       // EXPORT_TABLES mock = ['users', 'conversations']
@@ -270,7 +270,7 @@ describe('Transfer Routes', () => {
         .mockResolvedValueOnce({ exists: true })
         .mockResolvedValueOnce(null);
 
-      const res = await app.request('/database/export');
+      const res = await app.request('/db/export');
       const json = JSON.parse(await res.text());
       expect(json.database.version).toBe('unknown');
     });
@@ -281,16 +281,16 @@ describe('Transfer Routes', () => {
         .mockResolvedValueOnce({ exists: true })
         .mockResolvedValueOnce({ version: 'PostgreSQL 15.0' });
 
-      const res = await app.request('/database/export');
+      const res = await app.request('/db/export');
       const json = JSON.parse(await res.text());
       expect(json.errors).toBeUndefined();
     });
   });
 
   // =========================================================================
-  // POST /database/import
+  // POST /db/import
   // =========================================================================
-  describe('POST /database/import', () => {
+  describe('POST /db/import', () => {
     const validImportBody = {
       data: {
         version: '1.0',
@@ -303,7 +303,7 @@ describe('Transfer Routes', () => {
     };
 
     it('returns 202 with "Import started" and tables list', async () => {
-      const res = await jsonPost(app, '/database/import', validImportBody);
+      const res = await jsonPost(app, '/db/import', validImportBody);
       expect(res.status).toBe(202);
       const json = await res.json();
       expect(json.data.message).toBe('Import started');
@@ -315,7 +315,7 @@ describe('Transfer Routes', () => {
     it('returns 409 when operationStatus.isRunning is true', async () => {
       Object.assign(mockOperationStatus, { isRunning: true, operation: 'restore' });
 
-      const res = await jsonPost(app, '/database/import', validImportBody);
+      const res = await jsonPost(app, '/db/import', validImportBody);
       expect(res.status).toBe(409);
       const json = await res.json();
       expect(json.error.code).toBe('OPERATION_IN_PROGRESS');
@@ -323,7 +323,7 @@ describe('Transfer Routes', () => {
     });
 
     it('returns 400 when body has no data.tables', async () => {
-      const res = await jsonPost(app, '/database/import', { data: { version: '1.0' } });
+      const res = await jsonPost(app, '/db/import', { data: { version: '1.0' } });
       expect(res.status).toBe(400);
       const json = await res.json();
       expect(json.error.code).toBe('INVALID_IMPORT_DATA');
@@ -334,7 +334,7 @@ describe('Transfer Routes', () => {
         throw new Error('Not in whitelist');
       });
 
-      const res = await jsonPost(app, '/database/import', validImportBody);
+      const res = await jsonPost(app, '/db/import', validImportBody);
       expect(res.status).toBe(400);
       const json = await res.json();
       expect(json.error.code).toBe('INVALID_TABLES');
@@ -343,14 +343,14 @@ describe('Transfer Routes', () => {
     it('returns 500 when adapter is not connected', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await jsonPost(app, '/database/import', validImportBody);
+      const res = await jsonPost(app, '/db/import', validImportBody);
       expect(res.status).toBe(500);
       const json = await res.json();
       expect(json.error.code).toBe('IMPORT_FAILED');
     });
 
     it('calls setOperationStatus with isRunning: true at start of import', async () => {
-      const res = await jsonPost(app, '/database/import', validImportBody);
+      const res = await jsonPost(app, '/db/import', validImportBody);
       expect(res.status).toBe(202);
       expect(mockSetOperationStatus).toHaveBeenCalledWith(
         expect.objectContaining({ isRunning: true, operation: 'restore' })
@@ -360,7 +360,7 @@ describe('Transfer Routes', () => {
     it('starts background import process without blocking the response', async () => {
       // The response should come back immediately as 202
       const start = Date.now();
-      const res = await jsonPost(app, '/database/import', validImportBody);
+      const res = await jsonPost(app, '/db/import', validImportBody);
       const elapsed = Date.now() - start;
       expect(res.status).toBe(202);
       // Should respond quickly (background work not awaited)
@@ -379,7 +379,7 @@ describe('Transfer Routes', () => {
         options: { tables: ['users'] },
       };
 
-      const res = await jsonPost(app, '/database/import', bodyWithOptions);
+      const res = await jsonPost(app, '/db/import', bodyWithOptions);
       expect(res.status).toBe(202);
       const json = await res.json();
       // Only 'users' requested via options.tables
@@ -392,7 +392,7 @@ describe('Transfer Routes', () => {
         options: { truncate: true, skipExisting: false },
       };
 
-      const res = await jsonPost(app, '/database/import', bodyWithOptions);
+      const res = await jsonPost(app, '/db/import', bodyWithOptions);
       expect(res.status).toBe(202);
       const json = await res.json();
       expect(json.data.options).toMatchObject({ truncate: true, skipExisting: false });
@@ -401,7 +401,7 @@ describe('Transfer Routes', () => {
     it('returns 409 when import is already running with backup operation', async () => {
       Object.assign(mockOperationStatus, { isRunning: true, operation: 'backup' });
 
-      const res = await jsonPost(app, '/database/import', validImportBody);
+      const res = await jsonPost(app, '/db/import', validImportBody);
       expect(res.status).toBe(409);
       const json = await res.json();
       expect(json.error.message).toContain('backup');
@@ -409,9 +409,9 @@ describe('Transfer Routes', () => {
   });
 
   // =========================================================================
-  // POST /database/export/save
+  // POST /db/export/save
   // =========================================================================
-  describe('POST /database/export/save', () => {
+  describe('POST /db/export/save', () => {
     beforeEach(() => {
       // Default: both tables exist, each has one row, then version query
       mockAdapter.queryOne
@@ -422,7 +422,7 @@ describe('Transfer Routes', () => {
     });
 
     it('returns 200 with filename, path, tableCount and totalRows', async () => {
-      const res = await app.request('/database/export/save', { method: 'POST' });
+      const res = await app.request('/db/export/save', { method: 'POST' });
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.data.message).toBe('Export saved successfully');
@@ -433,7 +433,7 @@ describe('Transfer Routes', () => {
     });
 
     it('calls writeFile with a path inside the backup directory', async () => {
-      const res = await app.request('/database/export/save', { method: 'POST' });
+      const res = await app.request('/db/export/save', { method: 'POST' });
       expect(res.status).toBe(200);
       expect(mockWriteFile).toHaveBeenCalledOnce();
       const [filepath] = mockWriteFile.mock.calls[0] as [string, ...unknown[]];
@@ -444,7 +444,7 @@ describe('Transfer Routes', () => {
     });
 
     it('writes valid JSON content to the file', async () => {
-      const res = await app.request('/database/export/save', { method: 'POST' });
+      const res = await app.request('/db/export/save', { method: 'POST' });
       expect(res.status).toBe(200);
       const [, content] = mockWriteFile.mock.calls[0] as [string, string, ...unknown[]];
       const parsed = JSON.parse(content);
@@ -456,7 +456,7 @@ describe('Transfer Routes', () => {
     it('returns 500 when adapter is not connected', async () => {
       mockAdapter.isConnected.mockReturnValue(false);
 
-      const res = await app.request('/database/export/save', { method: 'POST' });
+      const res = await app.request('/db/export/save', { method: 'POST' });
       expect(res.status).toBe(500);
       const json = await res.json();
       expect(json.error.code).toBe('EXPORT_SAVE_FAILED');
@@ -465,7 +465,7 @@ describe('Transfer Routes', () => {
     it('returns 500 when writeFile throws', async () => {
       mockWriteFile.mockRejectedValueOnce(new Error('Disk full'));
 
-      const res = await app.request('/database/export/save', { method: 'POST' });
+      const res = await app.request('/db/export/save', { method: 'POST' });
       expect(res.status).toBe(500);
       const json = await res.json();
       expect(json.error.code).toBe('EXPORT_SAVE_FAILED');
@@ -481,7 +481,7 @@ describe('Transfer Routes', () => {
         .mockResolvedValueOnce({ exists: true })
         .mockResolvedValueOnce({ version: 'PostgreSQL 15.0' });
 
-      const res = await app.request('/database/export/save', { method: 'POST' });
+      const res = await app.request('/db/export/save', { method: 'POST' });
       expect(res.status).toBe(200);
       const [filepath] = mockWriteFile.mock.calls[0] as [string, ...unknown[]];
       // Normalize separators for cross-platform comparison
@@ -497,7 +497,7 @@ describe('Transfer Routes', () => {
         .mockResolvedValueOnce({ exists: false })
         .mockResolvedValueOnce({ version: 'PostgreSQL 15.0' });
 
-      const res = await app.request('/database/export/save', { method: 'POST' });
+      const res = await app.request('/db/export/save', { method: 'POST' });
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.data.tableCount).toBe(0);
@@ -515,7 +515,7 @@ describe('Transfer Routes', () => {
         .mockResolvedValueOnce([{ id: 1 }, { id: 2 }, { id: 3 }])
         .mockResolvedValueOnce([{ id: 4 }, { id: 5 }]);
 
-      const res = await app.request('/database/export/save', { method: 'POST' });
+      const res = await app.request('/db/export/save', { method: 'POST' });
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.data.tableCount).toBe(2);

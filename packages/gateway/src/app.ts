@@ -361,8 +361,8 @@ export function createApp(config: Partial<GatewayConfig> = {}): Hono {
   // Custom Tools (LLM-created and user-defined tools)
   app.route('/api/v1/custom-tools', customToolsRoutes);
 
-  // Database Admin (migration, status)
-  app.route('/api/v1/database', databaseRoutes);
+  // Database Admin (migration, status, backup, restore)
+  app.route('/api/v1/db', databaseRoutes);
 
   // Expenses
   app.route('/api/v1/expenses', expensesRoutes);

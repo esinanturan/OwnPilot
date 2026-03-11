@@ -23,7 +23,10 @@ vi.mock('../../../services/log.js', () => ({
 vi.mock('../../../routes/helpers.js', () => ({
   getErrorMessage: (error: unknown) => String(error),
 }));
-vi.mock('../../../config/defaults.js', () => ({ MAX_MESSAGE_CHAT_MAP_SIZE: 1000 }));
+vi.mock('../../../config/defaults.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return { ...actual, MAX_MESSAGE_CHAT_MAP_SIZE: 1000 };
+});
 vi.mock('../../utils/message-utils.js', () => ({ splitMessage: (text: string) => [text] }));
 vi.mock('./session-store.js', () => ({ getSessionDir: vi.fn(), clearSession: vi.fn() }));
 vi.mock('../../../ws/server.js', () => ({ wsGateway: { broadcast: vi.fn() } }));

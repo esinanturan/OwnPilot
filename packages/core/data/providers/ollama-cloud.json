@@ -235,23 +235,6 @@
       "releaseDate": "2025-11-19"
     },
     {
-      "id": "gemini-3-pro-preview",
-      "name": "gemini-3-pro-preview",
-      "contextWindow": 1048576,
-      "maxOutput": 64000,
-      "inputPrice": 0,
-      "outputPrice": 0,
-      "capabilities": [
-        "chat",
-        "vision",
-        "function_calling",
-        "reasoning",
-        "streaming"
-      ],
-      "default": false,
-      "releaseDate": "2025-11-18"
-    },
-    {
       "id": "kimi-k2-thinking",
       "name": "kimi-k2-thinking",
       "contextWindow": 262144,

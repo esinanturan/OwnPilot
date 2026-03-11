@@ -51,7 +51,7 @@ export function WizardShell({
   children,
 }: WizardShellProps) {
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex flex-col">
+    <div className="h-[calc(100vh-4rem)] flex flex-col">
       {/* Header */}
       <div className="border-b border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary px-6 py-4">
         <div className="max-w-2xl mx-auto flex items-center justify-between">

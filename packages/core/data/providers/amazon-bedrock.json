@@ -46,6 +46,21 @@
       "releaseDate": "2026-02-17"
     },
     {
+      "id": "mistral.devstral-2-123b",
+      "name": "Devstral 2 135B",
+      "contextWindow": 256000,
+      "maxOutput": 8192,
+      "inputPrice": 0.4,
+      "outputPrice": 2,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2026-02-17"
+    },
+    {
       "id": "global.anthropic.claude-sonnet-4-6",
       "name": "Claude Sonnet 4.6 (Global)",
       "contextWindow": 200000,
@@ -115,7 +130,7 @@
     {
       "id": "global.anthropic.claude-opus-4-6-v1",
       "name": "Claude Opus 4.6 (Global)",
-      "contextWindow": 1000000,
+      "contextWindow": 200000,
       "maxOutput": 128000,
       "inputPrice": 5,
       "outputPrice": 25,
@@ -132,7 +147,7 @@
     {
       "id": "us.anthropic.claude-opus-4-6-v1",
       "name": "Claude Opus 4.6 (US)",
-      "contextWindow": 1000000,
+      "contextWindow": 200000,
       "maxOutput": 128000,
       "inputPrice": 5,
       "outputPrice": 25,
@@ -149,7 +164,7 @@
     {
       "id": "anthropic.claude-opus-4-6-v1",
       "name": "Claude Opus 4.6",
-      "contextWindow": 1000000,
+      "contextWindow": 200000,
       "maxOutput": 128000,
       "inputPrice": 5,
       "outputPrice": 25,
@@ -166,7 +181,7 @@
     {
       "id": "eu.anthropic.claude-opus-4-6-v1",
       "name": "Claude Opus 4.6 (EU)",
-      "contextWindow": 1000000,
+      "contextWindow": 200000,
       "maxOutput": 128000,
       "inputPrice": 5,
       "outputPrice": 25,

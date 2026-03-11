@@ -52,7 +52,7 @@
     {
       "id": "zai-org/glm-5-maas",
       "name": "GLM-5",
-      "contextWindow": 204800,
+      "contextWindow": 202752,
       "maxOutput": 131072,
       "inputPrice": 1,
       "outputPrice": 3.2,

@@ -113,7 +113,6 @@
       "outputPrice": 2.36,
       "capabilities": [
         "chat",
-        "function_calling",
         "streaming"
       ],
       "default": false,
@@ -143,7 +142,7 @@
       "outputPrice": 0.47,
       "capabilities": [
         "chat",
-        "function_calling",
+        "vision",
         "streaming"
       ],
       "default": false,
@@ -158,7 +157,6 @@
       "outputPrice": 1.18,
       "capabilities": [
         "chat",
-        "function_calling",
         "streaming"
       ],
       "default": false,

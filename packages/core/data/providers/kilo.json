@@ -12,6 +12,37 @@
   },
   "models": [
     {
+      "id": "inception/mercury-2",
+      "name": "Inception: Mercury 2",
+      "contextWindow": 128000,
+      "maxOutput": 50000,
+      "inputPrice": 0.25,
+      "outputPrice": 0.75,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "reasoning",
+        "streaming"
+      ],
+      "default": true,
+      "releaseDate": "2026-02-24"
+    },
+    {
+      "id": "inception/mercury-edit",
+      "name": "Inception: Mercury Edit",
+      "contextWindow": 128000,
+      "maxOutput": 8192,
+      "inputPrice": 0.25,
+      "outputPrice": 0.75,
+      "capabilities": [
+        "chat",
+        "reasoning",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2026-02-24"
+    },
+    {
       "id": "qwen/qwen3.5-397b-a17b",
       "name": "Qwen: Qwen3.5 397B A17B",
       "contextWindow": 256000,
@@ -25,7 +56,7 @@
         "reasoning",
         "streaming"
       ],
-      "default": true,
+      "default": false,
       "releaseDate": "2026-02-15"
     },
     {

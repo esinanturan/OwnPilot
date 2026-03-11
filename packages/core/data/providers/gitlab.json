@@ -14,7 +14,7 @@
     {
       "id": "duo-chat-sonnet-4-6",
       "name": "Agentic Chat (Claude Sonnet 4.6)",
-      "contextWindow": 200000,
+      "contextWindow": 1000000,
       "maxOutput": 64000,
       "inputPrice": 0,
       "outputPrice": 0,
@@ -31,7 +31,7 @@
     {
       "id": "duo-chat-opus-4-6",
       "name": "Agentic Chat (Claude Opus 4.6)",
-      "contextWindow": 200000,
+      "contextWindow": 1000000,
       "maxOutput": 64000,
       "inputPrice": 0,
       "outputPrice": 0,

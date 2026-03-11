@@ -12,6 +12,40 @@
   },
   "models": [
     {
+      "id": "qwen/qwen3.5-397b-a17b",
+      "name": "Qwen3.5-397B-A17B",
+      "contextWindow": 262144,
+      "maxOutput": 8192,
+      "inputPrice": 0,
+      "outputPrice": 0,
+      "capabilities": [
+        "chat",
+        "vision",
+        "function_calling",
+        "json_mode",
+        "reasoning",
+        "streaming"
+      ],
+      "default": true,
+      "releaseDate": "2026-02-16"
+    },
+    {
+      "id": "minimaxai/minimax-m2.5",
+      "name": "MiniMax-M2.5",
+      "contextWindow": 204800,
+      "maxOutput": 131072,
+      "inputPrice": 0,
+      "outputPrice": 0,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "reasoning",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2026-02-12"
+    },
+    {
       "id": "z-ai/glm5",
       "name": "GLM5",
       "contextWindow": 202752,
@@ -25,8 +59,24 @@
         "reasoning",
         "streaming"
       ],
-      "default": true,
+      "default": false,
       "releaseDate": "2026-02-12"
+    },
+    {
+      "id": "stepfun-ai/step-3-5-flash",
+      "name": "Step 3.5 Flash",
+      "contextWindow": 256000,
+      "maxOutput": 16384,
+      "inputPrice": 0,
+      "outputPrice": 0,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "reasoning",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2026-02-02"
     },
     {
       "id": "moonshotai/kimi-k2.5",
@@ -160,22 +210,6 @@
       ],
       "default": false,
       "releaseDate": "2025-11"
-    },
-    {
-      "id": "minimaxai/minimax-m2",
-      "name": "MiniMax-M2",
-      "contextWindow": 128000,
-      "maxOutput": 16384,
-      "inputPrice": 0,
-      "outputPrice": 0,
-      "capabilities": [
-        "chat",
-        "function_calling",
-        "reasoning",
-        "streaming"
-      ],
-      "default": false,
-      "releaseDate": "2025-10-27"
     },
     {
       "id": "deepseek-ai/deepseek-v3.1-terminus",

@@ -148,14 +148,14 @@ describe('AutonomyEngine', () => {
   // ============================================================================
 
   describe('runPulse', () => {
-    it('returns a PulseResult', async () => {
+    it('returns a PulseResult (skips LLM when no signals)', async () => {
       const result = await engine.runPulse('test-user', true);
 
       expect(result.pulseId).toBe('test-id');
       expect(result.userId).toBe('test-user');
       expect(result.manual).toBe(true);
       expect(result.signalsFound).toBe(0);
-      expect(result.llmCalled).toBe(true);
+      expect(result.llmCalled).toBe(false);
       expect(result.durationMs).toBeGreaterThanOrEqual(0);
     });
 

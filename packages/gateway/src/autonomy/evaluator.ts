@@ -285,7 +285,7 @@ export function evaluatePulseContext(
   const urgencyScore = Math.min(100, rawScore);
 
   return {
-    shouldCallLLM: true,
+    shouldCallLLM: signals.length > 0,
     signals,
     urgencyScore,
   };

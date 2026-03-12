@@ -188,6 +188,40 @@ export class AutonomyEngine implements IPulseService {
         urgencyScore: evaluation.urgencyScore,
       });
 
+      // Skip LLM if no signals detected (save tokens)
+      if (!evaluation.shouldCallLLM) {
+        log.info(`[Pulse ${pulseId}] No signals detected, skipping LLM call`);
+
+        const result: PulseResult = {
+          pulseId,
+          userId,
+          pulsedAt: new Date(),
+          durationMs: Date.now() - startTime,
+          signalsFound: 0,
+          llmCalled: false,
+          actionsExecuted: [{ type: 'skip', success: true, skipped: true }],
+          reportMessage: '',
+          urgencyScore: 0,
+          manual,
+        };
+
+        await this.logResult(result);
+        this.lastPulseResult = result;
+        this.broadcastActivity('completed', 'done', {
+          signalsFound: 0,
+          actionsExecuted: 0,
+          durationMs: result.durationMs,
+        });
+
+        if (this.running && !manual) {
+          const nextMs = this.config.maxIntervalMs;
+          log.info(`[Pulse] Next pulse in ${Math.round(nextMs / 60_000)}min (no signals)`);
+          this.scheduleNext(nextMs);
+        }
+
+        return result;
+      }
+
       // Compute cooldown status for the agent prompt
       const lastActionTimes = this.getLastActionTimes();
       const cooledDownActions: Array<{ type: string; remainingMinutes: number }> = [];

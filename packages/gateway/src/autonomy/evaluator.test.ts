@@ -36,11 +36,11 @@ function makeContext(overrides: Partial<PulseContext> = {}): PulseContext {
 // ============================================================================
 
 describe('evaluatePulseContext', () => {
-  it('returns no signals for clean context', () => {
+  it('returns no signals for clean context and skips LLM', () => {
     const ctx = makeContext();
     const result = evaluatePulseContext(ctx);
 
-    expect(result.shouldCallLLM).toBe(true);
+    expect(result.shouldCallLLM).toBe(false);
     expect(result.signals).toHaveLength(0);
     expect(result.urgencyScore).toBe(0);
   });
@@ -291,7 +291,8 @@ describe('evaluatePulseContext with disabledRules', () => {
     expect(result.signals.find((s) => s.id === 'stale_goals')).toBeUndefined();
     expect(result.signals.find((s) => s.id === 'no_activity')).toBeUndefined();
     expect(result.signals.find((s) => s.id === 'memory_cleanup')).toBeUndefined();
-    expect(result.shouldCallLLM).toBe(true);
+    // All signal-producing rules are disabled, so no LLM call needed
+    expect(result.shouldCallLLM).toBe(false);
   });
 
   it('only disables specified rules, others still fire', () => {

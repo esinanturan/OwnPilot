@@ -174,6 +174,8 @@ export async function runClaudeCode(
     };
   }
 
+  // Set API key in env only for the duration of the SDK call (avoid global mutation)
+  const prevKey = process.env.ANTHROPIC_API_KEY;
   process.env.ANTHROPIC_API_KEY = apiKey;
 
   let sdkModule: { query: (...args: unknown[]) => AsyncIterable<Record<string, unknown>> };
@@ -212,7 +214,7 @@ export async function runClaudeCode(
       prompt: fullPrompt,
       options: {
         allowedTools,
-        permissionMode: perms.autonomy === 'full-auto' ? 'bypassPermissions' : 'bypassPermissions',
+        permissionMode: perms.autonomy === 'full-auto' ? 'bypassPermissions' : 'default',
         allowDangerouslySkipPermissions: true,
         cwd,
         model: task.model && task.model !== 'default' ? task.model : undefined,
@@ -232,6 +234,13 @@ export async function runClaudeCode(
       durationMs: Date.now() - start,
       error: getErrorMessage(err),
     };
+  } finally {
+    // Restore original env to avoid leaking API key across concurrent calls
+    if (prevKey !== undefined) {
+      process.env.ANTHROPIC_API_KEY = prevKey;
+    } else {
+      delete process.env.ANTHROPIC_API_KEY;
+    }
   }
 
   return {

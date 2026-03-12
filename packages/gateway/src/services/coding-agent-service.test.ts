@@ -273,7 +273,7 @@ describe('CodingAgentService', () => {
           options: expect.objectContaining({
             maxBudgetUsd: 0.5,
             maxTurns: 5,
-            permissionMode: 'bypassPermissions',
+            permissionMode: 'default',
           }),
         })
       );

@@ -290,6 +290,13 @@ export async function listOrchestrations(
   return records.map(recordToRun);
 }
 
+/**
+ * Count total orchestration runs for a user (for pagination).
+ */
+export async function countOrchestrations(userId: string): Promise<number> {
+  return orchestrationRunsRepo.count(userId);
+}
+
 // =============================================================================
 // THE LOOP — The core orchestration engine
 // =============================================================================

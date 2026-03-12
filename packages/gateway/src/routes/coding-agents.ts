@@ -14,6 +14,7 @@ import {
   cancelOrchestration,
   getOrchestration,
   listOrchestrations,
+  countOrchestrations,
 } from '../services/coding-agent-orchestrator.js';
 import { codingAgentResultsRepo } from '../db/repositories/coding-agent-results.js';
 import { orchestrationRunsRepo } from '../db/repositories/orchestration-runs.js';
@@ -796,8 +797,11 @@ codingAgentsRoutes.post('/orchestrate', async (c) => {
 codingAgentsRoutes.get('/orchestrate', async (c) => {
   const userId = getUserId(c);
   const { limit, offset } = getPaginationParams(c);
-  const runs = await listOrchestrations(userId, limit, offset);
-  return apiResponse(c, { runs, total: runs.length });
+  const [runs, total] = await Promise.all([
+    listOrchestrations(userId, limit, offset),
+    countOrchestrations(userId),
+  ]);
+  return apiResponse(c, { runs, total });
 });
 
 /**

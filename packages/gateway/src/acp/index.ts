@@ -12,7 +12,13 @@ export {
   mapSessionUpdate,
   type MappedAcpEvent,
 } from './acp-event-mapper.js';
-export { isAcpSupported, buildAcpArgs, getAcpBinary } from './acp-provider-support.js';
+export {
+  isAcpSupported,
+  buildAcpArgs,
+  getAcpBinary,
+  getAcpMode,
+  getAcpBridgePackage,
+} from './acp-provider-support.js';
 export type {
   AcpConnectionState,
   AcpSession,

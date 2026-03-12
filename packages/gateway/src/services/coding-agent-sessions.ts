@@ -633,6 +633,16 @@ export class CodingAgentSessionManager {
       state: managed.session.state,
     });
 
+    // Send current state first so UI knows context before output replay
+    wsSessionManager.send(
+      wsSessionId,
+      'coding-agent:session:state' as never,
+      {
+        sessionId: codingSessionId,
+        state: managed.session.state,
+      } as never
+    );
+
     // Replay output buffer for reconnection
     if (managed.outputBuffer.length > 0) {
       wsSessionManager.send(
@@ -644,16 +654,6 @@ export class CodingAgentSessionManager {
         } as never
       );
     }
-
-    // Send current state
-    wsSessionManager.send(
-      wsSessionId,
-      'coding-agent:session:state' as never,
-      {
-        sessionId: codingSessionId,
-        state: managed.session.state,
-      } as never
-    );
 
     // Send ACP snapshot on reconnect (tool calls, plan)
     if (managed.acpClient) {

@@ -72,6 +72,23 @@ class McpClientService implements IMcpClientService {
       // Connect
       await client.connect(transport);
 
+      // Handle post-connection transport/client errors gracefully
+      // Without these, a dying MCP server causes unhandled rejections → process crash
+      const handleTransportError = (err: unknown) => {
+        log.warn(`MCP server "${server.displayName}" transport error — disconnecting`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        this.handleUnexpectedDisconnect(server.name, server.id).catch(() => {});
+      };
+
+      transport.onerror = handleTransportError;
+      transport.onclose = () => {
+        if (this.connections.has(server.name)) {
+          log.warn(`MCP server "${server.displayName}" transport closed unexpectedly`);
+          this.handleUnexpectedDisconnect(server.name, server.id).catch(() => {});
+        }
+      };
+
       // List available tools
       const result = await client.listTools();
       const mcpTools: McpToolInfo[] = (result.tools ?? []).map((t) => ({
@@ -241,6 +258,41 @@ class McpClientService implements IMcpClientService {
   // ===========================================================================
   // PRIVATE HELPERS
   // ===========================================================================
+
+  /**
+   * Handle unexpected disconnection from an MCP server without crashing the process.
+   */
+  private async handleUnexpectedDisconnect(serverName: string, serverId: string): Promise<void> {
+    const conn = this.connections.get(serverName);
+    if (!conn) return;
+
+    // Unregister tools
+    const registry = getSharedToolRegistry();
+    registry.unregisterMcpTools(serverName);
+    this.connections.delete(serverName);
+
+    // Best-effort transport cleanup
+    try {
+      await conn.transport.close?.();
+    } catch {
+      /* already broken */
+    }
+
+    // Update DB status
+    try {
+      const repo = getMcpServersRepo();
+      await repo.updateStatus(serverId, 'error', 'Transport closed unexpectedly');
+    } catch {
+      /* DB update is best-effort */
+    }
+
+    getEventSystem().emit('mcp.server.disconnected', 'mcp-client', {
+      serverName,
+      reason: 'transport_error',
+    });
+
+    log.info(`Cleaned up MCP server "${serverName}" after unexpected disconnect`);
+  }
 
   private createTransport(server: McpServerRecord): Transport {
     switch (server.transport) {

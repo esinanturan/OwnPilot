@@ -151,6 +151,14 @@ export class OrchestrationRunsRepository extends BaseRepository {
     return rows.map(rowToRecord);
   }
 
+  async count(userId: string): Promise<number> {
+    const row = await this.queryOne<{ count: string }>(
+      'SELECT COUNT(*) as count FROM orchestration_runs WHERE user_id = $1',
+      [userId]
+    );
+    return parseInt(row?.count ?? '0', 10);
+  }
+
   async listActive(userId: string): Promise<OrchestrationRunRecord[]> {
     const rows = await this.query<RunRow>(
       `SELECT * FROM orchestration_runs

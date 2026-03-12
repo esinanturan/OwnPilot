@@ -351,6 +351,7 @@ export interface McpServerConnectedData {
 
 export interface McpServerDisconnectedData {
   serverName: string;
+  reason?: string;
 }
 
 // ============================================================================

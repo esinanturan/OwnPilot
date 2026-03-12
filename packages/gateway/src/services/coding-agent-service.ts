@@ -55,7 +55,7 @@ import {
   runCodex,
   runGeminiCli,
 } from './coding-agent-providers.js';
-import { isAcpSupported, buildAcpArgs } from '../acp/acp-provider-support.js';
+import { isAcpSupported, buildAcpArgs, getAcpBinary, getAcpMode } from '../acp/acp-provider-support.js';
 import type { AcpMcpServerConfig } from '../acp/types.js';
 
 const log = getLog('CodingAgent');
@@ -323,13 +323,23 @@ class CodingAgentService implements ICodingAgentService {
       throw new Error(`Unknown provider: ${provider}`);
     }
 
-    // All session modes require the CLI binary
-    if (!isBinaryInstalled(binary)) {
+    const displayName = customName
+      ? customName
+      : isBuiltinProvider(provider)
+        ? DISPLAY_NAMES[provider]
+        : provider;
+
+    // Check ACP mode early — bridge mode uses 'npx' instead of provider binary
+    const useAcp =
+      input.mode !== 'interactive' && isBuiltinProvider(provider) && isAcpSupported(provider);
+    const acpMode = useAcp && isBuiltinProvider(provider) ? getAcpMode(provider) : null;
+
+    // For bridge-mode ACP, validate 'npx'; otherwise validate the provider binary
+    const binaryToCheck = acpMode === 'bridge' ? 'npx' : binary;
+    if (!isBinaryInstalled(binaryToCheck)) {
       const installHint = INSTALL_COMMANDS[provider as BuiltinCodingAgentProvider];
-      const displayName =
-        customName ?? (isBuiltinProvider(provider) ? DISPLAY_NAMES[provider] : provider);
       throw new Error(
-        `${displayName} CLI ('${binary}') not found on PATH.` +
+        `${displayName} CLI ('${binaryToCheck}') not found on PATH.` +
           (installHint ? ` Install: ${installHint}` : ' Ensure the binary is on your PATH.')
       );
     }
@@ -338,34 +348,21 @@ class CodingAgentService implements ICodingAgentService {
     const cwd = input.cwd ? validateCwd(input.cwd, allowedDirs) : process.cwd();
     const env = createSanitizedEnv(provider, apiKey, apiKeyEnvVar);
 
-    // Build CLI args: custom providers get their own template, built-in use existing logic
-    let cliArgs: string[];
-    if (customName) {
-      const cp = await cliProvidersRepo.getByName(customName, userId);
-      cliArgs = this.buildCustomSessionArgs(input, cp!);
-    } else {
-      cliArgs = this.buildSessionArgs(input);
-    }
-
-    const displayName = customName
-      ? customName
-      : isBuiltinProvider(provider)
-        ? DISPLAY_NAMES[provider]
-        : provider;
-
     const { getCodingAgentSessionManager } = await import('./coding-agent-sessions.js');
     const mgr = getCodingAgentSessionManager();
     this.sessionManager = mgr; // Cache for sync methods (listSessions, getSession, etc.)
 
-    // Try ACP mode for supported providers (non-interactive, built-in only)
-    const useAcp =
-      input.mode !== 'interactive' && isBuiltinProvider(provider) && isAcpSupported(provider);
+    // ACP mode for supported providers (non-interactive, built-in only)
     const acpModel = input.model && input.model !== 'default' ? input.model : undefined;
     const acpArgs = useAcp ? buildAcpArgs(provider, { model: acpModel, cwd }) : null;
 
-    if (acpArgs) {
+    if (acpArgs && isBuiltinProvider(provider)) {
+      const acpBinary = getAcpBinary(provider);
+
       log.info(`Creating ACP session with ${displayName}`, {
         provider,
+        acpMode,
+        acpBinary,
         cwd,
         hasApiKey: !!apiKey,
         acpArgs,
@@ -374,7 +371,20 @@ class CodingAgentService implements ICodingAgentService {
       // Build MCP server config to inject OwnPilot's tools into the agent
       const mcpServers = this.buildOwnPilotMcpConfig();
 
-      return mgr.createAcpSession(input, userId, env, binary, acpArgs, mcpServers);
+      return mgr.createAcpSession(input, userId, env, acpBinary, acpArgs, mcpServers);
+    }
+
+    if (!acpArgs && input.mode !== 'interactive' && isBuiltinProvider(provider)) {
+      log.debug(`ACP not available for ${displayName}, falling back to PTY mode`);
+    }
+
+    // Build CLI args: custom providers get their own template, built-in use existing logic
+    let cliArgs: string[];
+    if (customName) {
+      const cp = await cliProvidersRepo.getByName(customName, userId);
+      cliArgs = this.buildCustomSessionArgs(input, cp!);
+    } else {
+      cliArgs = this.buildSessionArgs(input);
     }
 
     log.info(`Creating coding agent session with ${displayName}`, {

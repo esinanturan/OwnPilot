@@ -170,8 +170,14 @@ export class TriggerEngine {
     try {
       const eventSystem = getEventSystem();
       this.eventBusUnsub = eventSystem.onPattern('**', (event) => {
-        // Skip trigger.* events to prevent infinite loops
-        if (event.type.startsWith('trigger.')) return;
+        // Skip high-frequency internal events that no user trigger would ever listen to
+        if (
+          event.type.startsWith('trigger.') || // prevent infinite loops
+          event.type === 'tool.registered' ||   // 150+ per agent creation
+          event.type === 'tool.unregistered'
+        ) {
+          return;
+        }
         this.processEventTriggers(event.type, (event.data ?? {}) as Record<string, unknown>).catch(
           (err) =>
             log.error('EventBus trigger processing failed', { error: err, eventType: event.type })
@@ -426,7 +432,6 @@ export class TriggerEngine {
   ): Promise<void> {
     // Circuit breaker: skip if we're already processing this event type
     if (this.processingEvents.has(eventType)) {
-      log.debug('Circuit breaker: skipping re-entrant event', { eventType });
       return;
     }
     this.processingEvents.add(eventType);

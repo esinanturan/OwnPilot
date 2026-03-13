@@ -14,8 +14,14 @@ Thank you for your interest in contributing to OwnPilot! This document provides 
 ### Getting Started
 
 ```bash
+# Clone and run interactive setup (recommended)
 git clone https://github.com/ownpilot/ownpilot.git
 cd ownpilot
+./setup.sh   # Linux/macOS
+# or
+.\setup.ps1  # Windows PowerShell
+
+# Or manually:
 pnpm install
 cp .env.example .env
 # Edit .env with your PostgreSQL connection details

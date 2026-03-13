@@ -407,11 +407,23 @@ export const resizeImageExecutor: ToolExecutor = async (
     // Check if file exists
     await fs.access(source);
 
+    // Sharp type for dynamic import
+    type SharpInstance = {
+      metadata: () => Promise<{ width?: number; height?: number; format?: string }>;
+      resize: (width?: number, height?: number, options?: Record<string, unknown>) => SharpInstance;
+      jpeg: (options?: Record<string, unknown>) => SharpInstance;
+      png: (options?: Record<string, unknown>) => SharpInstance;
+      webp: (options?: Record<string, unknown>) => SharpInstance;
+      toBuffer: () => Promise<Buffer>;
+      toFile: (path: string) => Promise<void>;
+    };
+    type SharpConstructor = (input: string | Buffer) => SharpInstance;
+
     // Try to use sharp if available
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let sharp: any = null; // Optional dependency - dynamically imported
+    let sharp: SharpConstructor | null = null;
     try {
-      sharp = ((await tryImport('sharp')) as Record<string, unknown>).default;
+      const imported = await tryImport('sharp');
+      sharp = (imported as Record<string, unknown>)?.default as SharpConstructor ?? null;
     } catch {
       return {
         content: {

@@ -18,6 +18,22 @@ import { getErrorMessage } from '../routes/helpers.js';
 const log = getLog('EmailOverrides');
 
 // ============================================================================
+// Types
+// ============================================================================
+
+/** Email info structure */
+interface EmailInfo {
+  uid: number;
+  from: string;
+  to: string;
+  subject: string;
+  date: string | null;
+  isRead: boolean;
+  isFlagged: boolean;
+  messageId: string | null;
+}
+
+// ============================================================================
 // Config Center Registration
 // ============================================================================
 
@@ -196,16 +212,31 @@ interface EmailAddress {
   address?: string;
 }
 
-function formatAddress(addr: EmailAddress | EmailAddress[] | undefined): string {
+function formatAddress(addr: EmailAddress | EmailAddress[] | undefined): string;
+function formatAddress(addr: string[] | undefined): string;
+function formatAddress(addr: unknown): string {
   if (!addr) return '';
-  const list = Array.isArray(addr) ? addr : [addr];
-  return list.map((a) => (a.name ? `${a.name} <${a.address}>` : (a.address ?? ''))).join(', ');
+  if (Array.isArray(addr)) {
+    return addr.map((a) => {
+      if (typeof a === 'string') return a;
+      return a.name ? `${a.name} <${a.address}>` : (a.address ?? '');
+    }).join(', ');
+  }
+  // Single object
+  const a = addr as EmailAddress;
+  return a.name ? `${a.name} <${a.address}>` : (a.address ?? '');
 }
 
-function formatAddressList(addr: EmailAddress | EmailAddress[] | undefined): string[] {
+function formatAddressList(addr: string[] | undefined): string[];
+function formatAddressList(addr: unknown): string[] {
   if (!addr) return [];
-  const list = Array.isArray(addr) ? addr : [addr];
-  return list.map((a) => a.address ?? '').filter(Boolean);
+  if (!Array.isArray(addr)) {
+    return [(addr as EmailAddress).address ?? ''].filter(Boolean);
+  }
+  return addr.map((a) => {
+    if (typeof a === 'string') return a;
+    return a.address ?? '';
+  }).filter(Boolean);
 }
 
 // ============================================================================
@@ -412,8 +443,7 @@ const listEmailsOverride: ToolExecutor = async (params, _context): Promise<ToolE
         fetchRange = `${startSeq}:*`;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const emails: any[] = [];
+      const emails: EmailInfo[] = [];
       for await (const msg of client.fetch(fetchRange, {
         envelope: true,
         flags: true,
@@ -547,8 +577,7 @@ const searchEmailsOverride: ToolExecutor = async (
 
     return await withImapClient(searchFolder, async (client) => {
       // Build search criteria
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const criteria: Record<string, any> = { text: query };
+      const criteria: { text?: string; flagged?: boolean } = { text: query };
       if (isStarred) criteria.flagged = true;
 
       const uids = await client.search(criteria, { uid: true });
@@ -558,8 +587,7 @@ const searchEmailsOverride: ToolExecutor = async (
 
       // Fetch envelope data for matching UIDs (most recent first)
       const recentUids = uids.sort((a: number, b: number) => b - a).slice(0, limit);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const results: any[] = [];
+      const results: EmailInfo[] = [];
 
       for await (const msg of client.fetch(recentUids.join(','), {
         envelope: true,
@@ -574,6 +602,7 @@ const searchEmailsOverride: ToolExecutor = async (
           date: msg.envelope?.date?.toISOString() ?? null,
           isRead: msg.flags?.has('\\Seen') ?? false,
           isFlagged: msg.flags?.has('\\Flagged') ?? false,
+          messageId: msg.envelope?.messageId ?? null,
         });
       }
 

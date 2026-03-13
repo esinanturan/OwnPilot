@@ -17,6 +17,7 @@ Privacy-first personal AI assistant platform with soul agents, autonomous backgr
 - [Features](#features)
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
+- [Setup Guide](SETUP.md) — Detailed installation instructions
 - [Project Structure](#project-structure)
 - [Packages](#packages)
   - [Core](#core-ownpilotcore)
@@ -308,7 +309,39 @@ docker compose --profile postgres up -d
 - **pnpm** >= 10.0.0
 - **PostgreSQL** 16+ (via Docker Compose or native install)
 
-#### Setup
+#### Automated Setup (Recommended)
+
+Use the interactive setup wizard:
+
+```bash
+# Linux/macOS
+./setup.sh
+
+# Windows PowerShell
+.\setup.ps1
+```
+
+The wizard will guide you through:
+- Prerequisites check (Node.js, pnpm, Docker)
+- Server configuration (ports, host)
+- Authentication setup
+- Database configuration
+- Docker PostgreSQL startup
+- Dependency installation and build
+
+**Alternative: Non-interactive scripts**
+
+```bash
+# Linux/macOS
+./scripts/setup.sh --minimal          # Skip Docker
+./scripts/setup.sh --docker-only      # Only database
+
+# Windows PowerShell
+.\scripts\setup.ps1 -Mode Minimal
+.\scripts\setup.ps1 -Mode DockerOnly
+```
+
+#### Manual Setup
 
 ```bash
 # Clone and install
@@ -1663,6 +1696,21 @@ pnpm --filter @ownpilot/gateway start
 ### Scripts
 
 ```bash
+# Setup wizard (interactive)
+./setup.sh              # Linux/macOS
+.\setup.ps1             # Windows PowerShell
+
+# Start scripts
+./start.sh              # Linux/macOS
+.\start.ps1             # Windows PowerShell
+
+# Start options:
+#   --dev      Development mode with hot reload (default)
+#   --prod     Production mode (build & serve)
+#   --docker   Start with Docker Compose
+#   --no-ui    Gateway only, without UI
+
+# Package scripts
 pnpm dev              # Watch mode for all packages
 pnpm build            # Build all packages
 pnpm test             # Run all tests

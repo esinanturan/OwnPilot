@@ -115,16 +115,31 @@ fleetRoutes.post('/', async (c) => {
 
     const service = getFleetService();
 
+    // Map snake_case worker fields from API to camelCase for internal types
+    const mappedWorkers = (workers as Array<Record<string, unknown>>).map((w) => ({
+      name: w.name as string,
+      type: w.type as 'ai-chat' | 'coding-cli' | 'api-call' | 'mcp-bridge',
+      description: w.description as string | undefined,
+      provider: w.provider as string | undefined,
+      model: w.model as string | undefined,
+      systemPrompt: (w.system_prompt ?? w.systemPrompt) as string | undefined,
+      allowedTools: (w.allowed_tools ?? w.allowedTools) as string[] | undefined,
+      skills: w.skills as string[] | undefined,
+      cliProvider: (w.cli_provider ?? w.cliProvider) as string | undefined,
+      cwd: w.cwd as string | undefined,
+      mcpServer: (w.mcp_server ?? w.mcpServer) as string | undefined,
+      mcpTools: (w.mcp_tools ?? w.mcpTools) as string[] | undefined,
+      maxTurns: (w.max_turns ?? w.maxTurns) as number | undefined,
+      maxTokens: (w.max_tokens ?? w.maxTokens) as number | undefined,
+      timeoutMs: (w.timeout_ms ?? w.timeoutMs) as number | undefined,
+    }));
+
     const config = await service.createFleet({
       userId,
       name,
       mission,
       description: description as string | undefined,
-      workers: workers as Array<{
-        name: string;
-        type: 'ai-chat' | 'coding-cli' | 'api-call' | 'mcp-bridge';
-        [key: string]: unknown;
-      }>,
+      workers: mappedWorkers,
       scheduleType: schedule_type as FleetScheduleType | undefined,
       scheduleConfig: schedule_config as Record<string, unknown> | undefined,
       budget: budget as Record<string, unknown> | undefined,
@@ -423,7 +438,25 @@ fleetRoutes.put('/:id', async (c) => {
       mission: typeof body.mission === 'string' ? body.mission : undefined,
       scheduleType: body.schedule_type as FleetScheduleType | undefined,
       scheduleConfig: body.schedule_config as Record<string, unknown> | undefined,
-      workers: Array.isArray(body.workers) ? body.workers : undefined,
+      workers: Array.isArray(body.workers)
+        ? (body.workers as Array<Record<string, unknown>>).map((w) => ({
+            name: w.name as string,
+            type: w.type as 'ai-chat' | 'coding-cli' | 'api-call' | 'mcp-bridge',
+            description: w.description as string | undefined,
+            provider: w.provider as string | undefined,
+            model: w.model as string | undefined,
+            systemPrompt: (w.system_prompt ?? w.systemPrompt) as string | undefined,
+            allowedTools: (w.allowed_tools ?? w.allowedTools) as string[] | undefined,
+            skills: w.skills as string[] | undefined,
+            cliProvider: (w.cli_provider ?? w.cliProvider) as string | undefined,
+            cwd: w.cwd as string | undefined,
+            mcpServer: (w.mcp_server ?? w.mcpServer) as string | undefined,
+            mcpTools: (w.mcp_tools ?? w.mcpTools) as string[] | undefined,
+            maxTurns: (w.max_turns ?? w.maxTurns) as number | undefined,
+            maxTokens: (w.max_tokens ?? w.maxTokens) as number | undefined,
+            timeoutMs: (w.timeout_ms ?? w.timeoutMs) as number | undefined,
+          }))
+        : undefined,
       budget: body.budget as Record<string, unknown> | undefined,
       concurrencyLimit:
         typeof body.concurrency_limit === 'number' ? body.concurrency_limit : undefined,

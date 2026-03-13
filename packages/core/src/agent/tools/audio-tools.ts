@@ -455,10 +455,24 @@ export const audioInfoExecutor: ToolExecutor = async (
     };
 
     // Try to use music-metadata if available for detailed info
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let musicMetadata: any;
+    type MusicMetadataModule = {
+      parseFile: (path: string) => Promise<{
+        format: {
+          duration?: number;
+          sampleRate?: number;
+          bitrate?: number;
+          numberOfChannels?: number;
+          codec?: string;
+          container?: string;
+        };
+        common: Record<string, unknown>;
+      }>;
+    };
+
+    let musicMetadata: MusicMetadataModule | null = null;
     try {
-      musicMetadata = await tryImport('music-metadata');
+      const imported = await tryImport('music-metadata');
+      musicMetadata = (imported as MusicMetadataModule) ?? null;
     } catch {
       // music-metadata not installed
     }

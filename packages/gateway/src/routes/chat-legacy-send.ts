@@ -48,7 +48,7 @@ export interface LegacySendParams {
 /**
  * Execute a chat request using the legacy direct path (no MessageBus).
  */
-export async function handleLegacySend(params: LegacySendParams) {
+export async function handleLegacySend(params: LegacySendParams): Promise<Response> {
   const {
     c,
     agent,

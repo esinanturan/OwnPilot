@@ -63,11 +63,15 @@ export const readPdfExecutor: ToolExecutor = async (
 
     const fileBuffer = await fs.readFile(path);
 
+    // pdf-parse type for dynamic import
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    type PdfParseFunction = any;
+
     // Use pdf-parse library if available, otherwise basic extraction
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let pdfParse: any = null; // Optional dependency - dynamically imported
+    let pdfParse: any = null;
     try {
-      pdfParse = ((await tryImport('pdf-parse')) as Record<string, unknown>).default;
+      pdfParse = ((await tryImport('pdf-parse')) as PdfParseFunction)?.default ?? null;
     } catch {
       // pdf-parse not installed, use basic extraction
     }
@@ -218,11 +222,14 @@ export const createPdfExecutor: ToolExecutor = async (
     const dir = path.dirname(outputPath);
     await fs.mkdir(dir, { recursive: true });
 
-    // Try to use pdfkit if available
+    // PDFKit type for dynamic import
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let PDFDocument: any = null; // Optional dependency - dynamically imported
+    type PDFKitConstructor = any;
+
+    // Try to use pdfkit if available
+    let PDFDocument: PDFKitConstructor = null;
     try {
-      PDFDocument = ((await tryImport('pdfkit')) as Record<string, unknown>).default;
+      PDFDocument = ((await tryImport('pdfkit')) as PDFKitConstructor)?.default ?? null;
     } catch {
       // pdfkit not installed
     }
@@ -372,9 +379,11 @@ export const pdfInfoExecutor: ToolExecutor = async (
 
     // Try to use pdf-parse for metadata
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let pdfParse: any = null; // Optional dependency - dynamically imported
+    let pdfParse: any = null;
     try {
-      pdfParse = ((await tryImport('pdf-parse')) as Record<string, unknown>).default;
+      const imported = await tryImport('pdf-parse');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pdfParse = (imported as any)?.default ?? null;
     } catch {
       // pdf-parse not installed
     }

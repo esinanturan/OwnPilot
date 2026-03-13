@@ -9,7 +9,7 @@
 import { join } from 'node:path';
 import { mkdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { useMultiFileAuthState } from '@whiskeysockets/baileys';
+import { useMultiFileAuthState, type AuthenticationState } from '@whiskeysockets/baileys';
 import { getLog } from '../../../services/log.js';
 import { getDataPath } from '../../../paths/index.js';
 
@@ -31,7 +31,11 @@ export function getSessionDir(pluginId: string): string {
  * Load or create a file-based auth state for Baileys.
  * Returns the auth state and a saveCreds callback.
  */
-export async function loadAuthState(pluginId: string) {
+export async function loadAuthState(pluginId: string): Promise<{
+  state: AuthenticationState;
+  saveCreds: () => Promise<void>;
+  sessionDir: string;
+}> {
   const sessionDir = getSessionDir(pluginId);
 
   // Ensure directory exists

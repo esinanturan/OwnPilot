@@ -29,6 +29,12 @@ import {
   NotificationConfigPanel,
   ParallelConfigPanel,
   MergeConfigPanel,
+  DataStoreConfigPanel,
+  SchemaValidatorConfigPanel,
+  FilterConfigPanel,
+  MapConfigPanel,
+  AggregateConfigPanel,
+  WebhookResponseConfigPanel,
 } from './panels';
 
 // ============================================================================
@@ -252,6 +258,24 @@ export function NodeConfigPanel(props: NodeConfigPanelProps) {
   }
   if (props.node.type === 'mergeNode') {
     return <MergeConfigPanel {...props} />;
+  }
+  if (props.node.type === 'dataStoreNode') {
+    return <DataStoreConfigPanel {...props} />;
+  }
+  if (props.node.type === 'schemaValidatorNode') {
+    return <SchemaValidatorConfigPanel {...props} />;
+  }
+  if (props.node.type === 'filterNode') {
+    return <FilterConfigPanel {...props} />;
+  }
+  if (props.node.type === 'mapNode') {
+    return <MapConfigPanel {...props} />;
+  }
+  if (props.node.type === 'aggregateNode') {
+    return <AggregateConfigPanel {...props} />;
+  }
+  if (props.node.type === 'webhookResponseNode') {
+    return <WebhookResponseConfigPanel {...props} />;
   }
   return <ToolConfigPanel {...props} />;
 }

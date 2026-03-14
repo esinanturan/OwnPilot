@@ -48,7 +48,7 @@ export class DiscordUCPAdapter extends UCPChannelAdapter {
 
   constructor(
     private readonly api: ChannelPluginAPI,
-    private readonly channelId: string = 'channel.discord',
+    private readonly channelId: string = 'channel.discord'
   ) {
     super();
 

@@ -76,9 +76,15 @@ describe('crew-tools', () => {
     it('exports nine crew tools', () => {
       expect(CREW_TOOLS).toHaveLength(9);
       expect(CREW_TOOL_NAMES).toEqual([
-        'get_crew_members', 'delegate_task', 'broadcast_to_crew',
-        'claim_task', 'submit_result', 'request_review',
-        'share_knowledge', 'get_crew_memory', 'coordinate',
+        'get_crew_members',
+        'delegate_task',
+        'broadcast_to_crew',
+        'claim_task',
+        'submit_result',
+        'request_review',
+        'share_knowledge',
+        'get_crew_memory',
+        'coordinate',
       ]);
     });
 

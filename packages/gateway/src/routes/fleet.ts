@@ -201,17 +201,15 @@ fleetRoutes.post('/:id/tasks', async (c) => {
     const created = await service.addTasks(
       fleetId,
       userId,
-      tasks.map(
-        (t: Record<string, unknown>) => ({
-          title: t.title as string,
-          description: (t.description as string) ?? '',
-          assignedWorker: t.assigned_worker as string | undefined,
-          priority: t.priority as 'low' | 'normal' | 'high' | 'critical' | undefined,
-          input: t.input as Record<string, unknown> | undefined,
-          dependsOn: t.depends_on as string[] | undefined,
-          maxRetries: t.max_retries as number | undefined,
-        })
-      )
+      tasks.map((t: Record<string, unknown>) => ({
+        title: t.title as string,
+        description: (t.description as string) ?? '',
+        assignedWorker: t.assigned_worker as string | undefined,
+        priority: t.priority as 'low' | 'normal' | 'high' | 'critical' | undefined,
+        input: t.input as Record<string, unknown> | undefined,
+        dependsOn: t.depends_on as string[] | undefined,
+        maxRetries: t.max_retries as number | undefined,
+      }))
     );
 
     return apiResponse(c, created, 201);

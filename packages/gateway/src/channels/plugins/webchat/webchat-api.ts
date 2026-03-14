@@ -32,7 +32,8 @@ export class WebChatChannelAPI implements ChannelPluginAPI {
   private status: ChannelConnectionStatus = 'disconnected';
   private sendFn: ((sessionId: string, event: string, data: unknown) => void) | null = null;
 
-  constructor(_config: Record<string, unknown>) { // webchat needs no external credentials
+  constructor(_config: Record<string, unknown>) {
+    // webchat needs no external credentials
     void _config;
   }
 
@@ -110,10 +111,7 @@ export class WebChatChannelAPI implements ChannelPluginAPI {
   /**
    * Get all active sessions.
    */
-  getActiveSessions(): Map<
-    string,
-    { sessionId: string; displayName: string; connectedAt: Date }
-  > {
+  getActiveSessions(): Map<string, { sessionId: string; displayName: string; connectedAt: Date }> {
     return new Map(activeSessions);
   }
 }

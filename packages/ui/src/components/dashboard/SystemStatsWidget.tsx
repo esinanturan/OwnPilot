@@ -4,17 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Brain,
-  Bot,
-  Users,
-  GitBranch,
-  Heart,
-  Puzzle,
-  Zap,
-  AlertCircle,
-  Plus,
-} from '../icons';
+import { Brain, Bot, Users, GitBranch, Heart, Puzzle, Zap, AlertCircle, Plus } from '../icons';
 import {
   soulsApi,
   crewsApi,
@@ -92,13 +82,67 @@ export function SystemStatsWidget() {
   }, []);
 
   const statItems = [
-    { label: 'Souls', value: stats.souls, icon: Brain, link: '/autonomous', createLink: '/autonomous?new=1', color: 'text-primary', bgColor: 'bg-primary/10' },
-    { label: 'Crews', value: stats.crews, icon: Users, link: '/autonomous?tab=crews', createLink: '/autonomous?new=crew', color: 'text-green-500', bgColor: 'bg-green-500/10' },
-    { label: 'Bg Agents', value: stats.backgroundAgents, icon: Bot, link: '/background-agents', createLink: '/background-agents?new=1', color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
-    { label: 'Workflows', value: stats.workflows, icon: GitBranch, link: '/workflows', createLink: '/workflows/new', color: 'text-purple-500', bgColor: 'bg-purple-500/10' },
-    { label: 'Extensions', value: stats.extensions, icon: Puzzle, link: '/extensions', createLink: '/skills', color: 'text-amber-500', bgColor: 'bg-amber-500/10' },
-    { label: 'Heartbeats', value: stats.heartbeatLogs, icon: Heart, link: '/autonomous?tab=logs', color: 'text-red-500', bgColor: 'bg-red-500/10' },
-    { label: 'Subagents', value: stats.subagents, icon: Zap, link: '/subagents', color: 'text-cyan-500', bgColor: 'bg-cyan-500/10' },
+    {
+      label: 'Souls',
+      value: stats.souls,
+      icon: Brain,
+      link: '/autonomous',
+      createLink: '/autonomous?new=1',
+      color: 'text-primary',
+      bgColor: 'bg-primary/10',
+    },
+    {
+      label: 'Crews',
+      value: stats.crews,
+      icon: Users,
+      link: '/autonomous?tab=crews',
+      createLink: '/autonomous?new=crew',
+      color: 'text-green-500',
+      bgColor: 'bg-green-500/10',
+    },
+    {
+      label: 'Bg Agents',
+      value: stats.backgroundAgents,
+      icon: Bot,
+      link: '/background-agents',
+      createLink: '/background-agents?new=1',
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-500/10',
+    },
+    {
+      label: 'Workflows',
+      value: stats.workflows,
+      icon: GitBranch,
+      link: '/workflows',
+      createLink: '/workflows/new',
+      color: 'text-purple-500',
+      bgColor: 'bg-purple-500/10',
+    },
+    {
+      label: 'Extensions',
+      value: stats.extensions,
+      icon: Puzzle,
+      link: '/extensions',
+      createLink: '/skills',
+      color: 'text-amber-500',
+      bgColor: 'bg-amber-500/10',
+    },
+    {
+      label: 'Heartbeats',
+      value: stats.heartbeatLogs,
+      icon: Heart,
+      link: '/autonomous?tab=logs',
+      color: 'text-red-500',
+      bgColor: 'bg-red-500/10',
+    },
+    {
+      label: 'Subagents',
+      value: stats.subagents,
+      icon: Zap,
+      link: '/subagents',
+      color: 'text-cyan-500',
+      bgColor: 'bg-cyan-500/10',
+    },
   ];
 
   if (isLoading) {
@@ -136,7 +180,9 @@ export function SystemStatsWidget() {
             className="card-elevated card-hover p-3 bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-xl transition-colors hover:border-primary"
           >
             <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-lg ${stat.bgColor} flex items-center justify-center flex-shrink-0`}>
+              <div
+                className={`w-8 h-8 rounded-lg ${stat.bgColor} flex items-center justify-center flex-shrink-0`}
+              >
                 <stat.icon className={`w-4 h-4 ${stat.color}`} />
               </div>
               <div className="min-w-0">
@@ -154,7 +200,9 @@ export function SystemStatsWidget() {
 
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-border dark:border-dark-border">
-        <span className="text-xs text-text-muted dark:text-dark-text-muted mr-1">Quick create:</span>
+        <span className="text-xs text-text-muted dark:text-dark-text-muted mr-1">
+          Quick create:
+        </span>
         <Link
           to="/autonomous?new=1"
           className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"

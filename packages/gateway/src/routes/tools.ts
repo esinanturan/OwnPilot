@@ -19,7 +19,11 @@ import {
 } from '@ownpilot/core';
 import type { ToolInfo } from '../types/index.js';
 import { apiResponse, apiError, ERROR_CODES, notFoundError, getErrorMessage } from './helpers.js';
-import { validateBody, executeToolSchema, batchExecuteToolsSchema } from '../middleware/validation.js';
+import {
+  validateBody,
+  executeToolSchema,
+  batchExecuteToolsSchema,
+} from '../middleware/validation.js';
 import { getAgent } from './agents.js';
 import { gatewayConfigCenter } from '../services/config-center-impl.js';
 import { getSharedToolRegistry } from '../services/tool-executor.js';

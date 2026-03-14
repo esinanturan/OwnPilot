@@ -259,11 +259,7 @@ export interface IFleetService {
 
   // Tasks
   addTask(fleetId: string, userId: string, task: CreateFleetTaskInput): Promise<FleetTask>;
-  addTasks(
-    fleetId: string,
-    userId: string,
-    tasks: CreateFleetTaskInput[]
-  ): Promise<FleetTask[]>;
+  addTasks(fleetId: string, userId: string, tasks: CreateFleetTaskInput[]): Promise<FleetTask[]>;
   getTask(taskId: string): Promise<FleetTask | null>;
   listTasks(fleetId: string, status?: string): Promise<FleetTask[]>;
   cancelTask(taskId: string): Promise<boolean>;

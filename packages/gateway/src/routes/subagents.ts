@@ -60,12 +60,14 @@ subagentRoutes.post('/', async (c) => {
       allowedTools: body.allowedTools,
       provider: body.provider,
       model: body.model,
-      limits: body.limits ? {
-        maxTokens: body.limits.maxTokens,
-        maxTurns: body.limits.maxTurns,
-        maxToolCalls: body.limits.maxToolCalls,
-        timeoutMs: body.limits.timeout,
-      } : undefined,
+      limits: body.limits
+        ? {
+            maxTokens: body.limits.maxTokens,
+            maxTurns: body.limits.maxTurns,
+            maxToolCalls: body.limits.maxToolCalls,
+            timeoutMs: body.limits.timeout,
+          }
+        : undefined,
     });
 
     return apiResponse(c, session, 201);

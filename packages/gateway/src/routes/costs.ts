@@ -24,7 +24,12 @@ import {
   validateQueryEnum,
 } from './helpers.js';
 import { MAX_DAYS_LOOKBACK } from '../config/defaults.js';
-import { validateBody, costEstimateSchema, costBudgetSchema, costRecordSchema } from '../middleware/validation.js';
+import {
+  validateBody,
+  costEstimateSchema,
+  costBudgetSchema,
+  costRecordSchema,
+} from '../middleware/validation.js';
 
 export const costRoutes = new Hono();
 
@@ -248,7 +253,12 @@ costRoutes.post('/estimate', async (c) => {
     // Estimate tokens from text if provided
     const inputText = body.text ?? '';
 
-    const estimate = estimateCost(body.provider as AIProvider, body.model, inputText, body.outputTokens ?? 500);
+    const estimate = estimateCost(
+      body.provider as AIProvider,
+      body.model,
+      inputText,
+      body.outputTokens ?? 500
+    );
 
     return apiResponse(c, {
       provider: estimate.provider,

@@ -702,7 +702,18 @@ export const sendAgentMessageSchema = z.object({
   to: z.string().min(1).max(200),
   content: z.string().min(1).max(50000),
   from: z.string().max(200).optional(),
-  type: z.enum(['task_delegation', 'task_result', 'status_update', 'question', 'feedback', 'alert', 'coordination', 'knowledge_share']).optional(),
+  type: z
+    .enum([
+      'task_delegation',
+      'task_result',
+      'status_update',
+      'question',
+      'feedback',
+      'alert',
+      'coordination',
+      'knowledge_share',
+    ])
+    .optional(),
   subject: z.string().max(500).optional(),
   attachments: z.array(agentAttachmentSchema).max(20).optional(),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
@@ -758,7 +769,10 @@ export const createConfigServiceSchema = z.object({
     .string()
     .min(1)
     .max(200)
-    .regex(/^[a-z][a-z0-9_]*$/, 'Must start with lowercase letter, only lowercase/numbers/underscores'),
+    .regex(
+      /^[a-z][a-z0-9_]*$/,
+      'Must start with lowercase letter, only lowercase/numbers/underscores'
+    ),
   displayName: z.string().min(1).max(200),
   category: z.string().min(1).max(100),
   description: z.string().max(2000).optional(),
@@ -891,7 +905,9 @@ export const createHabitSchema = z.object({
 
 export const createCaptureSchema = z.object({
   content: z.string().min(1).max(50000),
-  type: z.enum(['idea', 'thought', 'todo', 'link', 'quote', 'snippet', 'question', 'other']).optional(),
+  type: z
+    .enum(['idea', 'thought', 'todo', 'link', 'quote', 'snippet', 'question', 'other'])
+    .optional(),
   tags: z.array(z.string().max(100)).max(20).optional(),
   source: z.string().max(200).optional(),
 });
@@ -930,23 +946,33 @@ export const createSoulSchema = z.object({
   agentId: z.string().min(1).max(200),
   identity: z.record(z.string(), z.unknown()),
   purpose: z.record(z.string(), z.unknown()),
-  autonomy: z.object({
-    level: z.number().int().min(0).max(4).optional(),
-  }).passthrough(),
+  autonomy: z
+    .object({
+      level: z.number().int().min(0).max(4).optional(),
+    })
+    .passthrough(),
   heartbeat: z.object({
     enabled: z.boolean(),
     interval: z.string().min(1).max(100),
-    checklist: z.array(z.object({
-      id: z.string().optional(),
-      task: z.string().min(1),
-      type: z.string().optional(),
-      priority: z.string().optional(),
-    }).passthrough()).default([]),
-    quietHours: z.object({
-      start: z.string(),
-      end: z.string(),
-      timezone: z.string().optional(),
-    }).optional(),
+    checklist: z
+      .array(
+        z
+          .object({
+            id: z.string().optional(),
+            task: z.string().min(1),
+            type: z.string().optional(),
+            priority: z.string().optional(),
+          })
+          .passthrough()
+      )
+      .default([]),
+    quietHours: z
+      .object({
+        start: z.string(),
+        end: z.string(),
+        timezone: z.string().optional(),
+      })
+      .optional(),
     selfHealingEnabled: z.boolean().default(false),
     maxDurationMs: z.number().int().positive().default(120000),
   }),
@@ -992,12 +1018,14 @@ export const spawnSubagentSchema = z.object({
   allowedTools: z.array(z.string().max(200)).max(200).optional(),
   provider: z.string().max(100).optional(),
   model: z.string().max(200).optional(),
-  limits: z.object({
-    maxTokens: z.number().int().min(1).max(128000).optional(),
-    maxTurns: z.number().int().min(1).max(100).optional(),
-    maxToolCalls: z.number().int().min(1).max(500).optional(),
-    timeout: z.number().int().min(1000).max(600000).optional(),
-  }).optional(),
+  limits: z
+    .object({
+      maxTokens: z.number().int().min(1).max(128000).optional(),
+      maxTurns: z.number().int().min(1).max(100).optional(),
+      maxToolCalls: z.number().int().min(1).max(500).optional(),
+      timeout: z.number().int().min(1000).max(600000).optional(),
+    })
+    .optional(),
 });
 
 // ─── Tool Execution Schemas ─────────────────────────────────────
@@ -1007,10 +1035,15 @@ export const executeToolSchema = z.object({
 });
 
 export const batchExecuteToolsSchema = z.object({
-  executions: z.array(z.object({
-    tool: z.string().min(1).max(200),
-    arguments: z.record(z.string(), z.unknown()).optional(),
-  })).min(1).max(20),
+  executions: z
+    .array(
+      z.object({
+        tool: z.string().min(1).max(200),
+        arguments: z.record(z.string(), z.unknown()).optional(),
+      })
+    )
+    .min(1)
+    .max(20),
 });
 
 // ─── Voice Schemas ──────────────────────────────────────────────

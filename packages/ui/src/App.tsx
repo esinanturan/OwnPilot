@@ -167,9 +167,7 @@ const ArtifactsPage = lazy(() =>
 const EdgeDevicesPage = lazy(() =>
   import('./pages/EdgeDevicesPage').then((m) => ({ default: m.EdgeDevicesPage }))
 );
-const FleetPage = lazy(() =>
-  import('./pages/FleetPage').then((m) => ({ default: m.FleetPage }))
-);
+const FleetPage = lazy(() => import('./pages/FleetPage').then((m) => ({ default: m.FleetPage })));
 
 function PageLoader() {
   return (

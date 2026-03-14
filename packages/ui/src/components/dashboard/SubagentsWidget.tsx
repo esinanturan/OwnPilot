@@ -4,14 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Bot,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  AlertCircle,
-  RefreshCw,
-} from '../icons';
+import { Bot, CheckCircle2, XCircle, Clock, AlertCircle, RefreshCw } from '../icons';
 import { subagentsApi, type SubagentHistoryView } from '../../api';
 import { Skeleton } from '../Skeleton';
 
@@ -167,7 +160,9 @@ export function SubagentsWidget({ limit = 6 }: SubagentsWidgetProps) {
               <div
                 className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${stateColor}`}
               >
-                <StateIcon className={`w-4 h-4 ${session.state === 'running' ? 'animate-spin' : ''}`} />
+                <StateIcon
+                  className={`w-4 h-4 ${session.state === 'running' ? 'animate-spin' : ''}`}
+                />
               </div>
 
               <div className="flex-1 min-w-0">
@@ -195,12 +190,8 @@ export function SubagentsWidget({ limit = 6 }: SubagentsWidgetProps) {
               </div>
 
               <div className="flex flex-col items-end text-xs text-text-muted dark:text-dark-text-muted">
-                {session.durationMs && (
-                  <span>{(session.durationMs / 1000).toFixed(1)}s</span>
-                )}
-                {session.toolCallsUsed > 0 && (
-                  <span>{session.toolCallsUsed} tools</span>
-                )}
+                {session.durationMs && <span>{(session.durationMs / 1000).toFixed(1)}s</span>}
+                {session.toolCallsUsed > 0 && <span>{session.toolCallsUsed} tools</span>}
               </div>
             </Link>
           );

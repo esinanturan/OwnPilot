@@ -115,9 +115,7 @@ export class FleetWorker {
       const durationMs = Date.now() - startTime;
       const errorMsg = getErrorMessage(error);
 
-      log.error(
-        `[${this.fleetId}:${this.config.name}] Task ${task.id} failed: ${errorMsg}`
-      );
+      log.error(`[${this.fleetId}:${this.config.name}] Task ${task.id} failed: ${errorMsg}`);
 
       return {
         id: generateId('flr'),
@@ -284,7 +282,10 @@ export class FleetWorker {
       output: response.content ?? '',
       toolCalls,
       tokensUsed: response.usage
-        ? { prompt: response.usage.promptTokens ?? 0, completion: response.usage.completionTokens ?? 0 }
+        ? {
+            prompt: response.usage.promptTokens ?? 0,
+            completion: response.usage.completionTokens ?? 0,
+          }
         : undefined,
       durationMs,
       executedAt: new Date(),
@@ -319,9 +320,7 @@ export class FleetWorker {
     let finalRun = run;
 
     // Import the repo to check status
-    const { orchestrationRunsRepo } = await import(
-      '../db/repositories/orchestration-runs.js'
-    );
+    const { orchestrationRunsRepo } = await import('../db/repositories/orchestration-runs.js');
 
     while (Date.now() < deadline) {
       const record = await orchestrationRunsRepo.getById(run.id, this.userId);
@@ -355,9 +354,7 @@ export class FleetWorker {
           });
         if (stepSummaries.length > 0) {
           outputSummary = `Orchestration ${run.id} (${finalRun.status})\n\n${stepSummaries.join('\n')}`;
-          const lastAnalysis = [...record.steps]
-            .reverse()
-            .find((s) => s.analysis)?.analysis;
+          const lastAnalysis = [...record.steps].reverse().find((s) => s.analysis)?.analysis;
           if (lastAnalysis?.summary) {
             outputSummary += `\n\nFinal: ${lastAnalysis.summary}`;
           }
@@ -413,12 +410,13 @@ export class FleetWorker {
       baseUrl: providerConfig?.baseUrl,
     });
 
-    const systemContent = this.config.systemPrompt ??
-      `You are a fleet worker. Mission: ${this.mission}`;
+    const systemContent =
+      this.config.systemPrompt ?? `You are a fleet worker. Mission: ${this.mission}`;
 
-    const contextStr = Object.keys(sharedContext).length > 0
-      ? `\n\nShared context: ${JSON.stringify(sharedContext, null, 2)}`
-      : '';
+    const contextStr =
+      Object.keys(sharedContext).length > 0
+        ? `\n\nShared context: ${JSON.stringify(sharedContext, null, 2)}`
+        : '';
 
     const userMessage = `Task: ${task.title}\n\n${task.description}${contextStr}`;
 
@@ -458,7 +456,10 @@ export class FleetWorker {
       success: true,
       output: content,
       tokensUsed: result.value.usage
-        ? { prompt: result.value.usage.promptTokens ?? 0, completion: result.value.usage.completionTokens ?? 0 }
+        ? {
+            prompt: result.value.usage.promptTokens ?? 0,
+            completion: result.value.usage.completionTokens ?? 0,
+          }
         : undefined,
       durationMs,
       executedAt: new Date(),
@@ -531,13 +532,13 @@ export class FleetWorker {
     if (!finalProvider) {
       throw new Error(
         `No AI provider configured for worker "${this.config.name}". ` +
-        'Set provider on the worker, fleet, or configure a default provider.'
+          'Set provider on the worker, fleet, or configure a default provider.'
       );
     }
     if (!finalModel) {
       throw new Error(
         `No model configured for worker "${this.config.name}". ` +
-        'Set model on the worker, fleet, or configure a default model.'
+          'Set model on the worker, fleet, or configure a default model.'
       );
     }
 
@@ -554,15 +555,8 @@ You have access to tools to accomplish your tasks. Work efficiently and report r
 When your task is complete, summarize what you accomplished.`;
   }
 
-  private buildTaskMessage(
-    task: FleetTask,
-    sharedContext: Record<string, unknown>
-  ): string {
-    const parts: string[] = [
-      `## Task: ${task.title}`,
-      '',
-      task.description,
-    ];
+  private buildTaskMessage(task: FleetTask, sharedContext: Record<string, unknown>): string {
+    const parts: string[] = [`## Task: ${task.title}`, '', task.description];
 
     if (task.input && Object.keys(task.input).length > 0) {
       parts.push('', '### Input Data', '```json', JSON.stringify(task.input, null, 2), '```');

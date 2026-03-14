@@ -23,18 +23,7 @@ export const automationDomain = {
     '/api/v1/execution-permissions',
   ],
 
-  tables: [
-    'triggers',
-    'trigger_history',
-    'plans',
-    'plan_steps',
-    'plan_history',
-    'workflows',
-  ],
+  tables: ['triggers', 'trigger_history', 'plans', 'plan_steps', 'plan_history', 'workflows'],
 
-  publicServices: [
-    'trigger-service',
-    'plan-service',
-    'workflow-service',
-  ],
+  publicServices: ['trigger-service', 'plan-service', 'workflow-service'],
 } as const;

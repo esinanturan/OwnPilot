@@ -47,7 +47,6 @@ function formatUptime(seconds: number): string {
   return parts.join(' ');
 }
 
-
 // Category color map for tool dependency badges
 const CATEGORY_COLORS: Record<string, string> = {
   Email: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
@@ -64,7 +63,11 @@ export function SystemPage() {
   const toast = useToast();
 
   type TabId = 'home' | 'system' | 'database';
-  const TAB_LABELS: Record<TabId, string> = { home: 'Home', system: 'System', database: 'Database' };
+  const TAB_LABELS: Record<TabId, string> = {
+    home: 'Home',
+    system: 'System',
+    database: 'Database',
+  };
 
   const tabParam = searchParams.get('tab') as TabId | null;
   const activeTab: TabId =

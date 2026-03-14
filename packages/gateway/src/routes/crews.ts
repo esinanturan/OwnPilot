@@ -229,7 +229,8 @@ crewRoutes.post('/deploy', async (c) => {
       201
     );
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
 });
@@ -428,7 +429,8 @@ crewRoutes.post('/:id/message', async (c) => {
       recipients: sent,
     });
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
 });
@@ -482,7 +484,8 @@ crewRoutes.post('/:id/delegate', async (c) => {
       status: 'delegated',
     });
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
 });
@@ -626,7 +629,12 @@ crewRoutes.get('/:id/tasks', async (c) => {
     const { getCrewTasksRepository } = await import('../db/repositories/crew-tasks.js');
     const taskRepo = getCrewTasksRepository();
 
-    const status = c.req.query('status') as 'pending' | 'in_progress' | 'completed' | 'failed' | undefined;
+    const status = c.req.query('status') as
+      | 'pending'
+      | 'in_progress'
+      | 'completed'
+      | 'failed'
+      | undefined;
     const { limit, offset } = getPaginationParams(c);
 
     const result = await taskRepo.listByCrew(crewId, status, limit, offset);
@@ -674,7 +682,8 @@ crewRoutes.post('/:id/sync', async (c) => {
       importance: 'medium',
     });
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
 });

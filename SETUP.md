@@ -6,12 +6,12 @@ This guide covers setting up OwnPilot from scratch, including prerequisites, aut
 
 ### Required Software
 
-| Software | Version | Purpose |
-|----------|---------|---------|
-| Node.js  | 22+     | Runtime |
-| pnpm     | 10+     | Package manager |
+| Software | Version | Purpose             |
+| -------- | ------- | ------------------- |
+| Node.js  | 22+     | Runtime             |
+| pnpm     | 10+     | Package manager     |
 | Docker   | Latest  | PostgreSQL database |
-| Git      | Latest  | Version control |
+| Git      | Latest  | Version control     |
 
 ### OS-Specific Setup
 
@@ -78,12 +78,12 @@ The interactive wizard will guide you through the complete setup.
 
 ### Setup Modes
 
-| Mode | Description |
-|------|-------------|
+| Mode             | Description                                                       |
+| ---------------- | ----------------------------------------------------------------- |
 | `Full` (default) | Complete setup: Docker, dependencies, database, build, dev server |
-| `Minimal` | Only install dependencies and create `.env` |
-| `DockerOnly` | Only Docker + PostgreSQL database |
-| `SkipInstall` | Skip pnpm install (for already installed deps) |
+| `Minimal`        | Only install dependencies and create `.env`                       |
+| `DockerOnly`     | Only Docker + PostgreSQL database                                 |
+| `SkipInstall`    | Skip pnpm install (for already installed deps)                    |
 
 #### Usage Examples
 
@@ -216,14 +216,14 @@ pnpm dev
 
 ### Start Options
 
-| Option | Description |
-|--------|-------------|
-| `--dev` | Development mode with hot reload (default) |
-| `--prod` | Production mode (build & serve) |
-| `--docker` | Start with Docker Compose |
-| `--no-ui` | Gateway only, without UI |
-| `--port PORT` | Gateway API port (default: 8080) |
-| `--ui-port PORT` | UI dev server port (default: 5173) |
+| Option           | Description                                |
+| ---------------- | ------------------------------------------ |
+| `--dev`          | Development mode with hot reload (default) |
+| `--prod`         | Production mode (build & serve)            |
+| `--docker`       | Start with Docker Compose                  |
+| `--no-ui`        | Gateway only, without UI                   |
+| `--port PORT`    | Gateway API port (default: 8080)           |
+| `--ui-port PORT` | UI dev server port (default: 5173)         |
 
 ### Manual Start
 
@@ -241,11 +241,11 @@ pnpm dev
 
 After starting, these services are available:
 
-| Service | URL | Description |
-|---------|-----|-------------|
+| Service     | URL                   | Description     |
+| ----------- | --------------------- | --------------- |
 | Gateway API | http://localhost:8080 | REST API server |
-| UI | http://localhost:5173 | Web interface |
-| PostgreSQL | localhost:25432 | Database |
+| UI          | http://localhost:5173 | Web interface   |
+| PostgreSQL  | localhost:25432       | Database        |
 
 ---
 
@@ -259,6 +259,7 @@ AI provider API keys are configured via:
 2. **CLI**: `ownpilot config set <provider>-api-key <key>`
 
 Supported providers:
+
 - OpenAI (`OPENAI_API_KEY`)
 - Anthropic (`ANTHROPIC_API_KEY`)
 - Google (`GOOGLE_API_KEY`)
@@ -268,23 +269,23 @@ Supported providers:
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | 8080 | Gateway API port |
-| `UI_PORT` | 5173 | UI dev server port |
-| `POSTGRES_HOST` | localhost | Database host |
-| `POSTGRES_PORT` | 25432 | Database port |
-| `NODE_ENV` | development | Environment |
-| `LOG_LEVEL` | info | Logging level |
+| Variable        | Default     | Description        |
+| --------------- | ----------- | ------------------ |
+| `PORT`          | 8080        | Gateway API port   |
+| `UI_PORT`       | 5173        | UI dev server port |
+| `POSTGRES_HOST` | localhost   | Database host      |
+| `POSTGRES_PORT` | 25432       | Database port      |
+| `NODE_ENV`      | development | Environment        |
+| `LOG_LEVEL`     | info        | Logging level      |
 
 ---
 
 ## Docker Compose Profiles
 
-| Profile | Services | Usage |
-|---------|----------|-------|
+| Profile    | Services   | Usage         |
+| ---------- | ---------- | ------------- |
 | `postgres` | PostgreSQL | Database only |
-| (default) | All | Full stack |
+| (default)  | All        | Full stack    |
 
 ```bash
 # Database only

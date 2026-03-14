@@ -45,13 +45,20 @@ export function initWebChatHandler(): void {
     if (session) {
       // Use sessionManager.send for typed events that exist in ServerEvents,
       // otherwise fall back to raw JSON via broadcast with sessionId filtering
-      sessionManager.send(sessionId, event as keyof import('./types.js').ServerEvents, data as never);
+      sessionManager.send(
+        sessionId,
+        event as keyof import('./types.js').ServerEvents,
+        data as never
+      );
     } else {
       // Fallback: broadcast to all (widget will filter by sessionId)
-      wsGateway.broadcast(event as keyof import('./types.js').ServerEvents, {
-        ...(data as Record<string, unknown>),
-        sessionId,
-      } as never);
+      wsGateway.broadcast(
+        event as keyof import('./types.js').ServerEvents,
+        {
+          ...(data as Record<string, unknown>),
+          sessionId,
+        } as never
+      );
     }
   });
 
@@ -64,7 +71,7 @@ export function initWebChatHandler(): void {
  */
 export async function handleWebChatMessage(
   payload: WebChatMessagePayload,
-  wsSessionId: string,
+  wsSessionId: string
 ): Promise<void> {
   const { text, sessionId, displayName = 'Web Visitor', replyToId } = payload;
 

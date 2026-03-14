@@ -147,7 +147,9 @@ function rowToTask(row: TaskRow): FleetTask {
     assignedWorker: row.assigned_worker ?? undefined,
     priority: row.priority as FleetTaskPriority,
     status: row.status as FleetTaskStatus,
-    input: row.input ? parseJsonFieldNullable<Record<string, unknown>>(row.input) ?? undefined : undefined,
+    input: row.input
+      ? (parseJsonFieldNullable<Record<string, unknown>>(row.input) ?? undefined)
+      : undefined,
     output: row.output ?? undefined,
     dependsOn: parseJsonField<string[]>(row.depends_on, []),
     retries: row.retries,
@@ -174,7 +176,8 @@ function rowToWorkerResult(row: WorkerHistoryRow): FleetWorkerResult {
       []
     ),
     tokensUsed: row.tokens_used
-      ? parseJsonFieldNullable<{ prompt: number; completion: number }>(row.tokens_used) ?? undefined
+      ? (parseJsonFieldNullable<{ prompt: number; completion: number }>(row.tokens_used) ??
+        undefined)
       : undefined,
     costUsd: row.cost_usd ? parseFloat(row.cost_usd) : undefined,
     durationMs: row.duration_ms,
@@ -234,9 +237,7 @@ export class FleetRepository extends BaseRepository {
   }
 
   async getAutoStartFleets(): Promise<FleetConfig[]> {
-    const rows = await this.query<FleetRow>(
-      'SELECT * FROM fleets WHERE auto_start = true'
-    );
+    const rows = await this.query<FleetRow>('SELECT * FROM fleets WHERE auto_start = true');
     return rows.map(rowToFleet);
   }
 
@@ -293,7 +294,10 @@ export class FleetRepository extends BaseRepository {
 
   // ---- Sessions ----
 
-  async createSession(fleetId: string, sharedContext?: Record<string, unknown>): Promise<FleetSession> {
+  async createSession(
+    fleetId: string,
+    sharedContext?: Record<string, unknown>
+  ): Promise<FleetSession> {
     const id = generateId('fls');
     const row = await this.queryOne<SessionRow>(
       `INSERT INTO fleet_sessions (id, fleet_id, state, shared_context)
@@ -365,10 +369,10 @@ export class FleetRepository extends BaseRepository {
 
     if (setClauses.length === 0) return;
 
-    await this.query(
-      `UPDATE fleet_sessions SET ${setClauses.join(', ')} WHERE id = $${idx}`,
-      [...params, sessionId]
-    );
+    await this.query(`UPDATE fleet_sessions SET ${setClauses.join(', ')} WHERE id = $${idx}`, [
+      ...params,
+      sessionId,
+    ]);
   }
 
   async listSessions(userId: string): Promise<FleetSession[]> {
@@ -407,17 +411,14 @@ export class FleetRepository extends BaseRepository {
   }
 
   async getTask(taskId: string): Promise<FleetTask | null> {
-    const row = await this.queryOne<TaskRow>(
-      'SELECT * FROM fleet_tasks WHERE id = $1',
-      [taskId]
-    );
+    const row = await this.queryOne<TaskRow>('SELECT * FROM fleet_tasks WHERE id = $1', [taskId]);
     return row ? rowToTask(row) : null;
   }
 
   async listTasks(fleetId: string, status?: string): Promise<FleetTask[]> {
     const sql = status
-      ? 'SELECT * FROM fleet_tasks WHERE fleet_id = $1 AND status = $2 ORDER BY CASE priority WHEN \'critical\' THEN 0 WHEN \'high\' THEN 1 WHEN \'normal\' THEN 2 WHEN \'low\' THEN 3 END, created_at ASC'
-      : 'SELECT * FROM fleet_tasks WHERE fleet_id = $1 ORDER BY CASE priority WHEN \'critical\' THEN 0 WHEN \'high\' THEN 1 WHEN \'normal\' THEN 2 WHEN \'low\' THEN 3 END, created_at ASC';
+      ? "SELECT * FROM fleet_tasks WHERE fleet_id = $1 AND status = $2 ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END, created_at ASC"
+      : "SELECT * FROM fleet_tasks WHERE fleet_id = $1 ORDER BY CASE priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 WHEN 'low' THEN 3 END, created_at ASC";
     const params = status ? [fleetId, status] : [fleetId];
     const rows = await this.query<TaskRow>(sql, params);
     return rows.map(rowToTask);
@@ -470,10 +471,10 @@ export class FleetRepository extends BaseRepository {
 
     if (setClauses.length === 0) return;
 
-    await this.query(
-      `UPDATE fleet_tasks SET ${setClauses.join(', ')} WHERE id = $${idx}`,
-      [...params, taskId]
-    );
+    await this.query(`UPDATE fleet_tasks SET ${setClauses.join(', ')} WHERE id = $${idx}`, [
+      ...params,
+      taskId,
+    ]);
   }
 
   async cancelTask(taskId: string): Promise<boolean> {

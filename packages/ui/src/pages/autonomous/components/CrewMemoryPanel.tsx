@@ -5,7 +5,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { crewsApi } from '../../../api/endpoints/souls';
 import type { CrewMemoryEntry } from '../../../api/endpoints/souls';
-import { Search, Trash2, RefreshCw, Database, ChevronDown, ChevronRight } from '../../../components/icons';
+import {
+  Search,
+  Trash2,
+  RefreshCw,
+  Database,
+  ChevronDown,
+  ChevronRight,
+} from '../../../components/icons';
 import { EmptyState } from '../../../components/EmptyState';
 import { useDialog } from '../../../components/ConfirmDialog';
 import { useToast } from '../../../components/ToastProvider';
@@ -51,7 +58,7 @@ export function CrewMemoryPanel({ crewId }: Props) {
       const data = await crewsApi.getMemory(
         crewId,
         activeCategory ?? undefined,
-        searchQuery || undefined,
+        searchQuery || undefined
       );
       setEntries(data.entries);
       setTotal(data.total);

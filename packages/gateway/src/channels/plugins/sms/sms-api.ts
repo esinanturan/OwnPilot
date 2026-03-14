@@ -29,7 +29,7 @@ export class SmsChannelAPI implements ChannelPluginAPI {
 
   constructor(
     private readonly config: Record<string, unknown>,
-    pluginId: string,
+    pluginId: string
   ) {
     this.pluginId = pluginId;
   }
@@ -55,7 +55,7 @@ export class SmsChannelAPI implements ChannelPluginAPI {
             Authorization: `Basic ${Buffer.from(`${this.accountSid}:${this.authToken}`).toString('base64')}`,
           },
           signal: AbortSignal.timeout(10_000),
-        },
+        }
       );
 
       if (!res.ok) {
@@ -100,7 +100,7 @@ export class SmsChannelAPI implements ChannelPluginAPI {
             Body: body,
           }),
           signal: AbortSignal.timeout(15_000),
-        },
+        }
       );
 
       if (!res.ok) {

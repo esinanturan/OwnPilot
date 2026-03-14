@@ -14,12 +14,7 @@
  */
 
 import { getEventSystem, getErrorMessage } from '@ownpilot/core';
-import type {
-  FleetConfig,
-  FleetSession,
-  FleetTask,
-  FleetWorkerConfig,
-} from '@ownpilot/core';
+import type { FleetConfig, FleetSession, FleetTask, FleetWorkerConfig } from '@ownpilot/core';
 import { FleetWorker } from './fleet-worker.js';
 import { getFleetRepository } from '../db/repositories/fleet.js';
 import { getLog } from './log.js';
@@ -306,11 +301,7 @@ export class FleetManager {
     }, delay);
   }
 
-  private scheduleInterval(
-    fleetId: string,
-    managed: ManagedFleet,
-    intervalMs?: number
-  ): void {
+  private scheduleInterval(fleetId: string, managed: ManagedFleet, intervalMs?: number): void {
     const delay = intervalMs ?? DEFAULT_INTERVAL_MS;
     managed.timer = setTimeout(() => {
       this.runCycle(fleetId).catch((err) =>
@@ -319,11 +310,7 @@ export class FleetManager {
     }, delay);
   }
 
-  private scheduleCron(
-    fleetId: string,
-    managed: ManagedFleet,
-    _cron?: string
-  ): void {
+  private scheduleCron(fleetId: string, managed: ManagedFleet, _cron?: string): void {
     // Simplified: parse cron-like interval. For full cron, use a library.
     // Fall back to 60s interval.
     const delay = DEFAULT_INTERVAL_MS;
@@ -590,10 +577,7 @@ export class FleetManager {
    * Resolve which worker should handle a task.
    * If assignedWorker is set, use that. Otherwise round-robin.
    */
-  private resolveWorker(
-    config: FleetConfig,
-    task: FleetTask
-  ): FleetWorkerConfig | null {
+  private resolveWorker(config: FleetConfig, task: FleetTask): FleetWorkerConfig | null {
     if (task.assignedWorker) {
       return config.workers.find((w) => w.name === task.assignedWorker) ?? null;
     }

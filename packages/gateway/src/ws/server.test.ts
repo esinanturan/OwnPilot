@@ -116,14 +116,18 @@ vi.mock('../routes/helpers.js', () => ({
   getErrorMessage: vi.fn((e: unknown) => (e instanceof Error ? e.message : 'Unknown error')),
 }));
 
-vi.mock('../config/defaults.js', () => ({
-  WS_PORT: 8081,
-  WS_HEARTBEAT_INTERVAL_MS: 30000,
-  WS_SESSION_TIMEOUT_MS: 300000,
-  WS_MAX_PAYLOAD_BYTES: 1048576,
-  WS_MAX_CONNECTIONS: 100,
-  WS_READY_STATE_OPEN: 1,
-}));
+vi.mock('../config/defaults.js', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    WS_PORT: 8081,
+    WS_HEARTBEAT_INTERVAL_MS: 30000,
+    WS_SESSION_TIMEOUT_MS: 300000,
+    WS_MAX_PAYLOAD_BYTES: 1048576,
+    WS_MAX_CONNECTIONS: 100,
+    WS_READY_STATE_OPEN: 1,
+  };
+});
 
 vi.mock('./event-bridge.js', () => ({
   EventBusBridge: vi.fn(function () {
@@ -134,6 +138,15 @@ vi.mock('./event-bridge.js', () => ({
 
 vi.mock('../services/coding-agent-sessions.js', () => ({
   getCodingAgentSessionManager: vi.fn(() => mockCodingAgentSessions),
+}));
+
+vi.mock('./webchat-handler.js', () => ({
+  handleWebChatMessage: vi.fn(),
+}));
+
+vi.mock('../services/ui-session.js', () => ({
+  validateSession: vi.fn(() => false),
+  isPasswordConfigured: vi.fn(() => false),
 }));
 
 // ---------------------------------------------------------------------------

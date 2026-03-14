@@ -44,7 +44,7 @@ export class WhatsAppUCPAdapter extends UCPChannelAdapter {
 
   constructor(
     private readonly api: ChannelPluginAPI,
-    private readonly channelId: string = 'channel.whatsapp',
+    private readonly channelId: string = 'channel.whatsapp'
   ) {
     super();
 

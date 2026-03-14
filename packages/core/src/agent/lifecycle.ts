@@ -11,13 +11,7 @@
 // ============================================================================
 
 /** All possible agent types in the system. */
-export type AgentType =
-  | 'regular'
-  | 'coding'
-  | 'background'
-  | 'soul'
-  | 'subagent'
-  | 'orchestra';
+export type AgentType = 'regular' | 'coding' | 'background' | 'soul' | 'subagent' | 'orchestra';
 
 /**
  * Unified agent state. Each agent type maps its internal states to these.
@@ -148,11 +142,7 @@ export abstract class BaseAgentLifecycle implements IAgentLifecycle {
     if (newState === 'running' && this._startedAt === null) {
       this._startedAt = Date.now();
     }
-    if (
-      newState === 'completed' ||
-      newState === 'failed' ||
-      newState === 'cancelled'
-    ) {
+    if (newState === 'completed' || newState === 'failed' || newState === 'cancelled') {
       if (this._startedAt !== null) {
         this._metrics.durationMs += Date.now() - this._startedAt;
         this._startedAt = null;

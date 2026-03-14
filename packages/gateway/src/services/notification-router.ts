@@ -147,7 +147,7 @@ export class NotificationRouter implements INotificationRouter {
   async notifyChannel(
     channelId: string,
     chatId: string,
-    notification: Notification,
+    notification: Notification
   ): Promise<string> {
     const channelService = getChannelService();
     return channelService.send(channelId, {
@@ -221,7 +221,7 @@ export function createNotification(
     priority?: NotificationPriority;
     source?: string;
     metadata?: Record<string, unknown>;
-  },
+  }
 ): Notification {
   return {
     id: randomUUID(),

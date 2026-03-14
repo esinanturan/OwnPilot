@@ -196,7 +196,9 @@ export class EmbeddingService implements IEmbeddingService {
 
       // Retry on transient server errors (5xx) once
       if (response.status >= 500 && !retried) {
-        log.warn(`Server error ${response.status}, retrying after ${EMBEDDING_SERVER_ERROR_RETRY_MS}ms`);
+        log.warn(
+          `Server error ${response.status}, retrying after ${EMBEDDING_SERVER_ERROR_RETRY_MS}ms`
+        );
         await sleep(EMBEDDING_SERVER_ERROR_RETRY_MS);
         return this.callEmbeddingAPI(inputs, true);
       }

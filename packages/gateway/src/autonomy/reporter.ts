@@ -19,9 +19,7 @@ const log = getLog('PulseReporter');
 /**
  * Report pulse results via EventBus.
  */
-export async function reportPulseResult(
-  result: PulseResult
-): Promise<void> {
+export async function reportPulseResult(result: PulseResult): Promise<void> {
   try {
     const eventSystem = getEventSystem();
 
@@ -29,12 +27,15 @@ export async function reportPulseResult(
     const failedActions = result.actionsExecuted.filter((a) => !a.success && !a.skipped);
     const skippedActions = result.actionsExecuted.filter((a) => a.skipped);
 
-    log.info(`[PulseReport] Pulse ${result.pulseId} — ${successActions.length} succeeded, ${failedActions.length} failed, ${skippedActions.length} skipped`, {
-      durationMs: result.durationMs,
-      signalsFound: result.signalsFound,
-      urgencyScore: result.urgencyScore,
-      error: result.error ?? undefined,
-    });
+    log.info(
+      `[PulseReport] Pulse ${result.pulseId} — ${successActions.length} succeeded, ${failedActions.length} failed, ${skippedActions.length} skipped`,
+      {
+        durationMs: result.durationMs,
+        signalsFound: result.signalsFound,
+        urgencyScore: result.urgencyScore,
+        error: result.error ?? undefined,
+      }
+    );
 
     // Broadcast completion notification
     if (result.reportMessage || successActions.length > 0) {

@@ -176,7 +176,7 @@ export class MatrixChannelAPI implements ChannelPluginAPI {
       const res = await this.matrixFetch(
         'PUT',
         `/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-        content,
+        content
       );
 
       if (!res.ok) {
@@ -214,7 +214,7 @@ export class MatrixChannelAPI implements ChannelPluginAPI {
       await this.matrixFetch(
         'PUT',
         `/_matrix/client/v3/rooms/${encodeURIComponent(platformChatId)}/typing/${encodeURIComponent(this.config.user_id)}`,
-        { typing: true, timeout: 5000 },
+        { typing: true, timeout: 5000 }
       );
     } catch {
       // Typing indicator failure is non-critical
@@ -229,7 +229,7 @@ export class MatrixChannelAPI implements ChannelPluginAPI {
     method: string,
     path: string,
     body?: unknown,
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ): Promise<Response> {
     const url = `${this.config.homeserver_url}${path}`;
     const headers: Record<string, string> = {
@@ -309,7 +309,7 @@ export class MatrixChannelAPI implements ChannelPluginAPI {
           'GET',
           `/_matrix/client/v3/sync?${params}`,
           undefined,
-          this.syncAbortController.signal,
+          this.syncAbortController.signal
         );
 
         if (!res.ok) {
@@ -342,7 +342,7 @@ export class MatrixChannelAPI implements ChannelPluginAPI {
               await this.matrixFetch(
                 'POST',
                 `/_matrix/client/v3/join/${encodeURIComponent(roomId)}`,
-                {},
+                {}
               );
               log.info('Auto-joined Matrix room', { roomId });
             } catch (err) {
@@ -402,8 +402,8 @@ export class MatrixChannelAPI implements ChannelPluginAPI {
           ChannelEvents.MESSAGE_RECEIVED,
           'channel',
           this.pluginId,
-          { message: channelMessage },
-        ),
+          { message: channelMessage }
+        )
       );
     } catch (err) {
       log.error(`Failed to emit Matrix message event: ${getErrorMessage(err)}`);
@@ -433,7 +433,7 @@ export class MatrixChannelAPI implements ChannelPluginAPI {
           channelPluginId: this.pluginId,
           platform: 'matrix',
           status,
-        }),
+        })
       );
     } catch {
       // EventBus may not be ready during early boot

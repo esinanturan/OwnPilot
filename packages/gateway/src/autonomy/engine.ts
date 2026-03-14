@@ -321,7 +321,9 @@ export class AutonomyEngine implements IPulseService {
           this.config.minIntervalMs,
           this.config.maxIntervalMs
         );
-        log.info(`[Pulse] Next pulse in ${Math.round(nextMs / 60_000)}min (urgency: ${evaluation.urgencyScore})`);
+        log.info(
+          `[Pulse] Next pulse in ${Math.round(nextMs / 60_000)}min (urgency: ${evaluation.urgencyScore})`
+        );
         this.scheduleNext(nextMs);
       }
 

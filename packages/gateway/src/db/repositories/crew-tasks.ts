@@ -113,10 +113,9 @@ export class CrewTasksRepository extends BaseRepository {
   }
 
   async getById(taskId: string): Promise<CrewTask | null> {
-    const row = await this.queryOne<TaskRow>(
-      `SELECT * FROM crew_task_queue WHERE id = $1`,
-      [taskId]
-    );
+    const row = await this.queryOne<TaskRow>(`SELECT * FROM crew_task_queue WHERE id = $1`, [
+      taskId,
+    ]);
     return row ? rowToTask(row) : null;
   }
 
@@ -202,9 +201,7 @@ export class CrewTasksRepository extends BaseRepository {
     limit = 20,
     offset = 0
   ): Promise<{ tasks: CrewTask[]; total: number }> {
-    const whereClause = status
-      ? 'WHERE crew_id = $1 AND status = $2'
-      : 'WHERE crew_id = $1';
+    const whereClause = status ? 'WHERE crew_id = $1 AND status = $2' : 'WHERE crew_id = $1';
     const params = status ? [crewId, status] : [crewId];
 
     const countRow = await this.queryOne<{ count: string }>(

@@ -113,9 +113,12 @@ export function useWorkflowCanvas(params: WorkflowCanvasParams) {
     [onEdgesChange, pushHistory, setHasUnsavedChanges]
   );
 
-  const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
-    setSelectedNodeId(node.id);
-  }, [setSelectedNodeId]);
+  const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      setSelectedNodeId(node.id);
+    },
+    [setSelectedNodeId]
+  );
 
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);

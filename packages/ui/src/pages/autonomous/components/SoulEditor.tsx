@@ -305,7 +305,9 @@ export function SoulEditor({ agentId }: Props) {
 
       {activeTab === 'autonomy' && (
         <div className="space-y-3">
-          <FieldGroup label={`Autonomy Level: ${edited.autonomy.level}${edited.autonomy.level === 5 ? ' (Claw)' : ''}`}>
+          <FieldGroup
+            label={`Autonomy Level: ${edited.autonomy.level}${edited.autonomy.level === 5 ? ' (Claw)' : ''}`}
+          >
             <input
               type="range"
               min={0}

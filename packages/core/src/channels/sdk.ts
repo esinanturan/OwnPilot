@@ -7,7 +7,12 @@
 
 import type { ChannelPlatform, ChannelOutgoingMessage, ChannelUser } from './types.js';
 import { UCPChannelAdapter } from './ucp/adapter.js';
-import type { UCPMessage, UCPChannelCapabilities, UCPFeature, UCPChannelLimits } from './ucp/types.js';
+import type {
+  UCPMessage,
+  UCPChannelCapabilities,
+  UCPFeature,
+  UCPChannelLimits,
+} from './ucp/types.js';
 
 /** Configuration for creating a channel adapter via SDK. */
 export interface ChannelAdapterConfig {
@@ -143,7 +148,8 @@ export function createChannelAdapter(config: ChannelAdapterConfig): UCPChannelAd
     adapter.logout = config.logout.bind(config);
   }
   if (config.getBotInfo) {
-    (adapter as unknown as { getBotInfo: typeof config.getBotInfo }).getBotInfo = config.getBotInfo.bind(config);
+    (adapter as unknown as { getBotInfo: typeof config.getBotInfo }).getBotInfo =
+      config.getBotInfo.bind(config);
   }
 
   return adapter;

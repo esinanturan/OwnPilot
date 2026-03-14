@@ -9,11 +9,7 @@
  * and resource budgeting.
  */
 
-import type {
-  AgentType,
-  UnifiedAgentState,
-  ResourceMetrics,
-} from '@ownpilot/core';
+import type { AgentType, UnifiedAgentState, ResourceMetrics } from '@ownpilot/core';
 import { getLog } from './log.js';
 
 const log = getLog('AgentRegistry');
@@ -90,11 +86,7 @@ class AgentRegistryImpl {
   }
 
   /** Cancel an agent by type + ID. */
-  async cancel(
-    type: AgentType,
-    agentId: string,
-    userId: string
-  ): Promise<boolean> {
+  async cancel(type: AgentType, agentId: string, userId: string): Promise<boolean> {
     const adapter = this.adapters.get(type);
     if (!adapter) return false;
     return adapter.cancel(agentId, userId);

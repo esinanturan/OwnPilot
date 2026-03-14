@@ -181,11 +181,9 @@ function createHeartbeatAgentEngine(): IHeartbeatAgentEngine {
       const skillAccessAllowed = request.context?.skillAccessAllowed as string[] | undefined;
       const skillAccessBlocked = request.context?.skillAccessBlocked as string[] | undefined;
 
-      const hasToolFilter = !clawMode && !!(
-        allowedTools?.length ||
-        skillAccessAllowed?.length ||
-        skillAccessBlocked?.length
-      );
+      const hasToolFilter =
+        !clawMode &&
+        !!(allowedTools?.length || skillAccessAllowed?.length || skillAccessBlocked?.length);
 
       // Wrap agent.chat() in the heartbeat context so communication/crew tools
       // can resolve the correct soul agent ID via AsyncLocalStorage.

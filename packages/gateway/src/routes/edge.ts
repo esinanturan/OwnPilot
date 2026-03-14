@@ -103,7 +103,8 @@ edgeRoutes.post('/', async (c) => {
 
     return apiResponse(c, device, 201);
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
 });
@@ -193,7 +194,8 @@ edgeRoutes.post('/:id/command', async (c) => {
 
     return apiResponse(c, command, 201);
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     if (err instanceof Error && err.message.includes('not found')) {
       return notFoundError(c, 'Device', id);
     }

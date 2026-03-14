@@ -57,8 +57,13 @@ vi.mock('../db/repositories/workflow-approvals.js', () => ({
   createWorkflowApprovalsRepository: () => mockApprovalsRepo,
 }));
 
+const mockWorkflowService = {
+  resumeFromApproval: vi.fn().mockResolvedValue(undefined),
+};
+
 vi.mock('../services/workflow-service.js', () => ({
   topologicalSort: vi.fn(), // default: no throw = valid DAG
+  getWorkflowService: () => mockWorkflowService,
 }));
 
 vi.mock('../services/workflow/dag-utils.js', () => ({

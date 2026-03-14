@@ -241,6 +241,15 @@ export class SubagentManager {
       this.sessions.delete(id);
     }
 
+    // Clean up spawnCounts for conversations with no active sessions
+    for (const [convId] of this.spawnCounts) {
+      const activeSessions = this.parentIndex.get(convId);
+      if (!activeSessions || activeSessions.size === 0) {
+        this.spawnCounts.delete(convId);
+        this.parentIndex.delete(convId);
+      }
+    }
+
     if (toRemove.length > 0) {
       log.debug(`Cleaned up ${toRemove.length} completed subagent sessions`);
     }

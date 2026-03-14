@@ -21,7 +21,7 @@ import {
 import { ERROR_CODES } from './error-codes.js';
 import { createWorkflowsRepository } from '../db/repositories/workflows.js';
 import { createWorkflowApprovalsRepository } from '../db/repositories/workflow-approvals.js';
-import { topologicalSort } from '../services/workflow-service.js';
+import { topologicalSort, getWorkflowService } from '../services/workflow-service.js';
 import {
   detectCycle,
   type ValidationNode,
@@ -768,6 +768,29 @@ workflowRoutes.post('/approvals/:id/approve', async (c) => {
   }
 
   wsGateway.broadcast('approval:decided', { approvalId: id, status: 'approved' });
+
+  // Resume the workflow execution from the approval point
+  if (approval.workflowId && approval.workflowLogId) {
+    const service = getWorkflowService();
+    service
+      .resumeFromApproval(
+        approval.workflowId,
+        userId,
+        approval.nodeId,
+        'approved',
+        approval.workflowLogId
+      )
+      .catch((err: unknown) => {
+        // Log but don't fail the approval response — workflow resume is best-effort
+        const wfRepo = createWorkflowsRepository(userId);
+        wfRepo.updateLog(approval.workflowLogId, {
+          status: 'failed',
+          error: `Resume after approval failed: ${getErrorMessage(err)}`,
+          completedAt: new Date().toISOString(),
+        }).catch(() => { /* ignore log update failure */ });
+      });
+  }
+
   return apiResponse(c, approval);
 });
 

@@ -397,7 +397,10 @@ export function getHeartbeatRunner(): HeartbeatRunner {
  */
 export function getCommunicationBus(): AgentCommunicationBus {
   getHeartbeatRunner(); // ensures communicationBusInstance is set
-  return communicationBusInstance!;
+  if (!communicationBusInstance) {
+    throw new Error('AgentCommunicationBus not initialized — heartbeat runner failed to start');
+  }
+  return communicationBusInstance;
 }
 
 /**

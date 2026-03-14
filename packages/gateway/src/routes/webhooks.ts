@@ -12,6 +12,10 @@ import { getServiceRegistry, Services } from '@ownpilot/core';
 import { getLog } from '../services/log.js';
 import { safeKeyCompare, apiError, apiResponse, ERROR_CODES, getErrorMessage } from './helpers.js';
 import { TriggersRepository, type WebhookConfig } from '../db/repositories/triggers.js';
+import {
+  WorkflowsRepository,
+  type TriggerNodeData,
+} from '../db/repositories/workflows.js';
 
 const log = getLog('Webhooks');
 
@@ -244,4 +248,95 @@ webhookRoutes.post('/trigger/:triggerId', async (c) => {
   }
 
   return apiResponse(c, { message: 'Webhook received', triggerId });
+});
+
+/**
+ * POST /webhooks/workflow/:path
+ *
+ * Receives external webhook calls that trigger workflows directly.
+ * Matches the incoming path against workflow trigger nodes with
+ * triggerType='webhook' and a matching webhookPath.
+ *
+ * Validates HMAC-SHA256 signature via X-Webhook-Signature header
+ * if webhookSecret is configured on the trigger node.
+ *
+ * The webhook payload is injected as workflow input variables
+ * under the __webhook namespace.
+ */
+webhookRoutes.post('/workflow/:path', async (c) => {
+  const webhookPath = c.req.param('path');
+
+  // Look up active workflow with matching webhookPath in its trigger node
+  const repo = new WorkflowsRepository();
+  const workflow = await repo.getByWebhookPath(`/hooks/${webhookPath}`);
+
+  if (!workflow) {
+    return apiError(
+      c,
+      { code: ERROR_CODES.NOT_FOUND, message: 'No workflow matches this webhook path' },
+      404
+    );
+  }
+
+  // Find the trigger node to check for webhook secret
+  const triggerNode = workflow.nodes.find((n) => n.type === 'triggerNode');
+  const triggerData = triggerNode?.data as TriggerNodeData | undefined;
+
+  // HMAC-SHA256 signature validation if webhookSecret is configured
+  if (triggerData?.webhookSecret) {
+    const signature = c.req.header('x-webhook-signature');
+    if (!signature) {
+      return apiError(
+        c,
+        { code: ERROR_CODES.ACCESS_DENIED, message: 'Missing X-Webhook-Signature header' },
+        403
+      );
+    }
+
+    const rawBody = await c.req.text();
+    const expected = createHmac('sha256', triggerData.webhookSecret).update(rawBody).digest('hex');
+
+    if (!safeKeyCompare(signature, expected)) {
+      return apiError(
+        c,
+        { code: ERROR_CODES.ACCESS_DENIED, message: 'Invalid webhook signature' },
+        403
+      );
+    }
+  }
+
+  // Parse the webhook body
+  let body: Record<string, unknown> = {};
+  try {
+    body = (await c.req.json()) as Record<string, unknown>;
+  } catch {
+    /* empty body is fine */
+  }
+
+  // Execute the workflow with webhook data as input
+  try {
+    const service = getServiceRegistry().get(Services.Workflow);
+    const userId = workflow.userId ?? 'default';
+
+    // Fire-and-forget: execute in background, don't block the webhook response
+    service
+      .executeWorkflow(workflow.id, userId, undefined, {
+        inputs: { __webhook: { path: webhookPath, body, receivedAt: new Date().toISOString() } },
+      })
+      .catch((err: Error) =>
+        log.error('Webhook workflow execution failed', { workflowId: workflow.id, error: err.message })
+      );
+
+    return apiResponse(c, {
+      message: 'Webhook received, workflow triggered',
+      workflowId: workflow.id,
+    });
+  } catch (error) {
+    log.error('Webhook workflow trigger failed', { error: getErrorMessage(error) });
+    return apiError(
+      c,
+      { code: ERROR_CODES.INTERNAL_ERROR, message: 'Failed to trigger workflow' },
+      500
+    );
+  }
 });

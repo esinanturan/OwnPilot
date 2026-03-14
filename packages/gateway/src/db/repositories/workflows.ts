@@ -837,6 +837,28 @@ export class WorkflowsRepository extends BaseRepository {
     );
     return parseInt(row?.count ?? '0', 10);
   }
+
+  /**
+   * Find a workflow by its trigger node's webhookPath (global lookup, cross-user).
+   * Used by the webhook endpoint to match incoming requests to workflows.
+   */
+  async getByWebhookPath(webhookPath: string): Promise<Workflow | null> {
+    // Query all active workflows and find one with a matching trigger node webhookPath.
+    // Uses PostgreSQL JSONB operators for efficient filtering.
+    const row = await this.queryOne<WorkflowRow>(
+      `SELECT w.* FROM workflows w,
+       LATERAL jsonb_array_elements(
+         CASE WHEN jsonb_typeof(w.nodes) = 'array' THEN w.nodes ELSE '[]'::jsonb END
+       ) AS node
+       WHERE w.status = 'active'
+         AND node->>'type' = 'triggerNode'
+         AND node->'data'->>'triggerType' = 'webhook'
+         AND node->'data'->>'webhookPath' = $1
+       LIMIT 1`,
+      [webhookPath]
+    );
+    return row ? mapWorkflow(row) : null;
+  }
 }
 
 // ============================================================================

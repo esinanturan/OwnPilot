@@ -887,6 +887,577 @@ export class WorkflowService implements IWorkflowService {
   }
 
   /**
+   * Resume a workflow that was paused for approval.
+   *
+   * Loads the paused log, restores node outputs, marks the approval node
+   * as completed with the decision, and re-executes the workflow continuing
+   * from where it left off (skipping already-completed nodes).
+   */
+  async resumeFromApproval(
+    workflowId: string,
+    userId: string,
+    approvalNodeId: string,
+    approvalResult: 'approved' | 'rejected',
+    logId: string,
+    onProgress?: (event: WorkflowProgressEvent) => void
+  ): Promise<WorkflowLog> {
+    const repo = createWorkflowsRepository(userId);
+    const workflow = await repo.get(workflowId);
+    if (!workflow) throw new Error('Workflow not found');
+
+    const pausedLog = await repo.getLog(logId);
+    if (!pausedLog) throw new Error('Workflow log not found');
+    if (pausedLog.status !== 'awaiting_approval') {
+      throw new Error(`Log is not awaiting approval (status: ${pausedLog.status})`);
+    }
+
+    // Restore node outputs from the paused log
+    const savedNodeOutputs = pausedLog.nodeResults ?? {};
+
+    // Mark the approval node as completed with the decision
+    savedNodeOutputs[approvalNodeId] = {
+      nodeId: approvalNodeId,
+      status: 'success',
+      output: { approved: approvalResult === 'approved', decision: approvalResult },
+      startedAt: savedNodeOutputs[approvalNodeId]?.startedAt ?? new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+    };
+
+    // If rejected, mark the workflow as failed
+    if (approvalResult === 'rejected') {
+      await repo.updateLog(logId, {
+        status: 'failed',
+        error: 'Approval rejected',
+        nodeResults: savedNodeOutputs,
+        completedAt: new Date().toISOString(),
+      });
+      const finalLog = await repo.getLog(logId);
+      return finalLog ?? pausedLog;
+    }
+
+    // Check for active execution
+    if (this.activeExecutions.has(workflowId)) {
+      throw new Error('Workflow is already running');
+    }
+
+    const abortController = new AbortController();
+    this.activeExecutions.set(workflowId, abortController);
+    const startTime = Date.now();
+
+    // Update log status to running for resume
+    await repo.updateLog(logId, { status: 'running', nodeResults: savedNodeOutputs });
+
+    onProgress?.({ type: 'started', logId });
+
+    try {
+      // Filter out trigger nodes
+      const executableNodes = workflow.nodes.filter((n) => n.type !== 'triggerNode');
+      const levels = topologicalSort(executableNodes, workflow.edges);
+      const nodeMap = new Map(executableNodes.map((n) => [n.id, n]));
+      const nodeOutputs: Record<string, NodeResult> = { ...savedNodeOutputs };
+
+      // Pre-compute ForEach body nodes
+      const forEachBodyNodeSet = new Set<string>();
+      for (const node of executableNodes) {
+        if (node.type === 'forEachNode') {
+          const { bodyNodes } = getForEachBodyNodes(node.id, workflow.edges);
+          for (const id of bodyNodes) forEachBodyNodeSet.add(id);
+        }
+      }
+
+      // Build alias map
+      const aliasToNodeId = new Map<string, string>();
+      for (const node of executableNodes) {
+        const alias = (node.data as unknown as Record<string, unknown>).outputAlias as
+          | string
+          | undefined;
+        if (alias && typeof alias === 'string' && alias.trim()) {
+          aliasToNodeId.set(alias.trim(), node.id);
+        }
+      }
+
+      // Find global error handler node
+      const errorHandlerNode = executableNodes.find((n) => n.type === 'errorHandlerNode');
+      const errorHandlerContinueOnSuccess =
+        errorHandlerNode &&
+        (errorHandlerNode.data as unknown as Record<string, unknown>).continueOnSuccess === true;
+
+      const toolService = this.getToolService();
+
+      // Execute level by level, skipping nodes already completed in the saved state
+      for (const level of levels) {
+        if (abortController.signal.aborted) {
+          throw new Error('Workflow execution cancelled');
+        }
+
+        const results = await Promise.allSettled(
+          level.map(async (nodeId) => {
+            const node = nodeMap.get(nodeId);
+            if (!node) throw new Error(`Node ${nodeId} not found`);
+
+            // Skip nodes that were already completed in the saved state
+            if (
+              nodeOutputs[nodeId] &&
+              (nodeOutputs[nodeId].status === 'success' ||
+                nodeOutputs[nodeId].status === 'skipped' ||
+                nodeOutputs[nodeId].status === 'error')
+            ) {
+              return nodeOutputs[nodeId];
+            }
+
+            // Skip ForEach body nodes
+            if (forEachBodyNodeSet.has(nodeId) && !nodeOutputs[nodeId]) {
+              const skipped: NodeResult = {
+                nodeId,
+                status: 'skipped',
+                completedAt: new Date().toISOString(),
+              };
+              nodeOutputs[nodeId] = skipped;
+              return skipped;
+            }
+
+            // Skip error handler node during normal execution
+            if (node.type === 'errorHandlerNode') {
+              if (!nodeOutputs[nodeId]) {
+                nodeOutputs[nodeId] = {
+                  nodeId,
+                  status: 'skipped',
+                  completedAt: new Date().toISOString(),
+                };
+              }
+              return nodeOutputs[nodeId];
+            }
+
+            // For remaining node types, delegate to normal execution via executeWorkflow's
+            // existing node executor dispatching. We call the same executor functions inline.
+            if (node.type === 'forEachNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'forEach' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                () =>
+                  executeForEachNode(
+                    node,
+                    nodeOutputs,
+                    workflow.variables,
+                    workflow.edges,
+                    nodeMap,
+                    userId,
+                    abortController.signal,
+                    toolService,
+                    onProgress,
+                    repo,
+                    logId
+                  ),
+                onProgress
+              );
+            }
+
+            if (node.type === 'llmNode') {
+              onProgress?.({
+                type: 'node_start',
+                nodeId,
+                toolName: `llm:${(node.data as LlmNodeData).provider}`,
+              });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                () => executeLlmNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'conditionNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'condition' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                async () => executeConditionNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'codeNode') {
+              const cd = node.data as CodeNodeData;
+              onProgress?.({ type: 'node_start', nodeId, toolName: `code:${cd.language}` });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                () => executeCodeNode(node, nodeOutputs, workflow.variables, userId, toolService),
+                onProgress
+              );
+            }
+
+            if (node.type === 'transformerNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'transformer' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                async () => executeTransformerNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'httpRequestNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'httpRequest' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                () => executeHttpRequestNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'delayNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'delay' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                () =>
+                  executeDelayNode(node, nodeOutputs, workflow.variables, abortController.signal),
+                onProgress
+              );
+            }
+
+            if (node.type === 'switchNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'switch' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                async () => executeSwitchNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'notificationNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'notification' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                async () => executeNotificationNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'mergeNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'merge' });
+              const incomingNodeIds = workflow.edges
+                .filter((e) => e.target === nodeId)
+                .map((e) => e.source);
+              return await this.executeWithRetryAndTimeout(
+                node,
+                async () =>
+                  executeMergeNode(node, nodeOutputs, workflow.variables, incomingNodeIds),
+                onProgress
+              );
+            }
+
+            if (node.type === 'dataStoreNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'dataStore' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                async () => executeDataStoreNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'schemaValidatorNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'schemaValidator' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                async () => executeSchemaValidatorNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'filterNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'filter' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                async () => executeFilterNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'mapNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'map' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                async () => executeMapNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'aggregateNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'aggregate' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                async () => executeAggregateNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'webhookResponseNode') {
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'webhookResponse' });
+              return await this.executeWithRetryAndTimeout(
+                node,
+                async () => executeWebhookResponseNode(node, nodeOutputs, workflow.variables),
+                onProgress
+              );
+            }
+
+            if (node.type === 'stickyNoteNode') {
+              return {
+                nodeId,
+                status: 'skipped' as const,
+                output: null,
+                startedAt: new Date().toISOString(),
+                completedAt: new Date().toISOString(),
+                durationMs: 0,
+              };
+            }
+
+            // Another approval node in the same workflow — pause again
+            if (node.type === 'approvalNode') {
+              const apData = node.data as unknown as Record<string, unknown>;
+              onProgress?.({ type: 'node_start', nodeId, toolName: 'approval' });
+
+              const approvalRepo = createWorkflowApprovalsRepository(userId);
+              const timeoutMin =
+                typeof apData.timeoutMinutes === 'number' ? apData.timeoutMinutes : undefined;
+              const approval = await approvalRepo.create({
+                workflowLogId: logId,
+                workflowId,
+                nodeId,
+                context: {
+                  approvalMessage: apData.approvalMessage,
+                  nodeLabel: apData.label,
+                  completedNodes: Object.keys(nodeOutputs).length,
+                },
+                message: (apData.approvalMessage as string) ?? undefined,
+                expiresAt: timeoutMin ? new Date(Date.now() + timeoutMin * 60000) : undefined,
+              });
+
+              const approvalNodeResult: NodeResult = {
+                nodeId,
+                status: 'running',
+                output: { approvalId: approval.id, status: 'awaiting_approval' },
+                startedAt: new Date().toISOString(),
+              };
+              nodeOutputs[nodeId] = approvalNodeResult;
+
+              await repo.updateLog(logId, {
+                status: 'awaiting_approval',
+                nodeResults: nodeOutputs,
+              });
+
+              onProgress?.({
+                type: 'node_complete',
+                nodeId,
+                status: 'running',
+                output: approvalNodeResult.output,
+              });
+
+              onProgress?.({
+                type: 'done',
+                logId,
+                logStatus: 'awaiting_approval',
+              });
+
+              throw new ApprovalPauseError(approval.id);
+            }
+
+            // Default: tool node
+            const toolData = node.data as ToolNodeData;
+            onProgress?.({ type: 'node_start', nodeId, toolName: toolData.toolName });
+
+            return await this.executeWithRetryAndTimeout(
+              node,
+              () => executeNode(node, nodeOutputs, workflow.variables, userId, toolService),
+              onProgress
+            );
+          })
+        );
+
+        // Process results (same logic as executeWorkflow)
+        for (let i = 0; i < level.length; i++) {
+          const nodeId = level[i]!;
+          const settled = results[i]!;
+
+          if (settled.status === 'fulfilled') {
+            nodeOutputs[nodeId] = settled.value;
+          } else {
+            nodeOutputs[nodeId] = {
+              nodeId,
+              status: 'error',
+              error: getErrorMessage(settled.reason, 'Unexpected error'),
+              completedAt: new Date().toISOString(),
+            };
+          }
+
+          const nodeResult = nodeOutputs[nodeId]!;
+
+          // Mirror result to alias key
+          for (const [alias, mappedNodeId] of aliasToNodeId) {
+            if (mappedNodeId === nodeId) {
+              nodeOutputs[alias] = nodeResult;
+              break;
+            }
+          }
+
+          if (nodeResult.status === 'error') {
+            onProgress?.({ type: 'node_error', nodeId, error: nodeResult.error });
+
+            let handlerRecovered = false;
+            if (errorHandlerNode && errorHandlerNode.id !== nodeId) {
+              onProgress?.({
+                type: 'node_start',
+                nodeId: errorHandlerNode.id,
+                toolName: 'errorHandler',
+              });
+              const handlerStart = Date.now();
+              const handlerResult: NodeResult = {
+                nodeId: errorHandlerNode.id,
+                status: 'success',
+                output: {
+                  handled: true,
+                  failedNodeId: nodeId,
+                  error: nodeResult.error,
+                  continueOnSuccess: !!errorHandlerContinueOnSuccess,
+                },
+                startedAt: new Date(handlerStart).toISOString(),
+                completedAt: new Date().toISOString(),
+                durationMs: Date.now() - handlerStart,
+              };
+              nodeOutputs[errorHandlerNode.id] = handlerResult;
+
+              for (const [alias, mappedNodeId] of aliasToNodeId) {
+                if (mappedNodeId === errorHandlerNode.id) {
+                  nodeOutputs[alias] = handlerResult;
+                  break;
+                }
+              }
+
+              onProgress?.({
+                type: 'node_complete',
+                nodeId: errorHandlerNode.id,
+                status: 'success',
+                output: handlerResult.output,
+                durationMs: handlerResult.durationMs,
+              });
+
+              if (errorHandlerContinueOnSuccess) {
+                handlerRecovered = true;
+              }
+            }
+
+            if (!handlerRecovered) {
+              const downstream = getDownstreamNodes(nodeId, workflow.edges);
+              for (const downId of downstream) {
+                if (!nodeOutputs[downId]) {
+                  nodeOutputs[downId] = {
+                    nodeId: downId,
+                    status: 'skipped',
+                    completedAt: new Date().toISOString(),
+                  };
+                }
+              }
+            }
+          } else {
+            onProgress?.({
+              type: 'node_complete',
+              nodeId,
+              status: nodeResult.status,
+              output: nodeResult.output,
+              resolvedArgs: nodeResult.resolvedArgs,
+              branchTaken: nodeResult.branchTaken,
+              durationMs: nodeResult.durationMs,
+            });
+
+            const node = nodeMap.get(nodeId);
+            if (node?.type === 'conditionNode' && nodeResult.branchTaken) {
+              const skippedHandle = nodeResult.branchTaken === 'true' ? 'false' : 'true';
+              const skippedNodes = getDownstreamNodesByHandle(
+                nodeId,
+                skippedHandle,
+                workflow.edges
+              );
+              for (const skipId of skippedNodes) {
+                if (!nodeOutputs[skipId]) {
+                  nodeOutputs[skipId] = {
+                    nodeId: skipId,
+                    status: 'skipped',
+                    completedAt: new Date().toISOString(),
+                  };
+                  onProgress?.({ type: 'node_complete', nodeId: skipId, status: 'skipped' });
+                }
+              }
+            }
+
+            if (node?.type === 'switchNode' && nodeResult.branchTaken) {
+              const switchData = node.data as SwitchNodeData;
+              const allHandles = [...switchData.cases.map((c) => c.label), 'default'];
+              for (const handle of allHandles) {
+                if (handle !== nodeResult.branchTaken) {
+                  const skippedNodes = getDownstreamNodesByHandle(nodeId, handle, workflow.edges);
+                  for (const skipId of skippedNodes) {
+                    if (!nodeOutputs[skipId]) {
+                      nodeOutputs[skipId] = {
+                        nodeId: skipId,
+                        status: 'skipped',
+                        completedAt: new Date().toISOString(),
+                      };
+                      onProgress?.({ type: 'node_complete', nodeId: skipId, status: 'skipped' });
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          await repo.updateLog(logId, { nodeResults: nodeOutputs });
+        }
+      }
+
+      // Finalize
+      const hasErrors = Object.values(nodeOutputs).some((r) => r.status === 'error');
+      const finalStatus: WorkflowLogStatus = hasErrors ? 'failed' : 'completed';
+      const totalDuration = Date.now() - startTime + (pausedLog.durationMs ?? 0);
+
+      await repo.updateLog(logId, {
+        status: finalStatus,
+        nodeResults: nodeOutputs,
+        completedAt: new Date().toISOString(),
+        durationMs: totalDuration,
+      });
+      await repo.markRun(workflowId);
+
+      onProgress?.({
+        type: 'done',
+        logId,
+        logStatus: finalStatus,
+        durationMs: totalDuration,
+      });
+
+      const finalLog = await repo.getLog(logId);
+      return finalLog ?? pausedLog;
+    } catch (error) {
+      if (error instanceof ApprovalPauseError) {
+        const finalLog = await repo.getLog(logId);
+        return finalLog ?? pausedLog;
+      }
+
+      const totalDuration = Date.now() - startTime + (pausedLog.durationMs ?? 0);
+      const errorMsg = getErrorMessage(error, 'Workflow resume failed');
+
+      await repo.updateLog(logId, {
+        status: 'failed',
+        error: errorMsg,
+        completedAt: new Date().toISOString(),
+        durationMs: totalDuration,
+      });
+
+      onProgress?.({ type: 'error', error: errorMsg });
+
+      const finalLog = await repo.getLog(logId);
+      return finalLog ?? pausedLog;
+    } finally {
+      this.activeExecutions.delete(workflowId);
+    }
+  }
+
+  /**
    * Cancel a running workflow execution.
    */
   cancelExecution(workflowId: string): boolean {

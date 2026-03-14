@@ -31,7 +31,7 @@ import {
   RefreshCw,
 } from '../components/icons';
 import type { Channel, ChannelUser, ChannelStats } from '../api/types';
-import { timeAgo, getStatusColor, getStatusBg, StatusIcon, PlatformIcon } from './ChannelsPage';
+import { timeAgo, getStatusColor, getStatusBg, StatusIcon, PlatformIcon } from './channels-helpers';
 
 // ============================================================================
 // Channel Detail Panel

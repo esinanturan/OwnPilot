@@ -55,7 +55,12 @@ import {
   runCodex,
   runGeminiCli,
 } from './coding-agent-providers.js';
-import { isAcpSupported, buildAcpArgs, getAcpBinary, getAcpMode } from '../acp/acp-provider-support.js';
+import {
+  isAcpSupported,
+  buildAcpArgs,
+  getAcpBinary,
+  getAcpMode,
+} from '../acp/acp-provider-support.js';
 import type { AcpMcpServerConfig } from '../acp/types.js';
 
 const log = getLog('CodingAgent');

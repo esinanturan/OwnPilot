@@ -57,11 +57,7 @@ export interface INotificationRouter {
   /**
    * Send a notification to a specific channel + chat ID (direct targeting).
    */
-  notifyChannel(
-    channelId: string,
-    chatId: string,
-    notification: Notification,
-  ): Promise<string>;
+  notifyChannel(channelId: string, chatId: string, notification: Notification): Promise<string>;
 
   /**
    * Broadcast a notification to all connected channels.

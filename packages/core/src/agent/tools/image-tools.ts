@@ -423,7 +423,7 @@ export const resizeImageExecutor: ToolExecutor = async (
     let sharp: SharpConstructor | null = null;
     try {
       const imported = await tryImport('sharp');
-      sharp = (imported as Record<string, unknown>)?.default as SharpConstructor ?? null;
+      sharp = ((imported as Record<string, unknown>)?.default as SharpConstructor) ?? null;
     } catch {
       return {
         content: {

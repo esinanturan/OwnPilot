@@ -55,10 +55,5 @@ export const platformDomain = {
     'user_containers',
   ],
 
-  publicServices: [
-    'config-center',
-    'provider-service',
-    'model-routing',
-    'workspace-service',
-  ],
+  publicServices: ['config-center', 'provider-service', 'model-routing', 'workspace-service'],
 } as const;

@@ -57,7 +57,10 @@ Each fleet has a task queue. Add tasks and workers pick them up automatically.`,
             description: { type: 'string', description: 'What this worker does' },
             provider: { type: 'string', description: 'AI provider (for ai-chat/api-call)' },
             model: { type: 'string', description: 'AI model (for ai-chat/api-call)' },
-            system_prompt: { type: 'string', description: 'Custom system prompt (for ai-chat/api-call)' },
+            system_prompt: {
+              type: 'string',
+              description: 'Custom system prompt (for ai-chat/api-call)',
+            },
             cli_provider: {
               type: 'string',
               description: 'CLI tool (for coding-cli): claude-code, codex, gemini-cli',
@@ -185,8 +188,7 @@ const addFleetTaskDef: ToolDefinition = {
 const listFleetsDef: ToolDefinition = {
   name: 'list_fleets',
   workflowUsable: true,
-  description:
-    'List all fleets with their status, worker count, and task statistics.',
+  description: 'List all fleets with their status, worker count, and task statistics.',
   parameters: {
     type: 'object',
     properties: {},
@@ -199,8 +201,7 @@ const listFleetsDef: ToolDefinition = {
 const getFleetStatusDef: ToolDefinition = {
   name: 'get_fleet_status',
   workflowUsable: true,
-  description:
-    'Get detailed status of a fleet: session state, active workers, task queue, cost.',
+  description: 'Get detailed status of a fleet: session state, active workers, task queue, cost.',
   parameters: {
     type: 'object',
     properties: {
@@ -215,7 +216,8 @@ const getFleetStatusDef: ToolDefinition = {
 const pauseFleetDef: ToolDefinition = {
   name: 'pause_fleet',
   workflowUsable: true,
-  description: 'Pause a running fleet. Workers finish their current tasks but no new cycles start. Use resume_fleet to continue.',
+  description:
+    'Pause a running fleet. Workers finish their current tasks but no new cycles start. Use resume_fleet to continue.',
   parameters: {
     type: 'object',
     properties: {
@@ -245,7 +247,8 @@ const resumeFleetDef: ToolDefinition = {
 const deleteFleetDef: ToolDefinition = {
   name: 'delete_fleet',
   workflowUsable: true,
-  description: 'Delete a fleet permanently. Stops it first if running. All tasks and history are removed.',
+  description:
+    'Delete a fleet permanently. Stops it first if running. All tasks and history are removed.',
   parameters: {
     type: 'object',
     properties: {
@@ -337,9 +340,7 @@ export async function executeFleetTool(
           mission,
           workers: workerConfigs,
           scheduleType: scheduleType as 'continuous' | 'interval' | 'on-demand' | 'event' | 'cron',
-          scheduleConfig: intervalMinutes
-            ? { intervalMs: intervalMinutes * 60_000 }
-            : undefined,
+          scheduleConfig: intervalMinutes ? { intervalMs: intervalMinutes * 60_000 } : undefined,
           concurrencyLimit,
           autoStart,
           provider: defaultProvider,

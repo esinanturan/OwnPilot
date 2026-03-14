@@ -5,14 +5,8 @@
  */
 
 import { Hono } from 'hono';
-import {
-  PomodoroRepository,
-  type UpdateSettingsInput,
-} from '../db/repositories/pomodoro.js';
-import {
-  HabitsRepository,
-  type UpdateHabitInput,
-} from '../db/repositories/habits.js';
+import { PomodoroRepository, type UpdateSettingsInput } from '../db/repositories/pomodoro.js';
+import { HabitsRepository, type UpdateHabitInput } from '../db/repositories/habits.js';
 import { CapturesRepository } from '../db/repositories/captures.js';
 import {
   apiResponse,

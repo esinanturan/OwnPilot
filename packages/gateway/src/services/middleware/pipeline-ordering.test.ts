@@ -110,9 +110,6 @@ describe('Pipeline Middleware Ordering', () => {
       'context-injection',
       'context-injection-middleware'
     );
-    expect(mockBus.useNamed).toHaveBeenCalledWith(
-      'agent-execution',
-      'agent-execution-middleware'
-    );
+    expect(mockBus.useNamed).toHaveBeenCalledWith('agent-execution', 'agent-execution-middleware');
   });
 });

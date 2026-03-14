@@ -172,9 +172,21 @@ const FLEET_TEMPLATES: FleetTemplate[] = [
     scheduleType: 'on-demand',
     concurrency: 3,
     workers: [
-      { name: 'reviewer', type: 'ai-chat', description: 'Analyzes code for bugs, security, and best practices' },
-      { name: 'fixer', type: 'coding-cli', description: 'Applies automated fixes using Claude Code' },
-      { name: 'reporter', type: 'api-call', description: 'Summarizes findings into a concise report' },
+      {
+        name: 'reviewer',
+        type: 'ai-chat',
+        description: 'Analyzes code for bugs, security, and best practices',
+      },
+      {
+        name: 'fixer',
+        type: 'coding-cli',
+        description: 'Applies automated fixes using Claude Code',
+      },
+      {
+        name: 'reporter',
+        type: 'api-call',
+        description: 'Summarizes findings into a concise report',
+      },
     ],
   },
   {
@@ -187,9 +199,21 @@ const FLEET_TEMPLATES: FleetTemplate[] = [
     scheduleType: 'on-demand',
     concurrency: 5,
     workers: [
-      { name: 'researcher', type: 'ai-chat', description: 'Deep research using web browsing and memory tools' },
-      { name: 'analyst', type: 'ai-chat', description: 'Analyzes data patterns and draws conclusions' },
-      { name: 'fact-checker', type: 'api-call', description: 'Verifies claims and cross-references sources' },
+      {
+        name: 'researcher',
+        type: 'ai-chat',
+        description: 'Deep research using web browsing and memory tools',
+      },
+      {
+        name: 'analyst',
+        type: 'ai-chat',
+        description: 'Analyzes data patterns and draws conclusions',
+      },
+      {
+        name: 'fact-checker',
+        type: 'api-call',
+        description: 'Verifies claims and cross-references sources',
+      },
       { name: 'writer', type: 'api-call', description: 'Synthesizes findings into clear reports' },
     ],
   },
@@ -218,9 +242,17 @@ const FLEET_TEMPLATES: FleetTemplate[] = [
     scheduleType: 'on-demand',
     concurrency: 4,
     workers: [
-      { name: 'drafter', type: 'ai-chat', description: 'Creates initial content drafts with research' },
+      {
+        name: 'drafter',
+        type: 'ai-chat',
+        description: 'Creates initial content drafts with research',
+      },
       { name: 'editor', type: 'api-call', description: 'Refines tone, clarity, and grammar' },
-      { name: 'seo-optimizer', type: 'api-call', description: 'Optimizes for search engines and readability' },
+      {
+        name: 'seo-optimizer',
+        type: 'api-call',
+        description: 'Optimizes for search engines and readability',
+      },
       { name: 'formatter', type: 'ai-chat', description: 'Formats and prepares final output' },
     ],
   },
@@ -234,9 +266,21 @@ const FLEET_TEMPLATES: FleetTemplate[] = [
     scheduleType: 'continuous',
     concurrency: 3,
     workers: [
-      { name: 'health-checker', type: 'mcp-bridge', description: 'Pings services and checks health endpoints' },
-      { name: 'log-analyzer', type: 'ai-chat', description: 'Analyzes logs for errors and anomalies' },
-      { name: 'responder', type: 'ai-chat', description: 'Takes remediation actions when issues detected' },
+      {
+        name: 'health-checker',
+        type: 'mcp-bridge',
+        description: 'Pings services and checks health endpoints',
+      },
+      {
+        name: 'log-analyzer',
+        type: 'ai-chat',
+        description: 'Analyzes logs for errors and anomalies',
+      },
+      {
+        name: 'responder',
+        type: 'ai-chat',
+        description: 'Takes remediation actions when issues detected',
+      },
     ],
   },
   {
@@ -249,11 +293,27 @@ const FLEET_TEMPLATES: FleetTemplate[] = [
     scheduleType: 'on-demand',
     concurrency: 5,
     workers: [
-      { name: 'coder-1', type: 'coding-cli', description: 'Feature development and implementation' },
-      { name: 'coder-2', type: 'coding-cli', description: 'Refactoring and code quality improvements' },
+      {
+        name: 'coder-1',
+        type: 'coding-cli',
+        description: 'Feature development and implementation',
+      },
+      {
+        name: 'coder-2',
+        type: 'coding-cli',
+        description: 'Refactoring and code quality improvements',
+      },
       { name: 'test-writer', type: 'coding-cli', description: 'Writes unit and integration tests' },
-      { name: 'doc-writer', type: 'coding-cli', description: 'Generates and updates documentation' },
-      { name: 'coordinator', type: 'ai-chat', description: 'Reviews outputs and coordinates between workers' },
+      {
+        name: 'doc-writer',
+        type: 'coding-cli',
+        description: 'Generates and updates documentation',
+      },
+      {
+        name: 'coordinator',
+        type: 'ai-chat',
+        description: 'Reviews outputs and coordinates between workers',
+      },
     ],
   },
 ];
@@ -263,13 +323,7 @@ const FLEET_TEMPLATES: FleetTemplate[] = [
 // =============================================================================
 
 /** Create Fleet Modal — template picker + form */
-function CreateFleetModal({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void;
-  onCreated: () => void;
-}) {
+function CreateFleetModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const toast = useToast();
   const [step, setStep] = useState<'templates' | 'form'>('templates');
   const [isCreating, setIsCreating] = useState(false);
@@ -297,8 +351,16 @@ function CreateFleetModal({
     mcpTools: string;
   }
   const emptyWorker = (): WorkerFormState => ({
-    name: '', type: 'ai-chat', description: '', provider: '', model: '',
-    systemPrompt: '', cliProvider: 'claude-code', cwd: '', mcpServer: '', mcpTools: '',
+    name: '',
+    type: 'ai-chat',
+    description: '',
+    provider: '',
+    model: '',
+    systemPrompt: '',
+    cliProvider: 'claude-code',
+    cwd: '',
+    mcpServer: '',
+    mcpTools: '',
   });
 
   const [workers, setWorkers] = useState<WorkerFormState[]>([emptyWorker()]);
@@ -306,7 +368,8 @@ function CreateFleetModal({
   const [expandedWorker, setExpandedWorker] = useState<number | null>(0);
 
   useEffect(() => {
-    fileWorkspacesApi.list()
+    fileWorkspacesApi
+      .list()
       .then((data) => setWorkspaces(data.workspaces ?? []))
       .catch(() => {});
   }, []);
@@ -333,9 +396,7 @@ function CreateFleetModal({
   };
 
   const updateWorker = (index: number, field: string, value: string) => {
-    setWorkers((prev) =>
-      prev.map((w, i) => (i === index ? { ...w, [field]: value } : w))
-    );
+    setWorkers((prev) => prev.map((w, i) => (i === index ? { ...w, [field]: value } : w)));
   };
 
   const handleCreate = async () => {
@@ -362,24 +423,26 @@ function CreateFleetModal({
           provider: w.provider.trim() || undefined,
           model: w.model.trim() || undefined,
           system_prompt: w.systemPrompt.trim() || undefined,
-          cli_provider: w.type === 'coding-cli' ? (w.cliProvider || 'claude-code') : undefined,
+          cli_provider: w.type === 'coding-cli' ? w.cliProvider || 'claude-code' : undefined,
           cwd: w.cwd.trim() || undefined,
           mcp_server: w.mcpServer.trim() || undefined,
           mcp_tools: w.mcpTools.trim() ? w.mcpTools.split(',').map((t) => t.trim()) : undefined,
         })),
         schedule_type: scheduleType,
-        schedule_config: scheduleType === 'interval'
-          ? { intervalMs }
-          : scheduleType === 'cron' && cronExpr.trim()
-          ? { cron: cronExpr.trim() }
-          : undefined,
-        budget: (maxCostUsd || maxCyclesPerHour || maxTotalCycles)
-          ? {
-              maxCostUsd: maxCostUsd ? parseFloat(maxCostUsd) : undefined,
-              maxCyclesPerHour: maxCyclesPerHour ? parseInt(maxCyclesPerHour) : undefined,
-              maxTotalCycles: maxTotalCycles ? parseInt(maxTotalCycles) : undefined,
-            }
-          : undefined,
+        schedule_config:
+          scheduleType === 'interval'
+            ? { intervalMs }
+            : scheduleType === 'cron' && cronExpr.trim()
+              ? { cron: cronExpr.trim() }
+              : undefined,
+        budget:
+          maxCostUsd || maxCyclesPerHour || maxTotalCycles
+            ? {
+                maxCostUsd: maxCostUsd ? parseFloat(maxCostUsd) : undefined,
+                maxCyclesPerHour: maxCyclesPerHour ? parseInt(maxCyclesPerHour) : undefined,
+                maxTotalCycles: maxTotalCycles ? parseInt(maxTotalCycles) : undefined,
+              }
+            : undefined,
         concurrency_limit: concurrencyLimit,
         auto_start: autoStart,
       };
@@ -388,7 +451,9 @@ function CreateFleetModal({
       onCreated();
       onClose();
     } catch (err) {
-      toast.error(`Failed to create fleet: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      toast.error(
+        `Failed to create fleet: ${err instanceof Error ? err.message : 'Unknown error'}`
+      );
     } finally {
       setIsCreating(false);
     }
@@ -412,7 +477,10 @@ function CreateFleetModal({
               {step === 'templates' ? 'Choose a Template' : 'Configure Fleet'}
             </h2>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded">
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -563,7 +631,11 @@ function CreateFleetModal({
                     className="w-full px-3 py-2 rounded-lg border border-border dark:border-dark-border bg-bg-secondary dark:bg-dark-bg-secondary text-text-primary dark:text-dark-text-primary"
                   />
                   <p className="text-xs text-text-tertiary dark:text-dark-text-tertiary mt-1">
-                    How often to run a new cycle ({intervalMs >= 60000 ? `${Math.round(intervalMs / 60000)}m` : `${Math.round(intervalMs / 1000)}s`})
+                    How often to run a new cycle (
+                    {intervalMs >= 60000
+                      ? `${Math.round(intervalMs / 60000)}m`
+                      : `${Math.round(intervalMs / 1000)}s`}
+                    )
                   </p>
                 </div>
               )}
@@ -672,10 +744,11 @@ function CreateFleetModal({
                             onClick={() => setExpandedWorker(isExpanded ? null : idx)}
                             className="p-0.5 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded"
                           >
-                            {isExpanded
-                              ? <ChevronDown className="w-3.5 h-3.5 text-text-tertiary" />
-                              : <ChevronRight className="w-3.5 h-3.5 text-text-tertiary" />
-                            }
+                            {isExpanded ? (
+                              <ChevronDown className="w-3.5 h-3.5 text-text-tertiary" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5 text-text-tertiary" />
+                            )}
                           </button>
                           <WIcon className="w-4 h-4 text-text-tertiary flex-shrink-0" />
                           <input
@@ -737,7 +810,9 @@ function CreateFleetModal({
                                 </div>
                                 <textarea
                                   value={worker.systemPrompt}
-                                  onChange={(e) => updateWorker(idx, 'systemPrompt', e.target.value)}
+                                  onChange={(e) =>
+                                    updateWorker(idx, 'systemPrompt', e.target.value)
+                                  }
                                   placeholder="System prompt (optional)"
                                   rows={2}
                                   className="w-full px-2 py-1.5 text-sm rounded border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary placeholder:text-text-tertiary resize-none"
@@ -751,7 +826,9 @@ function CreateFleetModal({
                                 <div className="grid grid-cols-2 gap-2">
                                   <select
                                     value={worker.cliProvider}
-                                    onChange={(e) => updateWorker(idx, 'cliProvider', e.target.value)}
+                                    onChange={(e) =>
+                                      updateWorker(idx, 'cliProvider', e.target.value)
+                                    }
                                     className="px-2 py-1.5 text-sm rounded border border-border dark:border-dark-border bg-bg-primary dark:bg-dark-bg-primary text-text-primary dark:text-dark-text-primary"
                                   >
                                     <option value="claude-code">Claude Code</option>
@@ -855,12 +932,15 @@ function AddTasksModal({
 }) {
   const toast = useToast();
   const [isAdding, setIsAdding] = useState(false);
-  const [tasks, setTasks] = useState<Array<{ title: string; description: string; priority: string; assignedWorker: string }>>([
-    { title: '', description: '', priority: 'normal', assignedWorker: '' },
-  ]);
+  const [tasks, setTasks] = useState<
+    Array<{ title: string; description: string; priority: string; assignedWorker: string }>
+  >([{ title: '', description: '', priority: 'normal', assignedWorker: '' }]);
 
   const addTask = () => {
-    setTasks((prev) => [...prev, { title: '', description: '', priority: 'normal', assignedWorker: '' }]);
+    setTasks((prev) => [
+      ...prev,
+      { title: '', description: '', priority: 'normal', assignedWorker: '' },
+    ]);
   };
 
   const removeTask = (index: number) => {
@@ -868,9 +948,7 @@ function AddTasksModal({
   };
 
   const updateTask = (index: number, field: string, value: string) => {
-    setTasks((prev) =>
-      prev.map((t, i) => (i === index ? { ...t, [field]: value } : t))
-    );
+    setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
   };
 
   const handleAdd = async () => {
@@ -906,7 +984,10 @@ function AddTasksModal({
           <h2 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary">
             Add Tasks to {fleet.name}
           </h2>
-          <button onClick={onClose} className="p-1 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded">
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -936,7 +1017,10 @@ function AddTasksModal({
                   <option value="critical">Critical</option>
                 </select>
                 {tasks.length > 1 && (
-                  <button onClick={() => removeTask(idx)} className="p-1 text-error hover:text-error/80">
+                  <button
+                    onClick={() => removeTask(idx)}
+                    className="p-1 text-error hover:text-error/80"
+                  >
                     <X className="w-4 h-4" />
                   </button>
                 )}
@@ -993,13 +1077,7 @@ function AddTasksModal({
 }
 
 /** Broadcast Modal */
-function BroadcastModal({
-  fleet,
-  onClose,
-}: {
-  fleet: FleetConfig;
-  onClose: () => void;
-}) {
+function BroadcastModal({ fleet, onClose }: { fleet: FleetConfig; onClose: () => void }) {
   const toast = useToast();
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -1025,7 +1103,10 @@ function BroadcastModal({
           <h2 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary">
             Broadcast to {fleet.name}
           </h2>
-          <button onClick={onClose} className="p-1 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded">
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1079,7 +1160,9 @@ function FleetDetailPanel({
   const [history, setHistory] = useState<FleetWorkerResult[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [activityLog, setActivityLog] = useState<Array<{ time: string; text: string; type: 'info' | 'success' | 'error' }>>([]);
+  const [activityLog, setActivityLog] = useState<
+    Array<{ time: string; text: string; type: 'info' | 'success' | 'error' }>
+  >([]);
 
   const loadTasks = useCallback(async () => {
     setTasksLoading(true);
@@ -1122,28 +1205,37 @@ function FleetDetailPanel({
         (data) => {
           if (data.fleetId !== fleet.id) return;
           setActivityLog((prev) => [
-            { time: new Date().toLocaleTimeString(), text: `${data.workerName} (${data.workerType}) started task`, type: 'info' },
-            ...prev.slice(0, 49),
-          ]);
-        }
-      ),
-      subscribe<{ fleetId: string; taskId: string; workerName: string; success: boolean; output: string; durationMs: number; costUsd: number }>(
-        'fleet:worker:completed',
-        (data) => {
-          if (data.fleetId !== fleet.id) return;
-          setActivityLog((prev) => [
             {
               time: new Date().toLocaleTimeString(),
-              text: `${data.workerName} ${data.success ? 'completed' : 'failed'} (${(data.durationMs / 1000).toFixed(1)}s)`,
-              type: data.success ? 'success' : 'error',
+              text: `${data.workerName} (${data.workerType}) started task`,
+              type: 'info',
             },
             ...prev.slice(0, 49),
           ]);
-          // Refresh tasks and history when worker completes
-          loadTasks();
-          loadHistory();
         }
       ),
+      subscribe<{
+        fleetId: string;
+        taskId: string;
+        workerName: string;
+        success: boolean;
+        output: string;
+        durationMs: number;
+        costUsd: number;
+      }>('fleet:worker:completed', (data) => {
+        if (data.fleetId !== fleet.id) return;
+        setActivityLog((prev) => [
+          {
+            time: new Date().toLocaleTimeString(),
+            text: `${data.workerName} ${data.success ? 'completed' : 'failed'} (${(data.durationMs / 1000).toFixed(1)}s)`,
+            type: data.success ? 'success' : 'error',
+          },
+          ...prev.slice(0, 49),
+        ]);
+        // Refresh tasks and history when worker completes
+        loadTasks();
+        loadHistory();
+      }),
       subscribe<{ fleetId: string }>('fleet:cycle:end', (data) => {
         if (data.fleetId !== fleet.id) return;
         loadTasks();
@@ -1170,7 +1262,10 @@ function FleetDetailPanel({
             <h2 className="text-lg font-semibold text-text-primary dark:text-dark-text-primary truncate">
               {fleet.name}
             </h2>
-            <button onClick={onClose} className="p-1 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded">
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -1266,7 +1361,9 @@ function FleetDetailPanel({
               <div className="text-xs text-text-tertiary dark:text-dark-text-tertiary">Cycles</div>
             </div>
             <div className="text-center">
-              <div className="text-lg font-semibold text-success">{fleet.session.tasksCompleted}</div>
+              <div className="text-lg font-semibold text-success">
+                {fleet.session.tasksCompleted}
+              </div>
               <div className="text-xs text-text-tertiary dark:text-dark-text-tertiary">Done</div>
             </div>
             <div className="text-center">
@@ -1283,21 +1380,24 @@ function FleetDetailPanel({
         )}
 
         {/* Budget Info */}
-        {fleet.budget && (fleet.budget.maxCostUsd || fleet.budget.maxCyclesPerHour || fleet.budget.maxTotalCycles) && (
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-border dark:border-dark-border text-xs text-text-tertiary dark:text-dark-text-tertiary">
-            <Gauge className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>Budget:</span>
-            {fleet.budget.maxCostUsd != null && (
-              <span>max ${fleet.budget.maxCostUsd.toFixed(2)}</span>
-            )}
-            {fleet.budget.maxCyclesPerHour != null && (
-              <span>{fleet.budget.maxCyclesPerHour} cycles/hr</span>
-            )}
-            {fleet.budget.maxTotalCycles != null && (
-              <span>{fleet.budget.maxTotalCycles} total cycles</span>
-            )}
-          </div>
-        )}
+        {fleet.budget &&
+          (fleet.budget.maxCostUsd ||
+            fleet.budget.maxCyclesPerHour ||
+            fleet.budget.maxTotalCycles) && (
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-border dark:border-dark-border text-xs text-text-tertiary dark:text-dark-text-tertiary">
+              <Gauge className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>Budget:</span>
+              {fleet.budget.maxCostUsd != null && (
+                <span>max ${fleet.budget.maxCostUsd.toFixed(2)}</span>
+              )}
+              {fleet.budget.maxCyclesPerHour != null && (
+                <span>{fleet.budget.maxCyclesPerHour} cycles/hr</span>
+              )}
+              {fleet.budget.maxTotalCycles != null && (
+                <span>{fleet.budget.maxTotalCycles} total cycles</span>
+              )}
+            </div>
+          )}
 
         {/* Workers Section */}
         <div className="border-b border-border dark:border-dark-border">
@@ -1409,21 +1509,32 @@ function FleetDetailPanel({
                           onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
                         >
                           <div className="flex items-center gap-2">
-                            {task.status === 'completed' && <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />}
-                            {task.status === 'running' && <Activity className="w-3.5 h-3.5 text-info flex-shrink-0 animate-pulse" />}
-                            {task.status === 'failed' && <XCircle className="w-3.5 h-3.5 text-error flex-shrink-0" />}
-                            {task.status === 'queued' && <Clock className="w-3.5 h-3.5 text-warning flex-shrink-0" />}
-                            {task.status === 'cancelled' && <X className="w-3.5 h-3.5 text-text-tertiary flex-shrink-0" />}
+                            {task.status === 'completed' && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />
+                            )}
+                            {task.status === 'running' && (
+                              <Activity className="w-3.5 h-3.5 text-info flex-shrink-0 animate-pulse" />
+                            )}
+                            {task.status === 'failed' && (
+                              <XCircle className="w-3.5 h-3.5 text-error flex-shrink-0" />
+                            )}
+                            {task.status === 'queued' && (
+                              <Clock className="w-3.5 h-3.5 text-warning flex-shrink-0" />
+                            )}
+                            {task.status === 'cancelled' && (
+                              <X className="w-3.5 h-3.5 text-text-tertiary flex-shrink-0" />
+                            )}
                             <span className="text-sm text-text-primary dark:text-dark-text-primary truncate flex-1">
                               {task.title}
                             </span>
                             <span className={`text-xs ${getTaskStatusColor(task.status)}`}>
                               {task.status}
                             </span>
-                            {isExpanded
-                              ? <ChevronDown className="w-3 h-3 text-text-tertiary" />
-                              : <ChevronRight className="w-3 h-3 text-text-tertiary" />
-                            }
+                            {isExpanded ? (
+                              <ChevronDown className="w-3 h-3 text-text-tertiary" />
+                            ) : (
+                              <ChevronRight className="w-3 h-3 text-text-tertiary" />
+                            )}
                           </div>
                         </button>
 
@@ -1437,20 +1548,40 @@ function FleetDetailPanel({
                             )}
                             {task.assignedWorker && (
                               <div className="text-xs text-text-tertiary dark:text-dark-text-tertiary">
-                                Worker: <span className="text-text-secondary dark:text-dark-text-secondary">{task.assignedWorker}</span>
+                                Worker:{' '}
+                                <span className="text-text-secondary dark:text-dark-text-secondary">
+                                  {task.assignedWorker}
+                                </span>
                               </div>
                             )}
                             <div className="flex items-center gap-3 text-xs text-text-tertiary dark:text-dark-text-tertiary">
-                              {task.startedAt && <span>Started: {new Date(task.startedAt).toLocaleTimeString()}</span>}
-                              {task.completedAt && <span>Done: {new Date(task.completedAt).toLocaleTimeString()}</span>}
-                              {task.startedAt && task.completedAt && (
-                                <span>{((new Date(task.completedAt).getTime() - new Date(task.startedAt).getTime()) / 1000).toFixed(1)}s</span>
+                              {task.startedAt && (
+                                <span>
+                                  Started: {new Date(task.startedAt).toLocaleTimeString()}
+                                </span>
                               )}
-                              <span>Retries: {task.retries}/{task.maxRetries}</span>
+                              {task.completedAt && (
+                                <span>Done: {new Date(task.completedAt).toLocaleTimeString()}</span>
+                              )}
+                              {task.startedAt && task.completedAt && (
+                                <span>
+                                  {(
+                                    (new Date(task.completedAt).getTime() -
+                                      new Date(task.startedAt).getTime()) /
+                                    1000
+                                  ).toFixed(1)}
+                                  s
+                                </span>
+                              )}
+                              <span>
+                                Retries: {task.retries}/{task.maxRetries}
+                              </span>
                             </div>
                             {task.output && (
                               <div>
-                                <div className="text-xs font-medium text-text-secondary dark:text-dark-text-secondary mb-0.5">Output:</div>
+                                <div className="text-xs font-medium text-text-secondary dark:text-dark-text-secondary mb-0.5">
+                                  Output:
+                                </div>
                                 <pre className="text-xs text-text-primary dark:text-dark-text-primary bg-bg-tertiary dark:bg-dark-bg-tertiary rounded p-2 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono">
                                   {task.output}
                                 </pre>
@@ -1511,10 +1642,11 @@ function FleetDetailPanel({
                         className="p-2 rounded-lg bg-bg-secondary dark:bg-dark-bg-secondary"
                       >
                         <div className="flex items-center gap-2 mb-1">
-                          {entry.success
-                            ? <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />
-                            : <XCircle className="w-3.5 h-3.5 text-error flex-shrink-0" />
-                          }
+                          {entry.success ? (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-success flex-shrink-0" />
+                          ) : (
+                            <XCircle className="w-3.5 h-3.5 text-error flex-shrink-0" />
+                          )}
                           <Icon className="w-3 h-3 text-text-tertiary" />
                           <span className="text-sm font-medium text-text-primary dark:text-dark-text-primary truncate flex-1">
                             {entry.workerName}
@@ -1575,11 +1707,15 @@ function FleetDetailPanel({
                       <span className="text-text-tertiary dark:text-dark-text-tertiary whitespace-nowrap font-mono">
                         {entry.time}
                       </span>
-                      <span className={
-                        entry.type === 'success' ? 'text-success' :
-                        entry.type === 'error' ? 'text-error' :
-                        'text-text-secondary dark:text-dark-text-secondary'
-                      }>
+                      <span
+                        className={
+                          entry.type === 'success'
+                            ? 'text-success'
+                            : entry.type === 'error'
+                              ? 'text-error'
+                              : 'text-text-secondary dark:text-dark-text-secondary'
+                        }
+                      >
                         {entry.text}
                       </span>
                     </div>
@@ -1688,21 +1824,29 @@ function FleetCard({
               <div className="text-xs font-medium text-text-primary dark:text-dark-text-primary">
                 {fleet.session.cyclesCompleted}
               </div>
-              <div className="text-[10px] text-text-tertiary dark:text-dark-text-tertiary">cycles</div>
+              <div className="text-[10px] text-text-tertiary dark:text-dark-text-tertiary">
+                cycles
+              </div>
             </div>
             <div>
               <div className="text-xs font-medium text-success">{fleet.session.tasksCompleted}</div>
-              <div className="text-[10px] text-text-tertiary dark:text-dark-text-tertiary">done</div>
+              <div className="text-[10px] text-text-tertiary dark:text-dark-text-tertiary">
+                done
+              </div>
             </div>
             <div>
               <div className="text-xs font-medium text-error">{fleet.session.tasksFailed}</div>
-              <div className="text-[10px] text-text-tertiary dark:text-dark-text-tertiary">failed</div>
+              <div className="text-[10px] text-text-tertiary dark:text-dark-text-tertiary">
+                failed
+              </div>
             </div>
             <div>
               <div className="text-xs font-medium text-text-primary dark:text-dark-text-primary">
                 {formatCost(fleet.session.totalCostUsd)}
               </div>
-              <div className="text-[10px] text-text-tertiary dark:text-dark-text-tertiary">cost</div>
+              <div className="text-[10px] text-text-tertiary dark:text-dark-text-tertiary">
+                cost
+              </div>
             </div>
           </div>
         )}
@@ -2071,7 +2215,9 @@ export function FleetPage() {
           <div className="flex items-center gap-4 mb-4">
             <div className="flex items-center gap-2 text-sm text-text-secondary dark:text-dark-text-secondary">
               <Layers className="w-4 h-4" />
-              <span>{fleets.length} fleet{fleets.length !== 1 ? 's' : ''}</span>
+              <span>
+                {fleets.length} fleet{fleets.length !== 1 ? 's' : ''}
+              </span>
             </div>
             {runningCount > 0 && (
               <div className="flex items-center gap-1.5 text-sm text-success">

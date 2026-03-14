@@ -4,13 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Puzzle,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Sparkles,
-} from '../icons';
+import { Puzzle, CheckCircle2, XCircle, AlertCircle, Sparkles } from '../icons';
 import { extensionsApi, type ExtensionInfo } from '../../api';
 import { Skeleton } from '../Skeleton';
 
@@ -105,10 +99,7 @@ export function SkillsWidget({ limit = 6 }: SkillsWidgetProps) {
           <p className="text-sm text-text-muted dark:text-dark-text-muted">
             No extensions installed
           </p>
-          <Link
-            to="/skills"
-            className="text-xs text-primary hover:underline mt-2 inline-block"
-          >
+          <Link to="/skills" className="text-xs text-primary hover:underline mt-2 inline-block">
             Browse skills
           </Link>
         </div>
@@ -128,9 +119,7 @@ export function SkillsWidget({ limit = 6 }: SkillsWidgetProps) {
             ({extensions.length})
           </span>
         </div>
-        <span className="text-xs text-success">
-          {enabledCount} enabled
-        </span>
+        <span className="text-xs text-success">{enabledCount} enabled</span>
       </div>
 
       <div className="space-y-2">

@@ -4,14 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  GitBranch,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  AlertCircle,
-  RefreshCw,
-} from '../icons';
+import { GitBranch, CheckCircle2, XCircle, Clock, AlertCircle, RefreshCw } from '../icons';
 import { workflowsApi, type WorkflowLog } from '../../api';
 import { Skeleton } from '../Skeleton';
 
@@ -63,7 +56,9 @@ export function WorkflowsWidget({ limit = 6 }: WorkflowsWidgetProps) {
         setLogs(result.logs);
 
         // Fetch workflow names for each unique workflowId
-        const workflowIds = [...new Set(result.logs.map((l) => l.workflowId).filter(Boolean))] as string[];
+        const workflowIds = [
+          ...new Set(result.logs.map((l) => l.workflowId).filter(Boolean)),
+        ] as string[];
         const names: Record<string, string> = {};
 
         await Promise.all(
@@ -140,10 +135,7 @@ export function WorkflowsWidget({ limit = 6 }: WorkflowsWidgetProps) {
           <p className="text-sm text-text-muted dark:text-dark-text-muted">
             No workflow executions yet
           </p>
-          <Link
-            to="/workflows"
-            className="text-xs text-primary hover:underline mt-2 inline-block"
-          >
+          <Link to="/workflows" className="text-xs text-primary hover:underline mt-2 inline-block">
             Create one
           </Link>
         </div>
@@ -159,9 +151,7 @@ export function WorkflowsWidget({ limit = 6 }: WorkflowsWidgetProps) {
           <h3 className="text-sm font-medium text-text-primary dark:text-dark-text-primary">
             Workflows
           </h3>
-          <span className="text-xs text-text-muted dark:text-dark-text-muted">
-            ({logs.length})
-          </span>
+          <span className="text-xs text-text-muted dark:text-dark-text-muted">({logs.length})</span>
         </div>
         <div className="flex items-center gap-3 text-xs">
           <span className="flex items-center gap-1 text-success">
@@ -189,13 +179,17 @@ export function WorkflowsWidget({ limit = 6 }: WorkflowsWidgetProps) {
               <div
                 className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${statusColor}`}
               >
-                <StatusIcon className={`w-4 h-4 ${log.status === 'running' ? 'animate-spin' : ''}`} />
+                <StatusIcon
+                  className={`w-4 h-4 ${log.status === 'running' ? 'animate-spin' : ''}`}
+                />
               </div>
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-text-primary dark:text-dark-text-primary truncate">
-                    {log.workflowId ? (workflowNames[log.workflowId] || `Workflow ${log.workflowId.slice(0, 8)}`) : 'Unknown Workflow'}
+                    {log.workflowId
+                      ? workflowNames[log.workflowId] || `Workflow ${log.workflowId.slice(0, 8)}`
+                      : 'Unknown Workflow'}
                   </span>
                   <span
                     className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full capitalize ${
@@ -212,9 +206,7 @@ export function WorkflowsWidget({ limit = 6 }: WorkflowsWidgetProps) {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-text-muted dark:text-dark-text-muted">
-                  <span>
-                    {new Date(log.startedAt).toLocaleString()}
-                  </span>
+                  <span>{new Date(log.startedAt).toLocaleString()}</span>
                 </div>
               </div>
 

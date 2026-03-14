@@ -114,7 +114,8 @@ settingsRoutes.post('/default-provider', async (c) => {
       defaultProvider: body.provider,
     });
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
 });
@@ -132,7 +133,8 @@ settingsRoutes.post('/default-model', async (c) => {
       defaultModel: body.model,
     });
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
 });
@@ -161,7 +163,8 @@ settingsRoutes.post('/api-keys', async (c) => {
       configured: true,
     });
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
 });
@@ -381,13 +384,12 @@ settingsRoutes.get('/coding-agents/allowed-dirs', async (c) => {
 settingsRoutes.put('/coding-agents/allowed-dirs', async (c) => {
   try {
     const body = validateBody(setAllowedDirsSchema, await c.req.json());
-    const dirs = body.dirs.filter(
-      (d: string): d is string => d.trim().length > 0
-    );
+    const dirs = body.dirs.filter((d: string): d is string => d.trim().length > 0);
     await setAllowedDirs(dirs);
     return apiResponse(c, { dirs });
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
 });
@@ -712,7 +714,8 @@ settingsRoutes.put('/tool-groups', async (c) => {
 
     return apiResponse(c, { enabledGroupIds });
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
 });

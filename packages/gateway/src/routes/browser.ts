@@ -125,12 +125,18 @@ browserRoutes.post('/action', async (c) => {
             },
             400
           );
-        const result = await service.fillForm(userId, body.fields as unknown as import('../services/browser-service.js').FormField[]);
+        const result = await service.fillForm(
+          userId,
+          body.fields as unknown as import('../services/browser-service.js').FormField[]
+        );
         return apiResponse(c, result);
       }
       case 'extract': {
         if (body.dataSelectors) {
-          const result = await service.extractData(userId, body.dataSelectors as Record<string, string>);
+          const result = await service.extractData(
+            userId,
+            body.dataSelectors as Record<string, string>
+          );
           return apiResponse(c, result);
         }
         const result = await service.extractText(userId, body.selector);
@@ -202,7 +208,9 @@ browserRoutes.post('/workflows', async (c) => {
       name: body.name,
       description: body.description,
       steps: body.steps as unknown as import('../services/browser-service.js').BrowserAction[],
-      parameters: body.parameters as unknown as import('../db/repositories/browser-workflows.js').WorkflowParameter[] | undefined,
+      parameters: body.parameters as unknown as
+        | import('../db/repositories/browser-workflows.js').WorkflowParameter[]
+        | undefined,
       triggerId: body.triggerId,
     });
     return apiResponse(c, workflow, 201);

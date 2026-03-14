@@ -5,7 +5,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { crewsApi } from '../../../api/endpoints/souls';
 import type { CrewTask } from '../../../api/endpoints/souls';
-import { ListChecks, Clock, ChevronDown, ChevronRight, User, RefreshCw } from '../../../components/icons';
+import {
+  ListChecks,
+  Clock,
+  ChevronDown,
+  ChevronRight,
+  User,
+  RefreshCw,
+} from '../../../components/icons';
 import { formatTimeAgo } from '../helpers';
 
 interface Props {
@@ -102,9 +109,7 @@ export function CrewTaskQueue({ crewId }: Props) {
           <h4 className="text-sm font-medium text-text-primary dark:text-dark-text-primary">
             Task Queue
           </h4>
-          <span className="text-xs text-text-muted dark:text-dark-text-muted">
-            ({total})
-          </span>
+          <span className="text-xs text-text-muted dark:text-dark-text-muted">({total})</span>
         </div>
         <button
           onClick={fetchTasks}

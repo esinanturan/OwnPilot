@@ -366,8 +366,8 @@ export function DashboardPage() {
                 </Link>
               </div>
               <p className="text-sm text-text-muted dark:text-dark-text-muted">
-                {summary.calendar.upcoming} event{summary.calendar.upcoming !== 1 ? 's' : ''}{' '}
-                coming up this week
+                {summary.calendar.upcoming} event{summary.calendar.upcoming !== 1 ? 's' : ''} coming
+                up this week
               </p>
             </div>
           )}
@@ -471,7 +471,9 @@ export function DashboardPage() {
               className="p-1.5 rounded-lg hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary transition-colors disabled:opacity-50"
               title="Refresh"
             >
-              <RefreshCw className={`w-4 h-4 text-text-muted dark:text-dark-text-muted ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`w-4 h-4 text-text-muted dark:text-dark-text-muted ${isRefreshing ? 'animate-spin' : ''}`}
+              />
             </button>
             <span className="text-xs text-text-muted dark:text-dark-text-muted">
               {lastUpdated.toLocaleTimeString()}

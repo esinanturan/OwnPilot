@@ -156,7 +156,10 @@ configServicesRoutes.get('/:name', async (c) => {
  */
 configServicesRoutes.post('/', async (c) => {
   try {
-    const body = validateBody(createConfigServiceSchema, await c.req.json()) as CreateConfigServiceInput;
+    const body = validateBody(
+      createConfigServiceSchema,
+      await c.req.json()
+    ) as CreateConfigServiceInput;
 
     // Check for duplicate
     const existing = configServicesRepo.getByName(body.name);

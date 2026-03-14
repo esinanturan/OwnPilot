@@ -207,7 +207,8 @@ mcpRoutes.post('/tool-call', async (c) => {
 
     return apiResponse(c, { content: String(result.content), isError: result.isError ?? false });
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     log.error('MCP tool-call failed:', err);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
@@ -249,7 +250,10 @@ mcpRoutes.post('/', async (c) => {
     const rawBody = await c.req.json();
     const body = validateBody(createMcpServerSchema, rawBody);
     // enabled is a pass-through field not in the schema
-    const enabled = typeof (rawBody as Record<string, unknown>).enabled === 'boolean' ? (rawBody as Record<string, unknown>).enabled as boolean : undefined;
+    const enabled =
+      typeof (rawBody as Record<string, unknown>).enabled === 'boolean'
+        ? ((rawBody as Record<string, unknown>).enabled as boolean)
+        : undefined;
 
     // Validate transport-specific fields
     if (body.transport === 'stdio' && !body.command?.trim()) {
@@ -296,7 +300,8 @@ mcpRoutes.post('/', async (c) => {
     wsGateway.broadcast('data:changed', { entity: 'mcp_server', action: 'created', id: server.id });
     return apiResponse(c, server, 201);
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     log.error('Failed to create MCP server:', err);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }
@@ -497,7 +502,8 @@ mcpRoutes.patch('/:id/tool-settings', async (c) => {
     wsGateway.broadcast('data:changed', { entity: 'mcp_server', action: 'updated', id });
     return apiResponse(c, { toolName: body.toolName, workflowUsable: body.workflowUsable });
   } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Validation failed:')) return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
+    if (err instanceof Error && err.message.startsWith('Validation failed:'))
+      return apiError(c, { code: ERROR_CODES.VALIDATION_ERROR, message: err.message }, 400);
     log.error('Failed to update MCP tool settings:', err);
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
   }

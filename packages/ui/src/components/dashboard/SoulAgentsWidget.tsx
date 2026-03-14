@@ -4,20 +4,19 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Bot,
-  Brain,
-  Heart,
-  Clock,
-  AlertCircle,
-  Pause,
-  Zap,
-} from '../icons';
+import { Bot, Brain, Heart, Clock, AlertCircle, Pause, Zap } from '../icons';
 import { soulsApi, type AgentSoul, type HeartbeatLog } from '../../api';
 import { Skeleton } from '../Skeleton';
 
 function getAutonomyLabel(level: number): string {
-  const labels = ['Manual', 'Guided', 'Supervised', 'Autonomous', 'Fully Autonomous', 'Unrestricted'];
+  const labels = [
+    'Manual',
+    'Guided',
+    'Supervised',
+    'Autonomous',
+    'Fully Autonomous',
+    'Unrestricted',
+  ];
   return labels[level] || 'Unknown';
 }
 
@@ -130,13 +129,8 @@ export function SoulAgentsWidget({ limit = 6 }: SoulAgentsWidgetProps) {
         </div>
         <div className="text-center py-6">
           <Bot className="w-8 h-8 text-text-muted dark:text-dark-text-muted mx-auto mb-2" />
-          <p className="text-sm text-text-muted dark:text-dark-text-muted">
-            No soul agents yet
-          </p>
-          <Link
-            to="/autonomous"
-            className="text-xs text-primary hover:underline mt-2 inline-block"
-          >
+          <p className="text-sm text-text-muted dark:text-dark-text-muted">No soul agents yet</p>
+          <Link to="/autonomous" className="text-xs text-primary hover:underline mt-2 inline-block">
             Create one
           </Link>
         </div>
@@ -194,14 +188,16 @@ export function SoulAgentsWidget({ limit = 6 }: SoulAgentsWidgetProps) {
                     <Zap className="w-3 h-3 inline mr-0.5" />
                     {getAutonomyLabel(soul.autonomy.level)}
                   </span>
-                  {soul.autonomy.level === 5 && soul.autonomy.clawMode?.enabled && soul.autonomy.clawMode.selfImprovement !== 'disabled' && (
-                    <>
-                      <span>•</span>
-                      <span className="text-orange-500">
-                        Self-improve: {soul.autonomy.clawMode.selfImprovement}
-                      </span>
-                    </>
-                  )}
+                  {soul.autonomy.level === 5 &&
+                    soul.autonomy.clawMode?.enabled &&
+                    soul.autonomy.clawMode.selfImprovement !== 'disabled' && (
+                      <>
+                        <span>•</span>
+                        <span className="text-orange-500">
+                          Self-improve: {soul.autonomy.clawMode.selfImprovement}
+                        </span>
+                      </>
+                    )}
                   {lastHeartbeat && (
                     <>
                       <span>•</span>

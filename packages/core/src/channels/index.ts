@@ -104,10 +104,7 @@ export {
 } from './ucp/index.js';
 
 // SDK
-export {
-  createChannelAdapter,
-  type ChannelAdapterConfig,
-} from './sdk.js';
+export { createChannelAdapter, type ChannelAdapterConfig } from './sdk.js';
 
 // Notifications
 // Note: NotificationPriority is not re-exported here to avoid ambiguity with

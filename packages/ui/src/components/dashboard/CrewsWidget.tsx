@@ -4,10 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Users,
-  AlertCircle,
-} from '../icons';
+import { Users, AlertCircle } from '../icons';
 import { crewsApi, type AgentCrew, type CrewStatusMetrics } from '../../api';
 import { Skeleton } from '../Skeleton';
 
@@ -114,9 +111,7 @@ export function CrewsWidget({ limit = 6 }: CrewsWidgetProps) {
         </div>
         <div className="text-center py-6">
           <Users className="w-8 h-8 text-text-muted dark:text-dark-text-muted mx-auto mb-2" />
-          <p className="text-sm text-text-muted dark:text-dark-text-muted">
-            No crews yet
-          </p>
+          <p className="text-sm text-text-muted dark:text-dark-text-muted">No crews yet</p>
           <Link
             to="/autonomous?tab=crews"
             className="text-xs text-primary hover:underline mt-2 inline-block"
@@ -140,9 +135,7 @@ export function CrewsWidget({ limit = 6 }: CrewsWidgetProps) {
             ({crews.length})
           </span>
         </div>
-        <span className="text-xs text-success">
-          {activeCount} active
-        </span>
+        <span className="text-xs text-success">{activeCount} active</span>
       </div>
 
       <div className="space-y-2">

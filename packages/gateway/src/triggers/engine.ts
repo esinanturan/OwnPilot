@@ -173,7 +173,7 @@ export class TriggerEngine {
         // Skip high-frequency internal events that no user trigger would ever listen to
         if (
           event.type.startsWith('trigger.') || // prevent infinite loops
-          event.type === 'tool.registered' ||   // 150+ per agent creation
+          event.type === 'tool.registered' || // 150+ per agent creation
           event.type === 'tool.unregistered'
         ) {
           return;

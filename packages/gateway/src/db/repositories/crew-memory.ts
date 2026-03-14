@@ -42,7 +42,7 @@ function rowToEntry(row: MemoryRow): CrewMemoryEntry {
     category: row.category,
     title: row.title,
     content: row.content,
-    metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata ?? {},
+    metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : (row.metadata ?? {}),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
   };
@@ -74,9 +74,7 @@ export class CrewMemoryRepository extends BaseRepository {
     limit = 20,
     offset = 0
   ): Promise<{ entries: CrewMemoryEntry[]; total: number }> {
-    const whereClause = category
-      ? 'WHERE crew_id = $1 AND category = $2'
-      : 'WHERE crew_id = $1';
+    const whereClause = category ? 'WHERE crew_id = $1 AND category = $2' : 'WHERE crew_id = $1';
     const params = category ? [crewId, category] : [crewId];
 
     const countRow = await this.queryOne<{ count: string }>(
@@ -108,18 +106,14 @@ export class CrewMemoryRepository extends BaseRepository {
   }
 
   async getById(id: string): Promise<CrewMemoryEntry | null> {
-    const row = await this.queryOne<MemoryRow>(
-      `SELECT * FROM crew_shared_memory WHERE id = $1`,
-      [id]
-    );
+    const row = await this.queryOne<MemoryRow>(`SELECT * FROM crew_shared_memory WHERE id = $1`, [
+      id,
+    ]);
     return row ? rowToEntry(row) : null;
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await this.execute(
-      `DELETE FROM crew_shared_memory WHERE id = $1`,
-      [id]
-    );
+    const result = await this.execute(`DELETE FROM crew_shared_memory WHERE id = $1`, [id]);
     return result.changes > 0;
   }
 }

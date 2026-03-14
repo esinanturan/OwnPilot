@@ -47,7 +47,7 @@ export class SlackUCPAdapter extends UCPChannelAdapter {
 
   constructor(
     private readonly api: ChannelPluginAPI,
-    private readonly channelId: string = 'channel.slack',
+    private readonly channelId: string = 'channel.slack'
   ) {
     super();
 

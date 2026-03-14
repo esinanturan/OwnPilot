@@ -50,7 +50,7 @@ export class TelegramUCPAdapter extends UCPChannelAdapter {
 
   constructor(
     private readonly api: ChannelPluginAPI,
-    private readonly channelId: string = 'channel.telegram',
+    private readonly channelId: string = 'channel.telegram'
   ) {
     super();
 

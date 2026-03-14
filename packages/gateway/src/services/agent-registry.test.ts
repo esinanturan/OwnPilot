@@ -95,7 +95,9 @@ describe('AgentRegistry', () => {
     registry.registerAdapter({
       type: 'regular',
       listActive: () => [
-        createMockSummary({ metrics: { tokensUsed: 100, toolCallsUsed: 5, costUsd: 0.01, durationMs: 1000 } }),
+        createMockSummary({
+          metrics: { tokensUsed: 100, toolCallsUsed: 5, costUsd: 0.01, durationMs: 1000 },
+        }),
       ],
       get: () => null,
       cancel: vi.fn().mockResolvedValue(false),
@@ -103,8 +105,15 @@ describe('AgentRegistry', () => {
     registry.registerAdapter({
       type: 'background',
       listActive: () => [
-        createMockSummary({ type: 'background', metrics: { tokensUsed: 200, toolCallsUsed: 10, costUsd: 0.02, durationMs: 2000 } }),
-        createMockSummary({ type: 'background', id: 'bg-2', metrics: { tokensUsed: 50, toolCallsUsed: 1, costUsd: 0.005, durationMs: 500 } }),
+        createMockSummary({
+          type: 'background',
+          metrics: { tokensUsed: 200, toolCallsUsed: 10, costUsd: 0.02, durationMs: 2000 },
+        }),
+        createMockSummary({
+          type: 'background',
+          id: 'bg-2',
+          metrics: { tokensUsed: 50, toolCallsUsed: 1, costUsd: 0.005, durationMs: 500 },
+        }),
       ],
       get: () => null,
       cancel: vi.fn().mockResolvedValue(false),
@@ -122,7 +131,9 @@ describe('AgentRegistry', () => {
     const registry = getAgentRegistry();
     registry.registerAdapter({
       type: 'soul',
-      listActive: () => { throw new Error('DB connection failed'); },
+      listActive: () => {
+        throw new Error('DB connection failed');
+      },
       get: () => null,
       cancel: vi.fn().mockResolvedValue(false),
     });

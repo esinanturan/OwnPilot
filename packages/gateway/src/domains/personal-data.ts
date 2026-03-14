@@ -43,10 +43,5 @@ export const personalDataDomain = {
     'artifacts',
   ],
 
-  publicServices: [
-    'memory-service',
-    'goal-service',
-    'custom-data-service',
-    'artifact-service',
-  ],
+  publicServices: ['memory-service', 'goal-service', 'custom-data-service', 'artifact-service'],
 } as const;

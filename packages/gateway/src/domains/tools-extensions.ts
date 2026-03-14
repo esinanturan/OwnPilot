@@ -20,16 +20,7 @@ export const toolsExtensionsDomain = {
     '/api/v1/plugins',
   ],
 
-  tables: [
-    'custom_tools',
-    'user_extensions',
-    'plugins',
-  ],
+  tables: ['custom_tools', 'user_extensions', 'plugins'],
 
-  publicServices: [
-    'tool-executor',
-    'extension-service',
-    'custom-tool-registry',
-    'plugin-service',
-  ],
+  publicServices: ['tool-executor', 'extension-service', 'custom-tool-registry', 'plugin-service'],
 } as const;

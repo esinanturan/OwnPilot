@@ -131,11 +131,7 @@ export class FleetServiceImpl implements IFleetService {
 
   // ---- Tasks ----
 
-  async addTask(
-    fleetId: string,
-    _userId: string,
-    task: CreateFleetTaskInput
-  ): Promise<FleetTask> {
+  async addTask(fleetId: string, _userId: string, task: CreateFleetTaskInput): Promise<FleetTask> {
     const repo = getFleetRepository();
     const created = await repo.createTask(fleetId, task);
 

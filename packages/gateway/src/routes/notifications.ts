@@ -31,7 +31,7 @@ app.post('/send', async (c) => {
       return apiError(
         c,
         { code: ERROR_CODES.VALIDATION_ERROR, message: 'title and body are required' },
-        400,
+        400
       );
     }
 
@@ -47,11 +47,7 @@ app.post('/send', async (c) => {
 
     return apiResponse(c, { notification: { id: notification.id }, result });
   } catch (error) {
-    return apiError(
-      c,
-      { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(error) },
-      500,
-    );
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(error) }, 500);
   }
 });
 
@@ -78,7 +74,7 @@ app.post('/channel', async (c) => {
           code: ERROR_CODES.VALIDATION_ERROR,
           message: 'channelId, chatId, title, and body are required',
         },
-        400,
+        400
       );
     }
 
@@ -92,11 +88,7 @@ app.post('/channel', async (c) => {
 
     return apiResponse(c, { notification: { id: notification.id }, messageId });
   } catch (error) {
-    return apiError(
-      c,
-      { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(error) },
-      500,
-    );
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(error) }, 500);
   }
 });
 
@@ -118,7 +110,7 @@ app.post('/broadcast', async (c) => {
       return apiError(
         c,
         { code: ERROR_CODES.VALIDATION_ERROR, message: 'title and body are required' },
-        400,
+        400
       );
     }
 
@@ -132,11 +124,7 @@ app.post('/broadcast', async (c) => {
 
     return apiResponse(c, { notification: { id: notification.id }, result });
   } catch (error) {
-    return apiError(
-      c,
-      { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(error) },
-      500,
-    );
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(error) }, 500);
   }
 });
 
@@ -153,11 +141,7 @@ app.get('/preferences/:userId', async (c) => {
 
     return apiResponse(c, { preferences: prefs });
   } catch (error) {
-    return apiError(
-      c,
-      { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(error) },
-      500,
-    );
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(error) }, 500);
   }
 });
 
@@ -190,19 +174,14 @@ app.put('/preferences/:userId', async (c) => {
         body.quietHoursMinPriority ??
         existing?.quietHoursMinPriority ??
         ('high' as NotificationPriority),
-      minPriority:
-        body.minPriority ?? existing?.minPriority ?? ('low' as NotificationPriority),
+      minPriority: body.minPriority ?? existing?.minPriority ?? ('low' as NotificationPriority),
     };
 
     await router.setPreferences(prefs);
 
     return apiResponse(c, { preferences: prefs });
   } catch (error) {
-    return apiError(
-      c,
-      { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(error) },
-      500,
-    );
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(error) }, 500);
   }
 });
 

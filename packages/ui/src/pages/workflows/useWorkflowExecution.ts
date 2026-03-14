@@ -423,8 +423,9 @@ export function useWorkflowExecution(params: WorkflowExecutionParams) {
       } else {
         // Trigger node removed -- clean up linked trigger if it existed
         const oldTrigger = workflow.nodes.find((n) => n.type === 'triggerNode');
-        const oldTriggerId = (oldTrigger?.data as unknown as Record<string, unknown>)
-          ?.triggerId as string | undefined;
+        const oldTriggerId = (oldTrigger?.data as unknown as Record<string, unknown>)?.triggerId as
+          | string
+          | undefined;
         if (oldTriggerId) {
           try {
             await triggersApi.delete(oldTriggerId);

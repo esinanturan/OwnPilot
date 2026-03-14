@@ -10,8 +10,4 @@ export {
   getChannelServiceImpl,
 } from './service-impl.js';
 
-export {
-  UnifiedChannelBus,
-  getUnifiedBus,
-  resetUnifiedBus,
-} from './unified-bus.js';
+export { UnifiedChannelBus, getUnifiedBus, resetUnifiedBus } from './unified-bus.js';

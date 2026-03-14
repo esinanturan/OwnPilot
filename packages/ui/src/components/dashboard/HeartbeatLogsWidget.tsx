@@ -4,13 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Heart,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Zap,
-} from '../icons';
+import { Heart, CheckCircle2, XCircle, AlertCircle, Zap } from '../icons';
 import { heartbeatLogsApi, soulsApi, type HeartbeatLog } from '../../api';
 import { Skeleton } from '../Skeleton';
 
@@ -55,7 +49,9 @@ export function HeartbeatLogsWidget({ limit = 6 }: HeartbeatLogsWidgetProps) {
     fetchData();
   }, [limit]);
 
-  const successCount = logs.filter((l) => l.tasksFailed.length === 0 && l.tasksRun.length > 0).length;
+  const successCount = logs.filter(
+    (l) => l.tasksFailed.length === 0 && l.tasksRun.length > 0
+  ).length;
   const failedCount = logs.filter((l) => l.tasksFailed.length > 0).length;
   const totalCost = logs.reduce((sum, l) => sum + l.cost, 0);
 
@@ -105,9 +101,7 @@ export function HeartbeatLogsWidget({ limit = 6 }: HeartbeatLogsWidgetProps) {
         </div>
         <div className="text-center py-6">
           <Heart className="w-8 h-8 text-text-muted dark:text-dark-text-muted mx-auto mb-2" />
-          <p className="text-sm text-text-muted dark:text-dark-text-muted">
-            No heartbeats yet
-          </p>
+          <p className="text-sm text-text-muted dark:text-dark-text-muted">No heartbeats yet</p>
         </div>
       </div>
     );
@@ -121,9 +115,7 @@ export function HeartbeatLogsWidget({ limit = 6 }: HeartbeatLogsWidgetProps) {
           <h3 className="text-sm font-medium text-text-primary dark:text-dark-text-primary">
             Heartbeat Logs
           </h3>
-          <span className="text-xs text-text-muted dark:text-dark-text-muted">
-            ({logs.length})
-          </span>
+          <span className="text-xs text-text-muted dark:text-dark-text-muted">({logs.length})</span>
         </div>
         <div className="flex items-center gap-3 text-xs">
           <span className="flex items-center gap-1 text-success">
@@ -135,8 +127,7 @@ export function HeartbeatLogsWidget({ limit = 6 }: HeartbeatLogsWidgetProps) {
             {failedCount}
           </span>
           <span className="flex items-center gap-1 text-text-muted dark:text-dark-text-muted">
-            <Zap className="w-3 h-3" />
-            ${totalCost.toFixed(4)}
+            <Zap className="w-3 h-3" />${totalCost.toFixed(4)}
           </span>
         </div>
       </div>
@@ -172,18 +163,14 @@ export function HeartbeatLogsWidget({ limit = 6 }: HeartbeatLogsWidgetProps) {
                   </span>
                   <span
                     className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${
-                      hasError
-                        ? 'bg-error/10 text-error'
-                        : 'bg-success/10 text-success'
+                      hasError ? 'bg-error/10 text-error' : 'bg-success/10 text-success'
                     }`}
                   >
                     {hasError ? 'Failed' : 'Success'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-text-muted dark:text-dark-text-muted">
-                  <span>
-                    {new Date(log.createdAt).toLocaleString()}
-                  </span>
+                  <span>{new Date(log.createdAt).toLocaleString()}</span>
                   <span>•</span>
                   <span>{log.tasksRun.length} tasks</span>
                   {log.tasksFailed.length > 0 && (

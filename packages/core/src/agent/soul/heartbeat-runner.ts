@@ -119,9 +119,12 @@ export class HeartbeatRunner {
     const tasksToRun = this.filterTasksToRun(soul.heartbeat.checklist, force);
     const skippedCount = soul.heartbeat.checklist.length - tasksToRun.length;
 
-    log.info(`[Heartbeat ${agentId}] ${tasksToRun.length} task(s) due, ${skippedCount} skipped by schedule`, {
-      tasks: tasksToRun.map((t) => t.name),
-    });
+    log.info(
+      `[Heartbeat ${agentId}] ${tasksToRun.length} task(s) due, ${skippedCount} skipped by schedule`,
+      {
+        tasks: tasksToRun.map((t) => t.name),
+      }
+    );
 
     // Keep an in-memory copy of the checklist to batch all status updates in one DB write.
     const updatedChecklist = soul.heartbeat.checklist.map((t) => ({ ...t }));
@@ -150,12 +153,17 @@ export class HeartbeatRunner {
       result.totalCost += taskResult.cost;
 
       if (taskResult.status === 'success') {
-        log.info(`[Heartbeat ${agentId}] Task "${task.name}" succeeded in ${taskResult.durationMs}ms`, {
-          cost: taskResult.cost,
-          outputLength: taskResult.output?.length ?? 0,
-        });
+        log.info(
+          `[Heartbeat ${agentId}] Task "${task.name}" succeeded in ${taskResult.durationMs}ms`,
+          {
+            cost: taskResult.cost,
+            outputLength: taskResult.output?.length ?? 0,
+          }
+        );
       } else {
-        log.warn(`[Heartbeat ${agentId}] Task "${task.name}" ${taskResult.status}: ${taskResult.error}`);
+        log.warn(
+          `[Heartbeat ${agentId}] Task "${task.name}" ${taskResult.status}: ${taskResult.error}`
+        );
       }
 
       // Route output
@@ -193,7 +201,9 @@ export class HeartbeatRunner {
 
     // Auto-pause agent if any task crossed the consecutiveFailures threshold
     if (pauseTriggered) {
-      log.warn(`[Heartbeat ${agentId}] AUTO-PAUSED: consecutive failure threshold (${soul.autonomy.pauseOnConsecutiveErrors}) reached`);
+      log.warn(
+        `[Heartbeat ${agentId}] AUTO-PAUSED: consecutive failure threshold (${soul.autonomy.pauseOnConsecutiveErrors}) reached`
+      );
       await this.soulRepo.setHeartbeatEnabled(agentId, false);
       this.eventBus?.emit('soul.heartbeat.auto_paused', {
         agentId,
@@ -283,7 +293,7 @@ Be concise and focused. Report your findings clearly.`.trim();
           isHeartbeat: true,
           heartbeatTaskId: task.id,
           // Claw mode: all tools available (task.tools becomes advisory, not enforced)
-          allowedTools: isClawMode ? undefined : (task.tools.length > 0 ? task.tools : undefined),
+          allowedTools: isClawMode ? undefined : task.tools.length > 0 ? task.tools : undefined,
           // Pass soul's provider preference so the engine can use it
           provider: soul.provider?.providerId,
           model: soul.provider?.modelId,
@@ -504,11 +514,15 @@ Be concise and focused. Report your findings clearly.`.trim();
       );
       const { suggestions, applied } = await evolutionEngine.selfReflect(agentId);
       if (suggestions.length > 0) {
-        log.info(`[Heartbeat ${agentId}] Claw reflection: ${suggestions.length} suggestion(s)${applied ? ' (applied)' : ' (pending review)'}`);
+        log.info(
+          `[Heartbeat ${agentId}] Claw reflection: ${suggestions.length} suggestion(s)${applied ? ' (applied)' : ' (pending review)'}`
+        );
       }
     } catch (err) {
       // Self-reflection failure should not break the heartbeat cycle
-      log.warn(`[Heartbeat ${agentId}] Claw reflection failed: ${err instanceof Error ? err.message : String(err)}`);
+      log.warn(
+        `[Heartbeat ${agentId}] Claw reflection failed: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
 }

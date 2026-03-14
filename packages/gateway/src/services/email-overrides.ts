@@ -217,10 +217,12 @@ function formatAddress(addr: string[] | undefined): string;
 function formatAddress(addr: unknown): string {
   if (!addr) return '';
   if (Array.isArray(addr)) {
-    return addr.map((a) => {
-      if (typeof a === 'string') return a;
-      return a.name ? `${a.name} <${a.address}>` : (a.address ?? '');
-    }).join(', ');
+    return addr
+      .map((a) => {
+        if (typeof a === 'string') return a;
+        return a.name ? `${a.name} <${a.address}>` : (a.address ?? '');
+      })
+      .join(', ');
   }
   // Single object
   const a = addr as EmailAddress;
@@ -233,10 +235,12 @@ function formatAddressList(addr: unknown): string[] {
   if (!Array.isArray(addr)) {
     return [(addr as EmailAddress).address ?? ''].filter(Boolean);
   }
-  return addr.map((a) => {
-    if (typeof a === 'string') return a;
-    return a.address ?? '';
-  }).filter(Boolean);
+  return addr
+    .map((a) => {
+      if (typeof a === 'string') return a;
+      return a.address ?? '';
+    })
+    .filter(Boolean);
 }
 
 // ============================================================================

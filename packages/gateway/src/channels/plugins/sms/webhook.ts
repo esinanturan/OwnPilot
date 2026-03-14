@@ -32,7 +32,7 @@ function validateTwilioSignature(
   authToken: string,
   signature: string,
   url: string,
-  params: Record<string, string>,
+  params: Record<string, string>
 ): boolean {
   // Build data string: URL + sorted param keys with their values concatenated
   const sortedKeys = Object.keys(params).sort();

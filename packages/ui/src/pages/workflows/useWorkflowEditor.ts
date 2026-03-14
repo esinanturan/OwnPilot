@@ -5,12 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  useNodesState,
-  useEdgesState,
-  type Edge,
-  type Node,
-} from '@xyflow/react';
+import { useNodesState, useEdgesState, type Edge, type Node } from '@xyflow/react';
 
 import { workflowsApi, toolsApi } from '../../api';
 import type { Workflow } from '../../api';

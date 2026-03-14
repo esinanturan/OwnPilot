@@ -74,7 +74,8 @@ export function buildEmailChannelPlugin() {
               name: 'imap_host',
               label: 'IMAP Host',
               type: 'string',
-              description: 'IMAP host for future inbound polling (not currently used — inbound via webhook)',
+              description:
+                'IMAP host for future inbound polling (not currently used — inbound via webhook)',
               placeholder: 'imap.gmail.com',
               order: 5,
             },

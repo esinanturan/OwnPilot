@@ -4,16 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Bot,
-  Play,
-  Pause,
-  Square,
-  AlertCircle,
-  Clock,
-  DollarSign,
-  RefreshCw,
-} from '../icons';
+import { Bot, Play, Pause, Square, AlertCircle, Clock, DollarSign, RefreshCw } from '../icons';
 import { backgroundAgentsApi, type BackgroundAgentConfig } from '../../api';
 import { Skeleton } from '../Skeleton';
 
@@ -125,9 +116,7 @@ export function BackgroundAgentsWidget({ limit = 6 }: BackgroundAgentsWidgetProp
         </div>
         <div className="text-center py-6">
           <Bot className="w-8 h-8 text-text-muted dark:text-dark-text-muted mx-auto mb-2" />
-          <p className="text-sm text-text-muted dark:text-dark-text-muted">
-            No background agents
-          </p>
+          <p className="text-sm text-text-muted dark:text-dark-text-muted">No background agents</p>
           <Link
             to="/background-agents"
             className="text-xs text-primary hover:underline mt-2 inline-block"
@@ -157,8 +146,7 @@ export function BackgroundAgentsWidget({ limit = 6 }: BackgroundAgentsWidgetProp
             {runningCount} running
           </span>
           <span className="flex items-center gap-1 text-text-muted dark:text-dark-text-muted">
-            <DollarSign className="w-3 h-3" />
-            ${totalCost.toFixed(4)}
+            <DollarSign className="w-3 h-3" />${totalCost.toFixed(4)}
           </span>
         </div>
       </div>

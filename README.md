@@ -322,6 +322,7 @@ Use the interactive setup wizard:
 ```
 
 The wizard will guide you through:
+
 - Prerequisites check (Node.js, pnpm, Docker)
 - Server configuration (ports, host)
 - Authentication setup

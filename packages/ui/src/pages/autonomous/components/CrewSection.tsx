@@ -293,11 +293,11 @@ export function CrewSection({ crews, templates, onRefresh }: Props) {
                   <div className="border-t border-border dark:border-dark-border">
                     {/* Tab bar */}
                     <div className="flex items-center gap-1 px-4 pt-3 pb-2">
-                      {([
+                      {[
                         { key: 'agents' as const, label: 'Agents', icon: Users },
                         { key: 'memory' as const, label: 'Shared Memory', icon: Database },
                         { key: 'tasks' as const, label: 'Task Queue', icon: ListChecks },
-                      ]).map(({ key, label, icon: Icon }) => {
+                      ].map(({ key, label, icon: Icon }) => {
                         const activeTab = crewTab[crew.id] || 'agents';
                         return (
                           <button

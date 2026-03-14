@@ -47,10 +47,7 @@ const ACP_PROVIDER_CONFIGS: Partial<Record<BuiltinCodingAgentProvider, AcpProvid
   codex: {
     mode: 'bridge',
     bridgePackage: 'codex-acp',
-    buildArgs: (options) => [
-      'codex-acp',
-      ...(options?.model ? ['--model', options.model] : []),
-    ],
+    buildArgs: (options) => ['codex-acp', ...(options?.model ? ['--model', options.model] : [])],
   },
 };
 
@@ -112,9 +109,7 @@ export function getAcpBinary(provider: BuiltinCodingAgentProvider): string {
 /**
  * Get the bridge package name for a provider (if using bridge mode).
  */
-export function getAcpBridgePackage(
-  provider: CodingAgentProvider
-): string | null {
+export function getAcpBridgePackage(provider: CodingAgentProvider): string | null {
   if (!isBuiltinProvider(provider)) return null;
   return ACP_PROVIDER_CONFIGS[provider]?.bridgePackage ?? null;
 }

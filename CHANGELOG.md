@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2026-03-14
+
+### Added
+
+- **Unified Channel System** — Extensible channel SDK with UnifiedBus event router and UCP (Unified Channel Protocol) adapters; channels register via builder pattern with standardized lifecycle hooks
+- **Web Chat Channel Plugin** — Embeddable floating chat widget for websites with real-time WebSocket messaging, session management, and customizable appearance
+- **SMS Channel Plugin** — SMS messaging channel via Twilio integration with send/receive support
+- **Email Channel Plugin** — Email channel via SMTP/IMAP with inbound parsing and outbound delivery
+- **Matrix Channel Plugin** — Matrix protocol channel for federated messaging support
+- **Cross-Channel Notification System** — Unified notification dispatching across all connected channels with priority routing, delivery tracking, and fallback chains
+- **Fleet System** — Multi-worker fleet management with worker assignment, budget configuration, schedule parameters, real-time status events, and full admin UI with detail panels
+- **Claw Mode (Autonomy L5)** — Enhanced crew orchestration mode with elevated autonomy capabilities for coordinated multi-agent operations
+- **Crew UI Panels** — Shared memory and task queue panels for crew collaboration visibility
+- **Dashboard Enhancements** — Claw badges and crew metrics widgets on the main dashboard
+- **ACP for Coding Agents** — Agent Communication Protocol enabled for all coding agent providers with critical bug fixes
+- **Autonomy Logging** — Comprehensive structured logging across all autonomous systems (pulse, heartbeat, triggers, background agents)
+- **Database Backup Endpoints** — Backup listing and download via REST API
+- **Setup Wizard Documentation** — Interactive setup wizard docs with type safety improvements
+
+### Fixed
+
+- **Fleet Boot/Lifecycle** — Fixed critical bugs preventing fleet system from starting: worker config snake_case→camelCase mapping, race condition guard, missing tool registrations
+- **Autonomous Agent Scheduling** — Fixed provider fallback, duration calculation, and scheduling bugs in background agents
+- **Session Shutdown Cleanup** — Removed hardcoded `limit:100` truncation and added proper session cleanup on shutdown
+- **Production Hardening** — Fixed shutdown ordering, memory leaks in timers, security edge cases, and logging gaps
+- **Autonomy Performance** — Skip LLM call when no signals detected; skip high-frequency tool events in trigger engine
+- **Silent Failures** — Upgraded swallowed errors to warn-level logging across autonomous systems
+- **CLI Provider Endpoints** — Added CLI provider support to detail and models API endpoints
+- **Docker Monorepo Build** — Fixed Dockerfile for correct monorepo structure
+- **UI Wizard Scroll** — Fixed wizard buttons scrolling out of view
+- **Husky Pre-Commit Hook** — Added missing shebang line
+- **WebSocket Server Test** — Fixed circular import TDZ error and missing mock exports
+
+### Changed
+
+- Comprehensive complexity reduction refactoring across the codebase
+- Database API path changed from `/database` to `/db`
+- Removed unused dependencies and dead code cleanup
+
+### Performance
+
+- Skip LLM call when no autonomy signals detected
+- Skip high-frequency tool events in trigger engine evaluation
+
 ## [0.1.6] - 2026-03-06
 
 ### Added
@@ -254,6 +298,7 @@ Initial release of OwnPilot.
 - Docker multi-arch image (amd64 + arm64) published to `ghcr.io/ownpilot/ownpilot`
 - PostgreSQL with pgvector for vector search
 
+[0.1.8]: https://github.com/ownpilot/ownpilot/releases/tag/v0.1.8
 [0.1.6]: https://github.com/ownpilot/ownpilot/releases/tag/v0.1.6
 [0.1.5]: https://github.com/ownpilot/ownpilot/releases/tag/v0.1.5
 [0.1.4]: https://github.com/ownpilot/ownpilot/releases/tag/v0.1.4

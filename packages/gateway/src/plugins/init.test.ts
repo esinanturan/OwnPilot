@@ -30,6 +30,10 @@ const {
   mockBuildDiscordChannelPlugin,
   mockBuildWhatsAppChannelPlugin,
   mockBuildSlackChannelPlugin,
+  mockBuildWebChatChannelPlugin,
+  mockBuildSmsChannelPlugin,
+  mockBuildEmailChannelPlugin,
+  mockBuildMatrixChannelPlugin,
   mockGetServiceRegistry,
 } = vi.hoisted(() => {
   const mockPlugin = {
@@ -169,6 +173,54 @@ const {
         channelApiFactory: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
       },
     })),
+    mockBuildWebChatChannelPlugin: vi.fn(() => ({
+      manifest: {
+        id: 'channel.webchat',
+        name: 'Web Chat',
+        version: '1.0.0',
+        requiredServices: [],
+        defaultConfig: {},
+      },
+      implementation: {
+        channelApiFactory: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
+      },
+    })),
+    mockBuildSmsChannelPlugin: vi.fn(() => ({
+      manifest: {
+        id: 'channel.sms',
+        name: 'SMS (Twilio)',
+        version: '1.0.0',
+        requiredServices: [{ name: 'twilio_sms' }],
+        defaultConfig: {},
+      },
+      implementation: {
+        channelApiFactory: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
+      },
+    })),
+    mockBuildEmailChannelPlugin: vi.fn(() => ({
+      manifest: {
+        id: 'channel.email',
+        name: 'Email',
+        version: '1.0.0',
+        requiredServices: [{ name: 'email_channel' }],
+        defaultConfig: {},
+      },
+      implementation: {
+        channelApiFactory: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
+      },
+    })),
+    mockBuildMatrixChannelPlugin: vi.fn(() => ({
+      manifest: {
+        id: 'channel.matrix',
+        name: 'Matrix',
+        version: '1.0.0',
+        requiredServices: [{ name: 'matrix_bot' }],
+        defaultConfig: {},
+      },
+      implementation: {
+        channelApiFactory: vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() })),
+      },
+    })),
     mockGetServiceRegistry,
   };
 });
@@ -177,7 +229,8 @@ const {
 // Module mocks
 // =============================================================================
 
-vi.mock('@ownpilot/core', () => {
+vi.mock('@ownpilot/core', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
   // Minimal PluginBuilder implementation to capture tool registrations
   class FakePluginBuilder {
     private _manifest: Record<string, unknown> = {};
@@ -297,6 +350,7 @@ vi.mock('@ownpilot/core', () => {
   }
 
   return {
+    ...actual,
     getDefaultPluginRegistry: vi.fn().mockResolvedValue(mockRegistry),
     createPlugin: vi.fn(() => new FakePluginBuilder()),
     buildCorePlugin: mockBuildCorePlugin,
@@ -335,6 +389,22 @@ vi.mock('../channels/plugins/whatsapp/index.js', () => ({
 
 vi.mock('../channels/plugins/slack/index.js', () => ({
   buildSlackChannelPlugin: mockBuildSlackChannelPlugin,
+}));
+
+vi.mock('../channels/plugins/webchat/index.js', () => ({
+  buildWebChatChannelPlugin: mockBuildWebChatChannelPlugin,
+}));
+
+vi.mock('../channels/plugins/sms/index.js', () => ({
+  buildSmsChannelPlugin: mockBuildSmsChannelPlugin,
+}));
+
+vi.mock('../channels/plugins/email/index.js', () => ({
+  buildEmailChannelPlugin: mockBuildEmailChannelPlugin,
+}));
+
+vi.mock('../channels/plugins/matrix/index.js', () => ({
+  buildMatrixChannelPlugin: mockBuildMatrixChannelPlugin,
 }));
 
 vi.mock('./gateway-plugin.js', () => ({
@@ -513,7 +583,7 @@ describe('initializePlugins()', () => {
 
     it('registers 9 built-in plugins total', async () => {
       await initializePlugins();
-      expect(mockRegistry.register).toHaveBeenCalledTimes(9);
+      expect(mockRegistry.register).toHaveBeenCalledTimes(13);
     });
 
     it('registers the core plugin', async () => {
@@ -710,6 +780,46 @@ describe('initializePlugins()', () => {
         },
         implementation: {},
       });
+      mockBuildWebChatChannelPlugin.mockReturnValue({
+        manifest: {
+          id: 'channel.webchat',
+          name: 'Web Chat',
+          version: '1.0.0',
+          requiredServices: [],
+          defaultConfig: {},
+        },
+        implementation: {},
+      });
+      mockBuildSmsChannelPlugin.mockReturnValue({
+        manifest: {
+          id: 'channel.sms',
+          name: 'SMS (Twilio)',
+          version: '1.0.0',
+          requiredServices: [],
+          defaultConfig: {},
+        },
+        implementation: {},
+      });
+      mockBuildEmailChannelPlugin.mockReturnValue({
+        manifest: {
+          id: 'channel.email',
+          name: 'Email',
+          version: '1.0.0',
+          requiredServices: [],
+          defaultConfig: {},
+        },
+        implementation: {},
+      });
+      mockBuildMatrixChannelPlugin.mockReturnValue({
+        manifest: {
+          id: 'channel.matrix',
+          name: 'Matrix',
+          version: '1.0.0',
+          requiredServices: [],
+          defaultConfig: {},
+        },
+        implementation: {},
+      });
 
       await initializePlugins();
       // news-rss and pomodoro have no requiredServices either
@@ -762,8 +872,8 @@ describe('initializePlugins()', () => {
       mockDatabaseRepo.ensurePluginTable.mockRejectedValueOnce(new Error('Table creation failed'));
 
       await expect(initializePlugins()).resolves.toBeUndefined();
-      // All 6 plugins should still attempt to register
-      expect(mockRegistry.register).toHaveBeenCalledTimes(9);
+      // All 13 plugins should still attempt to register
+      expect(mockRegistry.register).toHaveBeenCalledTimes(13);
     });
 
     it('logs error when table creation fails', async () => {
@@ -883,6 +993,46 @@ describe('initializePlugins()', () => {
         },
         implementation: {},
       });
+      mockBuildWebChatChannelPlugin.mockReturnValueOnce({
+        manifest: {
+          id: 'channel.webchat',
+          name: 'Web Chat',
+          version: '1.0.0',
+          requiredServices: [],
+          defaultConfig: {},
+        },
+        implementation: {},
+      });
+      mockBuildSmsChannelPlugin.mockReturnValueOnce({
+        manifest: {
+          id: 'channel.sms',
+          name: 'SMS (Twilio)',
+          version: '1.0.0',
+          requiredServices: [{ name: 'twilio_sms' }],
+          defaultConfig: {},
+        },
+        implementation: {},
+      });
+      mockBuildEmailChannelPlugin.mockReturnValueOnce({
+        manifest: {
+          id: 'channel.email',
+          name: 'Email',
+          version: '1.0.0',
+          requiredServices: [{ name: 'email_channel' }],
+          defaultConfig: {},
+        },
+        implementation: {},
+      });
+      mockBuildMatrixChannelPlugin.mockReturnValueOnce({
+        manifest: {
+          id: 'channel.matrix',
+          name: 'Matrix',
+          version: '1.0.0',
+          requiredServices: [{ name: 'matrix_bot' }],
+          defaultConfig: {},
+        },
+        implementation: {},
+      });
       mockConfigServicesRepo.getDefaultEntry.mockReturnValue(null);
 
       await initializePlugins();
@@ -987,7 +1137,7 @@ describe('initializePlugins()', () => {
 
       await initializePlugins();
       // At least some plugins should have registered after the failure
-      expect(mockRegistry.register).toHaveBeenCalledTimes(9);
+      expect(mockRegistry.register).toHaveBeenCalledTimes(13);
     });
   });
 

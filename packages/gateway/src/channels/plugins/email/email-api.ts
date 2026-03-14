@@ -38,7 +38,7 @@ export class EmailChannelAPI implements ChannelPluginAPI {
 
   constructor(
     private readonly config: Record<string, unknown>,
-    pluginId: string,
+    pluginId: string
   ) {
     this.pluginId = pluginId;
   }

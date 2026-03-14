@@ -71,7 +71,7 @@ interface ToolPaletteProps {
   hasTriggerNode?: boolean;
 }
 
-// Node type buttons shown at the top of the palette
+// Node type buttons — colors match gradient headers on canvas nodes
 const NODE_TYPES: Array<{
   type: string;
   label: string;
@@ -80,19 +80,20 @@ const NODE_TYPES: Array<{
   text: string;
   border: string;
 }> = [
+  // --- Flow Control ---
   {
     type: 'triggerNode',
     label: 'Trigger',
     icon: Zap,
-    bg: 'bg-violet-100 dark:bg-violet-900/30',
-    text: 'text-violet-700 dark:text-violet-300',
-    border: 'border-violet-300 dark:border-violet-700',
+    bg: 'bg-gradient-to-r from-emerald-100 to-green-100 dark:from-emerald-900/30 dark:to-green-900/30',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    border: 'border-emerald-300 dark:border-emerald-700',
   },
   {
     type: 'llmNode',
     label: 'LLM',
     icon: Brain,
-    bg: 'bg-indigo-100 dark:bg-indigo-900/30',
+    bg: 'bg-gradient-to-r from-indigo-100 to-violet-100 dark:from-indigo-900/30 dark:to-violet-900/30',
     text: 'text-indigo-700 dark:text-indigo-300',
     border: 'border-indigo-300 dark:border-indigo-700',
   },
@@ -100,7 +101,7 @@ const NODE_TYPES: Array<{
     type: 'conditionNode',
     label: 'If/Else',
     icon: GitBranch,
-    bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+    bg: 'bg-gradient-to-r from-emerald-100 to-teal-100 dark:from-emerald-900/30 dark:to-teal-900/30',
     text: 'text-emerald-700 dark:text-emerald-300',
     border: 'border-emerald-300 dark:border-emerald-700',
   },
@@ -108,15 +109,16 @@ const NODE_TYPES: Array<{
     type: 'codeNode',
     label: 'Code',
     icon: Terminal,
-    bg: 'bg-teal-100 dark:bg-teal-900/30',
-    text: 'text-teal-700 dark:text-teal-300',
-    border: 'border-teal-300 dark:border-teal-700',
+    bg: 'bg-gradient-to-r from-gray-200 to-gray-100 dark:from-gray-800 dark:to-gray-700',
+    text: 'text-gray-700 dark:text-gray-300',
+    border: 'border-gray-400 dark:border-gray-600',
   },
+  // --- Data Processing ---
   {
     type: 'transformerNode',
     label: 'Transform',
     icon: RefreshCw,
-    bg: 'bg-amber-100 dark:bg-amber-900/30',
+    bg: 'bg-gradient-to-r from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30',
     text: 'text-amber-700 dark:text-amber-300',
     border: 'border-amber-300 dark:border-amber-700',
   },
@@ -124,31 +126,33 @@ const NODE_TYPES: Array<{
     type: 'forEachNode',
     label: 'ForEach',
     icon: Repeat,
-    bg: 'bg-sky-100 dark:bg-sky-900/30',
+    bg: 'bg-gradient-to-r from-sky-100 to-blue-100 dark:from-sky-900/30 dark:to-blue-900/30',
     text: 'text-sky-700 dark:text-sky-300',
     border: 'border-sky-300 dark:border-sky-700',
   },
+  // --- External ---
   {
     type: 'httpRequestNode',
     label: 'HTTP',
     icon: Globe,
-    bg: 'bg-orange-100 dark:bg-orange-900/30',
-    text: 'text-orange-700 dark:text-orange-300',
-    border: 'border-orange-300 dark:border-orange-700',
+    bg: 'bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30',
+    text: 'text-blue-700 dark:text-blue-300',
+    border: 'border-blue-300 dark:border-blue-700',
   },
   {
     type: 'delayNode',
     label: 'Delay',
     icon: Clock,
-    bg: 'bg-rose-100 dark:bg-rose-900/30',
+    bg: 'bg-gradient-to-r from-rose-100 to-pink-100 dark:from-rose-900/30 dark:to-pink-900/30',
     text: 'text-rose-700 dark:text-rose-300',
     border: 'border-rose-300 dark:border-rose-700',
   },
+  // --- Branching ---
   {
     type: 'switchNode',
     label: 'Switch',
     icon: Shuffle,
-    bg: 'bg-fuchsia-100 dark:bg-fuchsia-900/30',
+    bg: 'bg-gradient-to-r from-fuchsia-100 to-purple-100 dark:from-fuchsia-900/30 dark:to-purple-900/30',
     text: 'text-fuchsia-700 dark:text-fuchsia-300',
     border: 'border-fuchsia-300 dark:border-fuchsia-700',
   },
@@ -156,15 +160,16 @@ const NODE_TYPES: Array<{
     type: 'errorHandlerNode',
     label: 'Error Handler',
     icon: ShieldAlert,
-    bg: 'bg-red-100 dark:bg-red-900/30',
+    bg: 'bg-gradient-to-r from-red-100 to-rose-100 dark:from-red-900/30 dark:to-rose-900/30',
     text: 'text-red-700 dark:text-red-300',
     border: 'border-red-300 dark:border-red-700',
   },
+  // --- Sub-processes ---
   {
     type: 'subWorkflowNode',
     label: 'Sub-Workflow',
     icon: GitBranch,
-    bg: 'bg-indigo-100 dark:bg-indigo-900/30',
+    bg: 'bg-gradient-to-r from-indigo-100 to-blue-100 dark:from-indigo-900/30 dark:to-blue-900/30',
     text: 'text-indigo-700 dark:text-indigo-300',
     border: 'border-indigo-300 dark:border-indigo-700',
   },
@@ -172,10 +177,11 @@ const NODE_TYPES: Array<{
     type: 'approvalNode',
     label: 'Approval Gate',
     icon: ShieldCheck,
-    bg: 'bg-amber-100 dark:bg-amber-900/30',
+    bg: 'bg-gradient-to-r from-amber-100 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30',
     text: 'text-amber-700 dark:text-amber-300',
     border: 'border-amber-300 dark:border-amber-700',
   },
+  // --- Annotation ---
   {
     type: 'stickyNoteNode',
     label: 'Sticky Note',
@@ -188,15 +194,16 @@ const NODE_TYPES: Array<{
     type: 'notificationNode',
     label: 'Notification',
     icon: Bell,
-    bg: 'bg-purple-100 dark:bg-purple-900/30',
+    bg: 'bg-gradient-to-r from-purple-100 to-violet-100 dark:from-purple-900/30 dark:to-violet-900/30',
     text: 'text-purple-700 dark:text-purple-300',
     border: 'border-purple-300 dark:border-purple-700',
   },
+  // --- Parallel/Merge ---
   {
     type: 'parallelNode',
     label: 'Parallel',
     icon: Columns,
-    bg: 'bg-teal-100 dark:bg-teal-900/30',
+    bg: 'bg-gradient-to-r from-teal-100 to-emerald-100 dark:from-teal-900/30 dark:to-emerald-900/30',
     text: 'text-teal-700 dark:text-teal-300',
     border: 'border-teal-300 dark:border-teal-700',
   },
@@ -204,15 +211,16 @@ const NODE_TYPES: Array<{
     type: 'mergeNode',
     label: 'Merge',
     icon: GitMerge,
-    bg: 'bg-teal-100 dark:bg-teal-900/30',
+    bg: 'bg-gradient-to-r from-teal-100 to-cyan-100 dark:from-teal-900/30 dark:to-cyan-900/30',
     text: 'text-teal-700 dark:text-teal-300',
     border: 'border-teal-300 dark:border-teal-700',
   },
+  // --- Data Nodes ---
   {
     type: 'dataStoreNode',
     label: 'Data Store',
     icon: Database,
-    bg: 'bg-cyan-100 dark:bg-cyan-900/30',
+    bg: 'bg-gradient-to-r from-cyan-100 to-sky-100 dark:from-cyan-900/30 dark:to-sky-900/30',
     text: 'text-cyan-700 dark:text-cyan-300',
     border: 'border-cyan-300 dark:border-cyan-700',
   },
@@ -220,7 +228,7 @@ const NODE_TYPES: Array<{
     type: 'schemaValidatorNode',
     label: 'Validator',
     icon: Shield,
-    bg: 'bg-orange-100 dark:bg-orange-900/30',
+    bg: 'bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30',
     text: 'text-orange-700 dark:text-orange-300',
     border: 'border-orange-300 dark:border-orange-700',
   },
@@ -228,7 +236,7 @@ const NODE_TYPES: Array<{
     type: 'filterNode',
     label: 'Filter',
     icon: Filter,
-    bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+    bg: 'bg-gradient-to-r from-emerald-100 to-green-100 dark:from-emerald-900/30 dark:to-green-900/30',
     text: 'text-emerald-700 dark:text-emerald-300',
     border: 'border-emerald-300 dark:border-emerald-700',
   },
@@ -236,7 +244,7 @@ const NODE_TYPES: Array<{
     type: 'mapNode',
     label: 'Map',
     icon: Repeat,
-    bg: 'bg-sky-100 dark:bg-sky-900/30',
+    bg: 'bg-gradient-to-r from-sky-100 to-blue-100 dark:from-sky-900/30 dark:to-blue-900/30',
     text: 'text-sky-700 dark:text-sky-300',
     border: 'border-sky-300 dark:border-sky-700',
   },
@@ -244,7 +252,7 @@ const NODE_TYPES: Array<{
     type: 'aggregateNode',
     label: 'Aggregate',
     icon: BarChart,
-    bg: 'bg-amber-100 dark:bg-amber-900/30',
+    bg: 'bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30',
     text: 'text-amber-700 dark:text-amber-300',
     border: 'border-amber-300 dark:border-amber-700',
   },
@@ -252,7 +260,7 @@ const NODE_TYPES: Array<{
     type: 'webhookResponseNode',
     label: 'Webhook Resp.',
     icon: Send,
-    bg: 'bg-rose-100 dark:bg-rose-900/30',
+    bg: 'bg-gradient-to-r from-rose-100 to-pink-100 dark:from-rose-900/30 dark:to-pink-900/30',
     text: 'text-rose-700 dark:text-rose-300',
     border: 'border-rose-300 dark:border-rose-700',
   },

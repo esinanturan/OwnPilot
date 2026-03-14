@@ -1,7 +1,7 @@
 /**
  * ConditionNode — ReactFlow node for if/else branching in workflows.
- * Evaluates a JS expression and routes to True or False output handles.
- * Emerald/green color theme to visually distinguish from other node types.
+ * Decision-focused design with expression in code-block style,
+ * angled header accent, and split TRUE/FALSE bottom indicators.
  */
 
 import { memo } from 'react';
@@ -44,12 +44,13 @@ function ConditionNodeComponent({ data, selected }: NodeProps<ConditionNodeType>
   const style = statusStyles[status];
   const StatusIcon = statusIcons[status];
   const branchTaken = data.branchTaken as string | undefined;
+  const expression = (data.expression as string) ?? '';
 
   return (
     <div
       className={`
-        relative min-w-[180px] max-w-[260px] rounded-lg border-2 shadow-sm
-        bg-emerald-50 dark:bg-emerald-950/30
+        relative min-w-[180px] max-w-[260px] rounded-lg border-2 shadow-sm overflow-hidden
+        bg-white dark:bg-gray-900
         ${style.border} ${style.bg}
         ${selected ? 'ring-2 ring-emerald-500 ring-offset-1' : ''}
         ${status === 'running' ? 'animate-pulse' : ''}
@@ -63,12 +64,11 @@ function ConditionNodeComponent({ data, selected }: NodeProps<ConditionNodeType>
         className="!w-3 !h-3 !bg-emerald-500 !border-2 !border-white dark:!border-emerald-950"
       />
 
-      {/* Content */}
-      <div className="px-3 py-2.5">
-        {/* Header */}
+      {/* Angled header accent with diamond icon */}
+      <div className="relative bg-gradient-to-r from-emerald-500/10 to-transparent dark:from-emerald-500/20 px-3 pt-2 pb-1">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-            <GitBranch className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          <div className="w-6 h-6 rounded bg-emerald-500/20 flex items-center justify-center shrink-0 rotate-45">
+            <GitBranch className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 -rotate-45" />
           </div>
           <span className="font-medium text-sm text-emerald-900 dark:text-emerald-100 truncate flex-1">
             {(data.label as string) || 'Condition'}
@@ -87,49 +87,72 @@ function ConditionNodeComponent({ data, selected }: NodeProps<ConditionNodeType>
             />
           )}
         </div>
+      </div>
 
-        {/* Expression preview */}
-        {data.expression && (
-          <p className="text-[10px] text-emerald-600/70 dark:text-emerald-400/50 mt-1 truncate font-mono">
-            {data.expression as string}
-          </p>
+      {/* Body Content */}
+      <div className="px-3 py-2 space-y-1.5">
+        {/* Expression in code-block style */}
+        {expression && (
+          <div className="bg-gray-900 dark:bg-gray-950 rounded px-2 py-1.5 overflow-hidden">
+            <p className="text-[10px] text-emerald-300 font-mono truncate" title={expression}>
+              {expression}
+            </p>
+          </div>
         )}
 
         {/* Branch taken indicator */}
         {branchTaken && status === 'success' && (
-          <div className="mt-1">
+          <div className="flex items-center gap-1">
+            <span className="text-[9px] text-gray-400">Result:</span>
             <span
-              className={`inline-block px-1.5 py-0.5 text-[9px] font-medium rounded ${
+              className={`inline-block px-1.5 py-0.5 text-[9px] font-bold rounded ${
                 branchTaken === 'true'
                   ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300'
                   : 'bg-red-500/20 text-red-700 dark:text-red-300'
               }`}
             >
-              {branchTaken === 'true' ? 'True' : 'False'}
+              {branchTaken === 'true' ? 'TRUE' : 'FALSE'}
             </span>
           </div>
         )}
 
         {/* Error message */}
         {status === 'error' && data.executionError && (
-          <p className="text-xs text-error mt-1 truncate" title={data.executionError as string}>
+          <p className="text-xs text-error truncate" title={data.executionError as string}>
             {data.executionError as string}
           </p>
         )}
 
         {/* Duration */}
         {data.executionDuration != null && (
-          <p className="text-[10px] text-text-muted dark:text-dark-text-muted mt-1">
+          <p className="text-[10px] text-text-muted dark:text-dark-text-muted">
             {(data.executionDuration as number) < 1000
               ? `${data.executionDuration}ms`
               : `${((data.executionDuration as number) / 1000).toFixed(1)}s`}
           </p>
         )}
 
-        {/* Output handle labels */}
-        <div className="flex justify-between mt-2 text-[9px] text-emerald-600/60 dark:text-emerald-400/40">
-          <span>True</span>
-          <span>False</span>
+        {/* Split bottom TRUE/FALSE indicators */}
+        <div className="flex mt-1 -mx-3 -mb-2">
+          <div
+            className={`flex-1 text-center py-1 text-[9px] font-bold border-t ${
+              branchTaken === 'true' && status === 'success'
+                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                : 'bg-emerald-50/50 dark:bg-emerald-950/20 text-emerald-500/60 dark:text-emerald-400/40 border-gray-200 dark:border-gray-700'
+            }`}
+          >
+            TRUE
+          </div>
+          <div className="w-px bg-gray-200 dark:bg-gray-700" />
+          <div
+            className={`flex-1 text-center py-1 text-[9px] font-bold border-t ${
+              branchTaken === 'false' && status === 'success'
+                ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700'
+                : 'bg-red-50/50 dark:bg-red-950/20 text-red-500/60 dark:text-red-400/40 border-gray-200 dark:border-gray-700'
+            }`}
+          >
+            FALSE
+          </div>
         </div>
       </div>
 

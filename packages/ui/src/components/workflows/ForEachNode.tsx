@@ -1,7 +1,7 @@
 /**
  * ForEachNode — ReactFlow node for iterating over arrays in workflows.
- * Processes each item through the "Each" body subgraph, collects results via "Done" handle.
- * Sky/cyan color theme to distinguish from other node types.
+ * Loop visualization with prominent repeat icon, item variable chip,
+ * max iterations badge, and clearly labeled dual output handles.
  */
 
 import { memo } from 'react';
@@ -49,12 +49,14 @@ function ForEachNodeComponent({ data, selected }: NodeProps<ForEachNodeType>) {
   const StatusIcon = statusIcons[status];
   const currentIter = data.currentIteration as number | undefined;
   const totalIter = data.totalIterations as number | undefined;
+  const maxIter = data.maxIterations as number | undefined;
+  const itemVar = (data.itemVariable as string) ?? '';
 
   return (
     <div
       className={`
-        relative min-w-[180px] max-w-[260px] rounded-lg border-2 shadow-sm
-        bg-sky-50 dark:bg-sky-950/30
+        relative min-w-[190px] max-w-[270px] rounded-lg border-2 shadow-sm overflow-hidden
+        bg-white dark:bg-gray-900
         ${style.border} ${style.bg}
         ${selected ? 'ring-2 ring-sky-500 ring-offset-1' : ''}
         ${status === 'running' ? 'animate-pulse' : ''}
@@ -68,11 +70,11 @@ function ForEachNodeComponent({ data, selected }: NodeProps<ForEachNodeType>) {
         className="!w-3 !h-3 !bg-sky-500 !border-2 !border-white dark:!border-sky-950"
       />
 
-      {/* Content */}
-      <div className="px-3 py-2.5">
-        {/* Header */}
+      {/* Header with prominent loop icon */}
+      <div className="bg-sky-50 dark:bg-sky-950/40 px-3 py-2">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-sky-500/20 flex items-center justify-center shrink-0">
+          {/* Circular loop indicator */}
+          <div className="w-7 h-7 rounded-full border-2 border-sky-400 border-dashed flex items-center justify-center shrink-0">
             <Repeat className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
           </div>
           <span className="font-medium text-sm text-sky-900 dark:text-sky-100 truncate flex-1">
@@ -92,30 +94,43 @@ function ForEachNodeComponent({ data, selected }: NodeProps<ForEachNodeType>) {
             />
           )}
         </div>
+      </div>
+
+      {/* Body */}
+      <div className="px-3 py-2 space-y-1.5">
+        {/* Chips row: item variable + max iterations */}
+        <div className="flex items-center gap-1 flex-wrap">
+          {itemVar && (
+            <span className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-mono font-semibold rounded-full bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
+              {itemVar}
+            </span>
+          )}
+          {maxIter != null && (
+            <span className="inline-block px-1.5 py-0.5 text-[9px] font-medium rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+              max {maxIter}
+            </span>
+          )}
+        </div>
 
         {/* Array expression preview */}
         {!!data.arrayExpression && (
-          <p className="text-[10px] text-sky-600/70 dark:text-sky-400/50 mt-1 truncate font-mono">
+          <p
+            className="text-[10px] text-sky-600/70 dark:text-sky-400/50 truncate font-mono"
+            title={data.arrayExpression as string}
+          >
             {data.arrayExpression as string}
-          </p>
-        )}
-
-        {/* Item variable alias */}
-        {!!data.itemVariable && (
-          <p className="text-[10px] text-sky-600/50 dark:text-sky-400/40 mt-0.5 truncate">
-            as <span className="font-mono">{String(data.itemVariable)}</span>
           </p>
         )}
 
         {/* Iteration progress during execution */}
         {status === 'running' && currentIter != null && totalIter != null && totalIter > 0 && (
-          <div className="mt-1.5">
+          <div>
             <div className="flex items-center justify-between text-[9px] text-sky-700 dark:text-sky-300 mb-0.5">
               <span>
                 {(currentIter as number) + 1}/{totalIter}
               </span>
             </div>
-            <div className="w-full h-1 bg-sky-200 dark:bg-sky-800 rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-sky-200 dark:bg-sky-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-sky-500 rounded-full transition-all duration-300"
                 style={{
@@ -128,33 +143,36 @@ function ForEachNodeComponent({ data, selected }: NodeProps<ForEachNodeType>) {
 
         {/* Completed iteration count */}
         {status === 'success' && !!data.executionOutput && (
-          <div className="mt-1">
-            <span className="inline-block px-1.5 py-0.5 text-[9px] font-medium rounded bg-sky-500/20 text-sky-700 dark:text-sky-300">
-              {(data.executionOutput as { count?: number })?.count ?? 0} items
-            </span>
-          </div>
+          <span className="inline-block px-1.5 py-0.5 text-[9px] font-medium rounded bg-sky-500/20 text-sky-700 dark:text-sky-300">
+            {(data.executionOutput as { count?: number })?.count ?? 0} items processed
+          </span>
         )}
 
         {/* Error message */}
         {status === 'error' && !!data.executionError && (
-          <p className="text-xs text-error mt-1 truncate" title={data.executionError as string}>
+          <p className="text-xs text-error truncate" title={data.executionError as string}>
             {data.executionError as string}
           </p>
         )}
 
         {/* Duration */}
         {data.executionDuration != null && (
-          <p className="text-[10px] text-text-muted dark:text-dark-text-muted mt-1">
+          <p className="text-[10px] text-text-muted dark:text-dark-text-muted">
             {(data.executionDuration as number) < 1000
               ? `${data.executionDuration}ms`
               : `${((data.executionDuration as number) / 1000).toFixed(1)}s`}
           </p>
         )}
 
-        {/* Output handle labels */}
-        <div className="flex justify-between mt-2 text-[9px] text-sky-600/60 dark:text-sky-400/40">
-          <span>Each</span>
-          <span>Done</span>
+        {/* Dual output labels */}
+        <div className="flex mt-1 -mx-3 -mb-2 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex-1 text-center py-1 text-[9px] font-bold text-sky-600 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-950/30">
+            EACH
+          </div>
+          <div className="w-px bg-gray-200 dark:bg-gray-700" />
+          <div className="flex-1 text-center py-1 text-[9px] font-bold text-sky-500/60 dark:text-sky-400/50 bg-gray-50 dark:bg-gray-800/50">
+            DONE
+          </div>
         </div>
       </div>
 

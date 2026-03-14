@@ -28,7 +28,15 @@ import type {
   ToolConfigRequirement,
 } from './types.js';
 import { logToolCall, logToolResult } from './debug.js';
-import { validateToolCall } from './tool-validation.js';
+// Lazy-imported to break circular dep: tool-validation.ts imports type from tools.ts
+let _validateToolCall: typeof import('./tool-validation.js').validateToolCall | null = null;
+async function getValidateToolCall() {
+  if (!_validateToolCall) {
+    const mod = await import('./tool-validation.js');
+    _validateToolCall = mod.validateToolCall;
+  }
+  return _validateToolCall;
+}
 import type { ConfigCenter } from '../services/config-center.js';
 import { getBaseName, qualifyToolName } from './tool-namespace.js';
 import {
@@ -701,6 +709,7 @@ export class ToolRegistry {
     }
 
     // Validate tool call (existence + fuzzy name match + parameter schema)
+    const validateToolCall = await getValidateToolCall();
     const validation = validateToolCall(this, toolCall.name, args);
 
     let effectiveName = toolCall.name;

@@ -8,7 +8,7 @@ Privacy-first personal AI assistant platform. TypeScript monorepo with Turborepo
 packages/
   core/      - Agent engine, tools, plugins, events, sandbox, privacy
   gateway/   - Hono HTTP API server, routes, services, DB, channels, triggers, WebSocket
-  ui/        - React 19 + Vite + Tailwind frontend (55+ pages, code-split)
+  ui/        - React 19 + Vite + Tailwind frontend (58 pages, code-split)
   cli/       - Commander.js CLI (bot, config, start, workspace commands)
 ```
 
@@ -22,10 +22,13 @@ packages/
 - **User Extensions**: Native tool bundles (JS code, triggers, services) in `packages/gateway/src/services/extension-service.ts`. DB table: `user_extensions`. API: `/extensions`
 - **Skills (AgentSkills.io)**: Open standard SKILL.md format for agent instructions. Parser: `packages/gateway/src/services/agentskills-parser.ts`. Format field: `'ownpilot' | 'agentskills'`
 - **Edge/IoT**: MQTT broker (Mosquitto) integration for edge device management. Types: `packages/core/src/edge/`. Service: `packages/gateway/src/services/edge-service.ts`. Routes: `/api/v1/edge`
-- **Test framework**: Vitest across all packages. 26,500+ tests total (gateway: 16,236; core: 9,832; cli: 293; ui: 141)
-- **Autonomous Agent Runners**: Shared utilities in `packages/gateway/src/services/agent-runner-utils.ts` — `createConfiguredAgent()`, `registerAllToolSources()`, `resolveProviderAndModel()`, `calculateExecutionCost()`, `createToolCallCollector()`, `resolveToolFilter()`
+- **Test framework**: Vitest across all packages. 26,600+ tests total (gateway: 16,400+; core: 9,714; cli: 340; ui: 141)
+- **Autonomous Agent Runners**: Shared utilities in `packages/gateway/src/services/agent-runner-utils.ts` — `createConfiguredAgent()`, `registerAllToolSources()`, `resolveProviderAndModel()`, `executeAgentPipeline()`, `calculateExecutionCost()`, `createToolCallCollector()`, `resolveToolFilter()`, `createCancellationPromise()`
+- **Habit Tracking**: 8 AI tools in `packages/gateway/src/tools/habit-tools.ts`, DB repo in `db/repositories/habits.ts` (645 lines), REST API in `routes/productivity.ts`, HabitsPage UI with streak heatmap
+- **Utilities**: `TTLCache<K,V>` in `packages/gateway/src/utils/ttl-cache.ts` — generic cache with auto-prune. `chat-post-processor.ts` in `assistant/` — extracted from conversation-service
+- **Extension splits**: `extension-trigger-manager.ts` (trigger lifecycle), `extension-scanner.ts` (directory scanning), `cli-chat-parsers.ts` (CLI output parsers + arg builders)
 - **Cost tracking**: `calculateExecutionCost(provider, model, usage)` in `agent-runner-utils.ts` — wraps `@ownpilot/core` `calculateCost()`. Used by BackgroundAgentRunner, SubagentRunner, FleetWorker, SoulHeartbeatService
-- **Workflow system**: 23 node types, copilot prompt in `routes/workflow-copilot-prompt.ts`, executors in `services/workflow/node-executors.ts`, service in `services/workflow/workflow-service.ts`. Copilot uses short type names (e.g. `"llm"`, `"condition"`) — UI's `convertDefinitionToReactFlow()` converts to `*Node` suffix
+- **Workflow system**: 23 node types, copilot prompt in `routes/workflow-copilot-prompt.ts`, executors in `services/workflow/node-executors.ts`, service in `services/workflow/workflow-service.ts`. Centralized `dispatchNode()` method handles all node types. Copilot uses short type names (e.g. `"llm"`, `"condition"`) — UI's `convertDefinitionToReactFlow()` converts to `*Node` suffix
 - **Fleet Command**: FleetManager + FleetWorker with 4 worker types (ai-chat, coding-cli, api-call, mcp-bridge). 68 tests in `fleet-manager.test.ts`. Task dependencies cascade failures via `failDependentTasks()`
 
 ## Commands

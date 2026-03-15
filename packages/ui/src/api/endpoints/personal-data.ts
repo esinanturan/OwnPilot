@@ -97,19 +97,19 @@ export const habitsApi = {
       '/habits/today'
     ),
   categories: () => apiClient.get<{ categories: string[] }>('/habits/categories'),
-  get: (id: string) => apiClient.get<{ habit: Habit }>(`/productivity/habits/${id}`),
+  get: (id: string) => apiClient.get<{ habit: Habit }>(`/habits/${id}`),
   create: (body: Record<string, unknown>) =>
     apiClient.post<Habit>('/habits', body),
   update: (id: string, body: Record<string, unknown>) =>
-    apiClient.patch<Habit>(`/productivity/habits/${id}`, body),
-  delete: (id: string) => apiClient.delete<void>(`/productivity/habits/${id}`),
-  archive: (id: string) => apiClient.post<Habit>(`/productivity/habits/${id}/archive`),
+    apiClient.patch<Habit>(`/habits/${id}`, body),
+  delete: (id: string) => apiClient.delete<void>(`/habits/${id}`),
+  archive: (id: string) => apiClient.post<Habit>(`/habits/${id}/archive`),
   log: (id: string, body?: Record<string, unknown>) =>
-    apiClient.post<HabitLog>(`/productivity/habits/${id}/log`, body ?? {}),
+    apiClient.post<HabitLog>(`/habits/${id}/log`, body ?? {}),
   getLogs: (id: string, params?: Record<string, string>) =>
-    apiClient.get<{ logs: HabitLog[]; count: number }>(`/productivity/habits/${id}/logs`, { params }),
+    apiClient.get<{ logs: HabitLog[]; count: number }>(`/habits/${id}/logs`, { params }),
   getStats: (id: string) =>
-    apiClient.get<Record<string, unknown>>(`/productivity/habits/${id}/stats`),
+    apiClient.get<Record<string, unknown>>(`/habits/${id}/stats`),
 };
 
 // ---- Calendar ----

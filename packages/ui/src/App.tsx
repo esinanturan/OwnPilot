@@ -76,6 +76,9 @@ const CustomToolsPage = lazy(() =>
 const ExpensesPage = lazy(() =>
   import('./pages/ExpensesPage').then((m) => ({ default: m.ExpensesPage }))
 );
+const HabitsPage = lazy(() =>
+  import('./pages/HabitsPage').then((m) => ({ default: m.HabitsPage }))
+);
 const ConfigCenterPage = lazy(() =>
   import('./pages/ConfigCenterPage').then((m) => ({ default: m.ConfigCenterPage }))
 );
@@ -232,6 +235,7 @@ export function App() {
         <Route path="contacts" element={page(<ContactsPage />)} />
         <Route path="bookmarks" element={page(<BookmarksPage />)} />
         <Route path="expenses" element={page(<ExpensesPage />)} />
+        <Route path="habits" element={page(<HabitsPage />)} />
         <Route path="custom-data" element={page(<CustomDataPage />)} />
         <Route path="data-browser" element={page(<DataBrowserPage />)} />
         <Route path="coding-agents" element={page(<CodingAgentsPage />)} />

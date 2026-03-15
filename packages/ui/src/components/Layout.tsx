@@ -32,6 +32,7 @@ import {
   Activity,
   Code,
   Receipt,
+  Repeat,
   Key,
   Globe,
   Server,
@@ -100,6 +101,7 @@ const navGroups: NavGroup[] = [
       { to: '/contacts', icon: Users, label: 'Contacts' },
       { to: '/bookmarks', icon: Bookmark, label: 'Bookmarks' },
       { to: '/expenses', icon: Receipt, label: 'Expenses' },
+      { to: '/habits', icon: Repeat, label: 'Habits' },
     ],
   },
   {

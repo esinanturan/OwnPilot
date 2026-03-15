@@ -55,6 +55,63 @@ export const contactsApi = {
   favorite: (id: string) => apiClient.post<void>(`/contacts/${id}/favorite`),
 };
 
+// ---- Habits ----
+
+export interface Habit {
+  id: string;
+  name: string;
+  description?: string;
+  frequency: string;
+  targetDays: number[];
+  targetCount: number;
+  unit?: string;
+  category?: string;
+  reminderTime?: string;
+  isArchived: boolean;
+  streakCurrent: number;
+  streakLongest: number;
+  totalCompletions: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HabitWithTodayStatus extends Habit {
+  completedToday: boolean;
+  todayCount: number;
+}
+
+export interface HabitLog {
+  id: string;
+  habitId: string;
+  date: string;
+  count: number;
+  notes?: string;
+  loggedAt: string;
+}
+
+export const habitsApi = {
+  list: (params?: Record<string, string>) =>
+    apiClient.get<{ habits: Habit[]; count: number }>('/productivity/habits', { params }),
+  getToday: () =>
+    apiClient.get<{ habits: HabitWithTodayStatus[]; progress: { total: number; completed: number; rate: number } }>(
+      '/productivity/habits/today'
+    ),
+  categories: () => apiClient.get<{ categories: string[] }>('/productivity/habits/categories'),
+  get: (id: string) => apiClient.get<{ habit: Habit }>(`/productivity/habits/${id}`),
+  create: (body: Record<string, unknown>) =>
+    apiClient.post<Habit>('/productivity/habits', body),
+  update: (id: string, body: Record<string, unknown>) =>
+    apiClient.patch<Habit>(`/productivity/habits/${id}`, body),
+  delete: (id: string) => apiClient.delete<void>(`/productivity/habits/${id}`),
+  archive: (id: string) => apiClient.post<Habit>(`/productivity/habits/${id}/archive`),
+  log: (id: string, body?: Record<string, unknown>) =>
+    apiClient.post<HabitLog>(`/productivity/habits/${id}/log`, body ?? {}),
+  getLogs: (id: string, params?: Record<string, string>) =>
+    apiClient.get<{ logs: HabitLog[]; count: number }>(`/productivity/habits/${id}/logs`, { params }),
+  getStats: (id: string) =>
+    apiClient.get<Record<string, unknown>>(`/productivity/habits/${id}/stats`),
+};
+
 // ---- Calendar ----
 
 export const calendarApi = {

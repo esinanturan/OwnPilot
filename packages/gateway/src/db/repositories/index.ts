@@ -195,6 +195,15 @@ export {
 } from './habits.js';
 
 export {
+  ExpensesRepository,
+  type Expense,
+  type CreateExpenseInput,
+  type UpdateExpenseInput,
+  type ExpenseQuery,
+  type ExpenseCategory,
+} from './expenses.js';
+
+export {
   CapturesRepository,
   createCapturesRepository,
   type Capture,

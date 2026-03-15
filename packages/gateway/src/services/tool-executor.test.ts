@@ -94,6 +94,7 @@ vi.mock('../db/repositories/custom-tools.js', () => ({
 vi.mock('./image-overrides.js', () => ({ registerImageOverrides: vi.fn(async () => {}) }));
 vi.mock('./email-overrides.js', () => ({ registerEmailOverrides: vi.fn(async () => {}) }));
 vi.mock('./audio-overrides.js', () => ({ registerAudioOverrides: vi.fn(async () => {}) }));
+vi.mock('./expense-overrides.js', () => ({ registerExpenseOverrides: vi.fn() }));
 
 vi.mock('../db/repositories/extensions.js', () => ({
   extensionsRepo: {

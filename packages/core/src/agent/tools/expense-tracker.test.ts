@@ -1372,8 +1372,8 @@ describe('EXPENSE_TRACKER_TOOLS export', () => {
     expect(EXPENSE_TRACKER_TOOLS.length).toBeGreaterThan(0);
   });
 
-  it('contains exactly 7 tools', () => {
-    expect(EXPENSE_TRACKER_TOOLS).toHaveLength(7);
+  it('contains exactly 8 tools', () => {
+    expect(EXPENSE_TRACKER_TOOLS).toHaveLength(8);
   });
 
   it('each entry has a definition and executor', () => {

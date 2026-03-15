@@ -156,8 +156,8 @@ describe('Gateway Tool Definitions', () => {
       expect(CUSTOM_DATA_TOOLS).toHaveLength(11);
     });
 
-    it('PERSONAL_DATA_TOOLS has 24 tools', () => {
-      expect(PERSONAL_DATA_TOOLS).toHaveLength(24);
+    it('PERSONAL_DATA_TOOLS has 26 tools', () => {
+      expect(PERSONAL_DATA_TOOLS).toHaveLength(26);
     });
   });
 

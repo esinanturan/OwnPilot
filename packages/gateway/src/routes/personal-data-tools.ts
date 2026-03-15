@@ -207,6 +207,31 @@ async function handleBookmarkTool(
       };
     }
 
+    case 'update_bookmark': {
+      const { bookmarkId, ...updates } = params as {
+        bookmarkId: string;
+        url?: string;
+        title?: string;
+        description?: string;
+        category?: string;
+        tags?: string[];
+        isFavorite?: boolean;
+      };
+      const updated = await repo.update(bookmarkId, updates);
+      if (!updated) {
+        return {
+          success: false,
+          error: `Bookmark not found: ${sanitizeId(String(bookmarkId))}`,
+        };
+      }
+      wsGateway.broadcast('data:changed', {
+        entity: 'bookmark',
+        action: 'updated',
+        id: bookmarkId,
+      });
+      return { success: true, result: updated };
+    }
+
     case 'delete_bookmark': {
       const deleted = await repo.delete(params.bookmarkId as string);
       if (!deleted) {
@@ -424,6 +449,37 @@ async function handleCalendarTool(
         success: true,
         result: { message: `Found ${events.length} event(s).`, events },
       };
+    }
+
+    case 'update_calendar_event': {
+      const { eventId, ...updates } = params as {
+        eventId: string;
+        title?: string;
+        startTime?: string;
+        endTime?: string;
+        isAllDay?: boolean;
+        location?: string;
+        description?: string;
+        category?: string;
+        reminder?: number;
+      };
+      const updated = await repo.update(eventId, {
+        ...updates,
+        startTime: updates.startTime ? new Date(updates.startTime) : undefined,
+        endTime: updates.endTime ? new Date(updates.endTime) : undefined,
+      });
+      if (!updated) {
+        return {
+          success: false,
+          error: `Event not found: ${sanitizeId(String(eventId))}`,
+        };
+      }
+      wsGateway.broadcast('data:changed', {
+        entity: 'calendar',
+        action: 'updated',
+        id: eventId,
+      });
+      return { success: true, result: updated };
     }
 
     case 'delete_calendar_event': {

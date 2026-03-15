@@ -934,6 +934,120 @@ function generateInsights(
 }
 
 /**
+ * Update expense tool
+ */
+export const updateExpenseTool: ToolDefinition = {
+  name: 'update_expense',
+  brief: 'Update an expense entry',
+  description: 'Update an existing expense entry. Only include the fields you want to change.',
+  parameters: {
+    type: 'object',
+    properties: {
+      expenseId: {
+        type: 'string',
+        description: 'The expense ID to update',
+      },
+      date: {
+        type: 'string',
+        description: 'New date in YYYY-MM-DD format',
+      },
+      amount: {
+        type: 'number',
+        description: 'New amount',
+      },
+      currency: {
+        type: 'string',
+        enum: ['TRY', 'USD', 'EUR', 'GBP'],
+        description: 'New currency',
+      },
+      category: {
+        type: 'string',
+        enum: [
+          'food',
+          'transport',
+          'utilities',
+          'entertainment',
+          'shopping',
+          'health',
+          'education',
+          'travel',
+          'subscription',
+          'housing',
+          'other',
+        ],
+        description: 'New category',
+      },
+      description: {
+        type: 'string',
+        description: 'New description',
+      },
+      paymentMethod: {
+        type: 'string',
+        description: 'New payment method',
+      },
+      tags: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'New tags (replaces existing)',
+      },
+      notes: {
+        type: 'string',
+        description: 'New notes',
+      },
+    },
+    required: ['expenseId'],
+  },
+};
+
+export const updateExpenseExecutor: ToolExecutor = async (
+  args,
+  _context
+): Promise<ToolExecutionResult> => {
+  try {
+    const db = await loadExpenseDb();
+    const expenseId = args.expenseId as string;
+
+    const index = db.expenses.findIndex((e) => e.id === expenseId);
+    if (index === -1) {
+      return {
+        content: `Expense not found: ${expenseId}`,
+        isError: true,
+      };
+    }
+
+    const existing = db.expenses[index]!;
+    const updated = {
+      ...existing,
+      ...(args.date !== undefined && { date: args.date as string }),
+      ...(args.amount !== undefined && { amount: args.amount as number }),
+      ...(args.currency !== undefined && { currency: args.currency as string }),
+      ...(args.category !== undefined && { category: args.category as ExpenseCategory }),
+      ...(args.description !== undefined && { description: args.description as string }),
+      ...(args.paymentMethod !== undefined && { paymentMethod: args.paymentMethod as string }),
+      ...(args.tags !== undefined && { tags: args.tags as string[] }),
+      ...(args.notes !== undefined && { notes: args.notes as string }),
+      updatedAt: new Date().toISOString(),
+    };
+
+    db.expenses[index] = updated;
+    await saveExpenseDb(db);
+
+    return {
+      content: JSON.stringify({
+        success: true,
+        expense: updated,
+        message: `Updated expense: ${updated.description} (${updated.amount} ${updated.currency})`,
+      }),
+    };
+  } catch (error) {
+    return {
+      content: `Error updating expense: ${getErrorMessage(error)}`,
+      isError: true,
+    };
+  }
+};
+
+/**
  * Delete expense tool
  */
 export const deleteExpenseTool: ToolDefinition = {
@@ -998,5 +1112,6 @@ export const EXPENSE_TRACKER_TOOLS: Array<{ definition: ToolDefinition; executor
     { definition: queryExpensesTool, executor: queryExpensesExecutor },
     { definition: exportExpensesTool, executor: exportExpensesExecutor },
     { definition: expenseSummaryTool, executor: expenseSummaryExecutor },
+    { definition: updateExpenseTool, executor: updateExpenseExecutor },
     { definition: deleteExpenseTool, executor: deleteExpenseExecutor },
   ];

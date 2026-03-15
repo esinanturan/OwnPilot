@@ -271,6 +271,47 @@ export const listBookmarksTool: ToolDefinition = {
   },
 };
 
+export const updateBookmarkTool: ToolDefinition = {
+  name: 'update_bookmark',
+  brief: 'Update a bookmark URL, title, category, or tags',
+  description: `Update an existing bookmark. Only include the fields you want to change.`,
+  parameters: {
+    type: 'object',
+    properties: {
+      bookmarkId: {
+        type: 'string',
+        description: 'The bookmark ID to update',
+      },
+      url: {
+        type: 'string',
+        description: 'New URL',
+      },
+      title: {
+        type: 'string',
+        description: 'New title',
+      },
+      description: {
+        type: 'string',
+        description: 'New description',
+      },
+      category: {
+        type: 'string',
+        description: 'New category',
+      },
+      tags: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'New tags (replaces existing)',
+      },
+      isFavorite: {
+        type: 'boolean',
+        description: 'Set favorite status',
+      },
+    },
+    required: ['bookmarkId'],
+  },
+};
+
 export const deleteBookmarkTool: ToolDefinition = {
   name: 'delete_bookmark',
   brief: 'Delete a bookmark by ID',
@@ -570,6 +611,54 @@ export const listEventsTool: ToolDefinition = {
   },
 };
 
+export const updateEventTool: ToolDefinition = {
+  name: 'update_calendar_event',
+  brief: 'Update a calendar event time, title, or location',
+  description: `Update an existing calendar event. Only include the fields you want to change.`,
+  parameters: {
+    type: 'object',
+    properties: {
+      eventId: {
+        type: 'string',
+        description: 'The event ID to update',
+      },
+      title: {
+        type: 'string',
+        description: 'New event title',
+      },
+      startTime: {
+        type: 'string',
+        description: 'New start time in ISO format',
+      },
+      endTime: {
+        type: 'string',
+        description: 'New end time in ISO format',
+      },
+      isAllDay: {
+        type: 'boolean',
+        description: 'Set as all-day event',
+      },
+      location: {
+        type: 'string',
+        description: 'New location',
+      },
+      description: {
+        type: 'string',
+        description: 'New description',
+      },
+      category: {
+        type: 'string',
+        description: 'New category',
+      },
+      reminder: {
+        type: 'number',
+        description: 'Reminder in minutes before event (0 to disable)',
+      },
+    },
+    required: ['eventId'],
+  },
+};
+
 export const deleteEventTool: ToolDefinition = {
   name: 'delete_calendar_event',
   brief: 'Delete a calendar event by ID',
@@ -860,6 +949,7 @@ export const PERSONAL_DATA_TOOLS: ToolDefinition[] = [
   // Bookmarks
   addBookmarkTool,
   listBookmarksTool,
+  updateBookmarkTool,
   deleteBookmarkTool,
   batchAddBookmarksTool,
   // Notes
@@ -871,6 +961,7 @@ export const PERSONAL_DATA_TOOLS: ToolDefinition[] = [
   // Calendar Events
   addEventTool,
   listEventsTool,
+  updateEventTool,
   deleteEventTool,
   batchAddEventsTool,
   // Contacts

@@ -17,6 +17,7 @@ import {
   CalendarRepository,
   ContactsRepository,
   HabitsRepository,
+  ExpensesRepository,
   type CreateTaskInput,
   type UpdateTaskInput,
   type TaskQuery,
@@ -609,6 +610,7 @@ personalDataRoutes.get('/summary', async (c) => {
   const calendarRepo = new CalendarRepository(userId);
   const contactsRepo = new ContactsRepository(userId);
   const habitsRepo = new HabitsRepository(userId);
+  const expensesRepo = new ExpensesRepository(userId);
 
   const [
     tasksTotal,
@@ -629,6 +631,8 @@ personalDataRoutes.get('/summary', async (c) => {
     contactsUpcomingBirthdays,
     habitsProgress,
     habitsList,
+    expenseSummary,
+    expensesTotal,
   ] = await Promise.all([
     tasksRepo.count(),
     tasksRepo.count({ status: 'pending' }),
@@ -648,6 +652,8 @@ personalDataRoutes.get('/summary', async (c) => {
     contactsRepo.getUpcomingBirthdays(30),
     habitsRepo.getTodayProgress(),
     habitsRepo.list({ isArchived: false }),
+    expensesRepo.getSummary(),
+    expensesRepo.count(),
   ]);
 
   const summary = {
@@ -683,6 +689,11 @@ personalDataRoutes.get('/summary', async (c) => {
       totalToday: habitsProgress.total,
       percentage: habitsProgress.percentage,
       bestStreak: Math.max(0, ...habitsList.map((h) => h.streakCurrent)),
+    },
+    expenses: {
+      total: expensesTotal,
+      thisMonth: expenseSummary.totalAmount,
+      byCategory: expenseSummary.byCategory,
     },
   };
 

@@ -89,6 +89,11 @@ const mockHabitsRepo = {
   getTodayProgress: vi.fn(async () => ({ total: 0, completed: 0, percentage: 0, habits: [] })),
 };
 
+const mockExpensesRepo = {
+  getSummary: vi.fn(async () => ({ totalAmount: 0, count: 0, byCategory: {}, byCurrency: {} })),
+  count: vi.fn(async () => 0),
+};
+
 vi.mock('../db/repositories/index.js', () => ({
   TasksRepository: vi.fn(function () {
     return mockTasksRepo;
@@ -107,6 +112,9 @@ vi.mock('../db/repositories/index.js', () => ({
   }),
   HabitsRepository: vi.fn(function () {
     return mockHabitsRepo;
+  }),
+  ExpensesRepository: vi.fn(function () {
+    return mockExpensesRepo;
   }),
 }));
 
@@ -997,6 +1005,8 @@ describe('Personal Data Routes', () => {
       expect(json.data.habits.completedToday).toBe(2);
       expect(json.data.habits.totalToday).toBe(3);
       expect(json.data.habits.bestStreak).toBe(12);
+      expect(json.data.expenses.total).toBe(0);
+      expect(json.data.expenses.thisMonth).toBe(0);
     });
   });
 });

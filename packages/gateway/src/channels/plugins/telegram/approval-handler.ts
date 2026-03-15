@@ -50,7 +50,7 @@ export class TelegramApprovalHandler {
       const entry = this.pending.get(id);
 
       if (!entry || entry.resolved) {
-        await ctx.answerCallbackQuery({ text: 'This approval has expired.' }).catch(() => {});
+        await ctx.answerCallbackQuery({ text: 'This approval has expired.' }).catch((e) => log.debug('Telegram callback error', { error: String(e) }));
         return;
       }
 
@@ -153,7 +153,7 @@ export class TelegramApprovalHandler {
             sent.message_id,
             '\u23f0 Approval timed out — denied automatically.'
           )
-          .catch(() => {});
+          .catch((e) => log.debug('Telegram callback error', { error: String(e) }));
       }, APPROVAL_TIMEOUT_MS);
 
       this.pending.set(id, entry);

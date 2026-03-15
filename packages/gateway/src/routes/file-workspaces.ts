@@ -10,6 +10,7 @@ import { Hono } from 'hono';
 import { createReadStream } from 'node:fs';
 import { stat, unlink } from 'node:fs/promises';
 import { basename } from 'node:path';
+import { getLog } from '../services/log.js';
 import {
   apiResponse,
   apiError,
@@ -67,6 +68,7 @@ function getOwnedWorkspace(
   return workspace;
 }
 
+const log = getLog('FileWorkspaces');
 const app = new Hono();
 
 /**
@@ -398,10 +400,10 @@ app.get('/:id/download', async (c) => {
     // Stream the file, then clean up temp ZIP
     const stream = createReadStream(zipPath);
     stream.on('end', () => {
-      unlink(zipPath).catch(() => {});
+      unlink(zipPath).catch((e) => log.debug('Temp zip cleanup failed', { error: String(e) }));
     });
     stream.on('error', () => {
-      unlink(zipPath).catch(() => {});
+      unlink(zipPath).catch((e) => log.debug('Temp zip cleanup failed', { error: String(e) }));
     });
     return new Response(stream as unknown as ReadableStream, {
       headers: {

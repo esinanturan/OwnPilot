@@ -39,6 +39,7 @@ import { getLog } from './log.js';
 import { registerImageOverrides } from './image-overrides.js';
 import { registerEmailOverrides } from './email-overrides.js';
 import { registerAudioOverrides } from './audio-overrides.js';
+import { registerExpenseOverrides } from './expense-overrides.js';
 import { hasServiceRegistry, getServiceRegistry, Services } from '@ownpilot/core';
 import type { IAuditService } from '@ownpilot/core';
 import { checkToolPermission } from './tool-permission-service.js';
@@ -99,6 +100,7 @@ export function getSharedToolRegistry(userId = 'default'): ToolRegistry {
   registerAudioOverrides(tools).catch((err) =>
     log.warn('registerAudioOverrides failed:', String(err))
   );
+  registerExpenseOverrides(tools, userId);
 
   // Register legacy core tools (get_current_time, calculate, etc.)
   // Duplicates are safely ignored by ToolRegistry

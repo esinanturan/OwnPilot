@@ -33,6 +33,7 @@ import {
   Code,
   Receipt,
   Repeat,
+  Clock,
   Key,
   Globe,
   Server,
@@ -102,6 +103,7 @@ const navGroups: NavGroup[] = [
       { to: '/bookmarks', icon: Bookmark, label: 'Bookmarks' },
       { to: '/expenses', icon: Receipt, label: 'Expenses' },
       { to: '/habits', icon: Repeat, label: 'Habits' },
+      { to: '/pomodoro', icon: Clock, label: 'Pomodoro' },
     ],
   },
   {

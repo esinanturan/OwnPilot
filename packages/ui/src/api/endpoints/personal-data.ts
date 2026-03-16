@@ -112,6 +112,50 @@ export const habitsApi = {
     apiClient.get<Record<string, unknown>>(`/habits/${id}`),
 };
 
+// ---- Pomodoro ----
+
+export interface PomodoroSession {
+  id: string;
+  type: 'work' | 'short_break' | 'long_break';
+  status: 'running' | 'completed' | 'interrupted';
+  taskDescription?: string;
+  durationMinutes: number;
+  startedAt: string;
+  completedAt?: string;
+}
+
+export interface PomodoroSettings {
+  workDuration: number;
+  shortBreakDuration: number;
+  longBreakDuration: number;
+  sessionsBeforeLongBreak: number;
+  autoStartBreaks: boolean;
+  autoStartWork: boolean;
+}
+
+export interface PomodoroStats {
+  completedSessions: number;
+  totalWorkMinutes: number;
+  totalBreakMinutes: number;
+  interruptions: number;
+}
+
+export const pomodoroApi = {
+  getSession: () => apiClient.get<{ session: PomodoroSession | null }>('/pomodoro/session'),
+  startSession: (body: { type: string; durationMinutes: number; taskDescription?: string }) =>
+    apiClient.post<{ session: PomodoroSession }>('/pomodoro/session/start', body),
+  completeSession: (id: string) =>
+    apiClient.post<{ session: PomodoroSession }>(`/pomodoro/session/${id}/complete`),
+  interruptSession: (id: string, reason?: string) =>
+    apiClient.post<{ session: PomodoroSession }>(`/pomodoro/session/${id}/interrupt`, { reason }),
+  listSessions: (params?: Record<string, string>) =>
+    apiClient.get<{ sessions: PomodoroSession[]; total: number }>('/pomodoro/sessions', { params }),
+  getSettings: () => apiClient.get<PomodoroSettings>('/pomodoro/settings'),
+  updateSettings: (body: Partial<PomodoroSettings>) =>
+    apiClient.patch<PomodoroSettings>('/pomodoro/settings', body),
+  getStats: () => apiClient.get<PomodoroStats>('/pomodoro/stats'),
+};
+
 // ---- Calendar ----
 
 export const calendarApi = {

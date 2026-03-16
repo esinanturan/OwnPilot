@@ -79,6 +79,9 @@ const ExpensesPage = lazy(() =>
 const HabitsPage = lazy(() =>
   import('./pages/HabitsPage').then((m) => ({ default: m.HabitsPage }))
 );
+const PomodoroPage = lazy(() =>
+  import('./pages/PomodoroPage').then((m) => ({ default: m.PomodoroPage }))
+);
 const ConfigCenterPage = lazy(() =>
   import('./pages/ConfigCenterPage').then((m) => ({ default: m.ConfigCenterPage }))
 );
@@ -236,6 +239,7 @@ export function App() {
         <Route path="bookmarks" element={page(<BookmarksPage />)} />
         <Route path="expenses" element={page(<ExpensesPage />)} />
         <Route path="habits" element={page(<HabitsPage />)} />
+        <Route path="pomodoro" element={page(<PomodoroPage />)} />
         <Route path="custom-data" element={page(<CustomDataPage />)} />
         <Route path="data-browser" element={page(<DataBrowserPage />)} />
         <Route path="coding-agents" element={page(<CodingAgentsPage />)} />

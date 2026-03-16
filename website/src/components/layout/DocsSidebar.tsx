@@ -48,7 +48,7 @@ export const docsNav: NavItem[] = [
       { title: "Subagents", href: "/docs/agents/subagents" },
       { title: "Agent Orchestra", href: "/docs/agents/orchestra" },
       { title: "Crew System", href: "/docs/agents/crew" },
-      { title: "Coding Agents", href: "/docs/agents/coding" },
+      { title: "Coding Agents", href: "/docs/coding-agents" },
     ],
   },
   {
@@ -57,7 +57,7 @@ export const docsNav: NavItem[] = [
       { title: "Tool Overview", href: "/docs/tools" },
       { title: "Built-in Tools (190+)", href: "/docs/tools/builtin" },
       { title: "Meta-tool Proxy", href: "/docs/tools/meta-proxy" },
-      { title: "MCP Integration", href: "/docs/tools/mcp" },
+      { title: "MCP Integration", href: "/docs/mcp" },
       { title: "Extensions", href: "/docs/tools/extensions" },
       { title: "Skills Platform", href: "/docs/tools/skills" },
       { title: "Custom Tools", href: "/docs/tools/custom" },
@@ -66,10 +66,20 @@ export const docsNav: NavItem[] = [
   {
     title: "Personal Data",
     items: [
+      { title: "Overview", href: "/docs/personal-data" },
       { title: "Notes & Tasks", href: "/docs/personal-data/notes-tasks" },
       { title: "Calendar & Contacts", href: "/docs/personal-data/calendar" },
       { title: "Memory System", href: "/docs/personal-data/memory" },
       { title: "Goals", href: "/docs/personal-data/goals" },
+    ],
+  },
+  {
+    title: "Channels",
+    items: [
+      { title: "Channels Overview", href: "/docs/channels" },
+      { title: "Telegram Setup", href: "/docs/channels/telegram" },
+      { title: "WhatsApp Setup", href: "/docs/channels/whatsapp" },
+      { title: "User Approval", href: "/docs/channels/approval" },
     ],
   },
   {
@@ -79,6 +89,15 @@ export const docsNav: NavItem[] = [
       { title: "Triggers", href: "/docs/automation/triggers" },
       { title: "Pulse System", href: "/docs/automation/pulse" },
       { title: "Fleet Command", href: "/docs/automation/fleet" },
+    ],
+  },
+  {
+    title: "Edge Devices",
+    items: [
+      { title: "Edge & IoT Overview", href: "/docs/edge-devices" },
+      { title: "MQTT Setup", href: "/docs/edge-devices/mqtt" },
+      { title: "Device Registry", href: "/docs/edge-devices/registry" },
+      { title: "Telemetry & Commands", href: "/docs/edge-devices/telemetry" },
     ],
   },
   {

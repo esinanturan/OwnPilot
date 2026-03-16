@@ -2,6 +2,8 @@ import { DocsLayout } from "@/components/layout/DocsLayout";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { Callout } from "@/components/ui/Callout";
 import { Badge } from "@/components/ui/Badge";
+import { Link } from "react-router";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 export function InstallationPage() {
   return (
@@ -191,6 +193,24 @@ nvm install 22
 nvm use 22`}
         language="bash"
       />
+
+      {/* Prev/Next navigation */}
+      <div className="flex items-center justify-between mt-12 pt-6 border-t border-[var(--color-border)]">
+        <Link
+          to="/docs/quick-start"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Quick Start
+        </Link>
+        <Link
+          to="/docs/configuration"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          Configuration
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
     </DocsLayout>
   );
 }

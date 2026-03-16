@@ -2,6 +2,8 @@ import { DocsLayout } from "@/components/layout/DocsLayout";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { Badge } from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
+import { Link } from "react-router";
+import { ArrowLeft } from "lucide-react";
 
 const DOCKER_COMPOSE = `version: "3.9"
 
@@ -190,6 +192,17 @@ pnpm build
           <tr><td>Power user</td><td>8 GB+</td><td>4+ cores</td><td>100 GB+</td><td>Heavy automation, local LLMs</td></tr>
         </tbody>
       </table>
+
+      {/* Prev navigation */}
+      <div className="flex items-center mt-12 pt-6 border-t border-[var(--color-border)]">
+        <Link
+          to="/docs/api-reference"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          API Reference
+        </Link>
+      </div>
     </DocsLayout>
   );
 }

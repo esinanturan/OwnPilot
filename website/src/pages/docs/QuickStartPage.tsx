@@ -2,6 +2,8 @@ import { DocsLayout } from "@/components/layout/DocsLayout";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { Callout } from "@/components/ui/Callout";
 import { Badge } from "@/components/ui/Badge";
+import { Link } from "react-router";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 export function QuickStartPage() {
   return (
@@ -167,6 +169,24 @@ ownpilot config set ollama-base-url http://localhost:11434`}
         Once OwnPilot is running and you've set an API key, navigate to the Chat page to start your first conversation.
         The assistant has access to all 190+ built-in tools by default.
       </Callout>
+
+      {/* Prev/Next navigation */}
+      <div className="flex items-center justify-between mt-12 pt-6 border-t border-[var(--color-border)]">
+        <Link
+          to="/docs/introduction"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Introduction
+        </Link>
+        <Link
+          to="/docs/installation"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          Installation
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
     </DocsLayout>
   );
 }

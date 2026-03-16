@@ -2,6 +2,8 @@ import { DocsLayout } from "@/components/layout/DocsLayout";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { Badge } from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
+import { Link } from "react-router";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 const WORKFLOW_EXAMPLE = `{
   "name": "GitHub Issue Triage",
@@ -129,6 +131,24 @@ export function WorkflowsPage() {
         Set <code>responseFormat: "json"</code> on an LLM node to automatically parse the model's
         output as JSON. This is useful for classification, extraction, and data transformation tasks.
       </Callout>
+
+      {/* Prev/Next navigation */}
+      <div className="flex items-center justify-between mt-12 pt-6 border-t border-[var(--color-border)]">
+        <Link
+          to="/docs/channels"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Channels
+        </Link>
+        <Link
+          to="/docs/security"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          Security
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
     </DocsLayout>
   );
 }

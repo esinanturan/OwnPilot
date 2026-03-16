@@ -43,6 +43,24 @@ const ApiReferencePage = lazy(() =>
 const DeploymentPage = lazy(() =>
   import("@/pages/docs/DeploymentPage").then((m) => ({ default: m.DeploymentPage }))
 );
+const PersonalDataPage = lazy(() =>
+  import("@/pages/docs/PersonalDataPage").then((m) => ({ default: m.PersonalDataPage }))
+);
+const ChannelsPage = lazy(() =>
+  import("@/pages/docs/ChannelsPage").then((m) => ({ default: m.ChannelsPage }))
+);
+const McpPage = lazy(() =>
+  import("@/pages/docs/McpPage").then((m) => ({ default: m.McpPage }))
+);
+const CodingAgentsPage = lazy(() =>
+  import("@/pages/docs/CodingAgentsPage").then((m) => ({ default: m.CodingAgentsPage }))
+);
+const EdgeDevicesPage = lazy(() =>
+  import("@/pages/docs/EdgeDevicesPage").then((m) => ({ default: m.EdgeDevicesPage }))
+);
+const ConfigurationPage = lazy(() =>
+  import("@/pages/docs/ConfigurationPage").then((m) => ({ default: m.ConfigurationPage }))
+);
 
 function PageLoader() {
   return (
@@ -91,7 +109,7 @@ export default function App() {
           <Route path="/docs/getting-started" element={<IntroductionPage />} />
           <Route path="/docs/quick-start" element={<QuickStartPage />} />
           <Route path="/docs/installation" element={<InstallationPage />} />
-          <Route path="/docs/configuration" element={<InstallationPage />} />
+          <Route path="/docs/configuration" element={<ConfigurationPage />} />
           <Route path="/docs/architecture" element={<ArchitecturePage />} />
           <Route path="/docs/architecture/*" element={<ArchitecturePage />} />
           <Route path="/docs/providers" element={<ProvidersPage />} />
@@ -100,7 +118,16 @@ export default function App() {
           <Route path="/docs/agents/*" element={<AgentsPage />} />
           <Route path="/docs/tools" element={<ToolsPage />} />
           <Route path="/docs/tools/*" element={<ToolsPage />} />
-          <Route path="/docs/personal-data/*" element={<IntroductionPage />} />
+          <Route path="/docs/personal-data" element={<PersonalDataPage />} />
+          <Route path="/docs/personal-data/*" element={<PersonalDataPage />} />
+          <Route path="/docs/channels" element={<ChannelsPage />} />
+          <Route path="/docs/channels/*" element={<ChannelsPage />} />
+          <Route path="/docs/mcp" element={<McpPage />} />
+          <Route path="/docs/mcp/*" element={<McpPage />} />
+          <Route path="/docs/coding-agents" element={<CodingAgentsPage />} />
+          <Route path="/docs/coding-agents/*" element={<CodingAgentsPage />} />
+          <Route path="/docs/edge-devices" element={<EdgeDevicesPage />} />
+          <Route path="/docs/edge-devices/*" element={<EdgeDevicesPage />} />
           <Route path="/docs/automation/workflows" element={<WorkflowsPage />} />
           <Route path="/docs/automation/*" element={<WorkflowsPage />} />
           <Route path="/docs/security" element={<SecurityPage />} />

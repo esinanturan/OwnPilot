@@ -2,6 +2,8 @@ import { DocsLayout } from "@/components/layout/DocsLayout";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { Badge } from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
+import { Link } from "react-router";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 const ARCH = `                     ┌──────────────┐
                      │   Web UI     │  React 19 + Vite 7
@@ -146,6 +148,24 @@ export function ArchitecturePage() {
         <li>AES-256-GCM encrypted columns for sensitive data</li>
         <li>Tamper-evident hash chain for audit logs</li>
       </ul>
+
+      {/* Prev/Next navigation */}
+      <div className="flex items-center justify-between mt-12 pt-6 border-t border-[var(--color-border)]">
+        <Link
+          to="/docs/installation"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Installation
+        </Link>
+        <Link
+          to="/docs/providers"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          AI Providers
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
     </DocsLayout>
   );
 }

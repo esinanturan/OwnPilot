@@ -2,6 +2,8 @@ import { DocsLayout } from "@/components/layout/DocsLayout";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { Badge } from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
+import { Link } from "react-router";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 export function ProvidersPage() {
   return (
@@ -126,6 +128,24 @@ ownpilot config set ollama-base-url http://localhost:11434`}
         For maximum privacy, configure Ollama with a capable local model (llama3.3, qwen2.5, etc.).
         All AI processing stays on your machine — no data ever leaves your server.
       </Callout>
+
+      {/* Prev/Next navigation */}
+      <div className="flex items-center justify-between mt-12 pt-6 border-t border-[var(--color-border)]">
+        <Link
+          to="/docs/architecture"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Architecture
+        </Link>
+        <Link
+          to="/docs/agents"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          Agent System
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
     </DocsLayout>
   );
 }

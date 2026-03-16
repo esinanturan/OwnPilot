@@ -1,6 +1,8 @@
 import { DocsLayout } from "@/components/layout/DocsLayout";
 import { Badge } from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
+import { Link } from "react-router";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 export function SecurityPage() {
   return (
@@ -156,6 +158,24 @@ export function SecurityPage() {
         <li>User blocking/unblocking with real-time notifications</li>
         <li>WhatsApp anti-ban safety filters and auto-reply protection</li>
       </ul>
+
+      {/* Prev/Next navigation */}
+      <div className="flex items-center justify-between mt-12 pt-6 border-t border-[var(--color-border)]">
+        <Link
+          to="/docs/configuration"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Configuration
+        </Link>
+        <Link
+          to="/docs/api-reference"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          API Reference
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
     </DocsLayout>
   );
 }

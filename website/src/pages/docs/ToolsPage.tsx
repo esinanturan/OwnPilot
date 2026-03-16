@@ -2,6 +2,8 @@ import { DocsLayout } from "@/components/layout/DocsLayout";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { Badge } from "@/components/ui/Badge";
 import { Callout } from "@/components/ui/Callout";
+import { Link } from "react-router";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 const TOOL_CATEGORIES = `Personal Data:    notes, tasks, bookmarks, contacts, calendar, expenses
 Productivity:     pomodoro, habits, quick-capture, goals
@@ -147,6 +149,24 @@ ownpilot skill update`}
         1000+ OAuth app integrations via Composio. Google Drive, GitHub, Slack, Notion, Stripe,
         Linear, Jira, and hundreds more — all accessible through AI tool calling after OAuth authentication.
       </p>
+
+      {/* Prev/Next navigation */}
+      <div className="flex items-center justify-between mt-12 pt-6 border-t border-[var(--color-border)]">
+        <Link
+          to="/docs/agents"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Agent System
+        </Link>
+        <Link
+          to="/docs/personal-data"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          Personal Data
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
     </DocsLayout>
   );
 }

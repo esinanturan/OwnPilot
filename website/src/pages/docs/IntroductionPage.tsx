@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { Link } from "react-router";
 import { ArrowRight, Shield, Cpu, Wrench, Bot } from "lucide-react";
+import { CodeBlock } from "@/components/ui/CodeBlock";
 
 export function IntroductionPage() {
   return (
@@ -106,6 +107,28 @@ export function IntroductionPage() {
         and Server-Sent Events. In development mode, Vite runs on port 5173 and proxies API/WebSocket requests to the gateway on 8080.
       </p>
 
+      <h2>What you can do with OwnPilot</h2>
+      <ul>
+        <li>Chat with 96 AI providers (OpenAI, Anthropic, Google, Ollama, and more) through a single interface</li>
+        <li>Manage notes, tasks, calendar, contacts, memories, bookmarks, expenses, and habits — all locally stored</li>
+        <li>Build visual workflows with 23 node types and a Workflow Copilot for AI-assisted creation</li>
+        <li>Create autonomous Soul Agents with personalities, heartbeat schedules, and crew orchestration</li>
+        <li>Connect Telegram and WhatsApp as channel interfaces with full tool access</li>
+        <li>Integrate external tools via MCP client, and expose all tools to Claude Desktop via MCP server</li>
+        <li>Orchestrate Claude Code, Codex CLI, and Gemini CLI as coding agents</li>
+        <li>Control IoT devices (ESP32, RPi, Arduino) via MQTT integration</li>
+        <li>Run 1000+ OAuth app integrations via Composio (GitHub, Slack, Google Drive, Notion, etc.)</li>
+      </ul>
+
+      <h2>Quickstart</h2>
+      <CodeBlock
+        code={`git clone https://github.com/ownpilot/ownpilot.git
+cd ownpilot
+docker compose --profile postgres up -d
+# Open http://localhost:8080 — configure your first AI provider in Settings → Config Center`}
+        language="bash"
+      />
+
       <h2>Next steps</h2>
       <div className="grid sm:grid-cols-2 gap-3">
         {[
@@ -126,6 +149,17 @@ export function IntroductionPage() {
             <ArrowRight className="w-4 h-4 text-[var(--color-text-subtle)] group-hover:text-[hsl(var(--primary))] transition-colors" />
           </Link>
         ))}
+      </div>
+
+      {/* Next navigation */}
+      <div className="flex items-center justify-end mt-12 pt-6 border-t border-[var(--color-border)]">
+        <Link
+          to="/docs/quick-start"
+          className="flex items-center gap-2 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)] transition-colors no-underline"
+        >
+          Quick Start
+          <ArrowRight className="w-4 h-4" />
+        </Link>
       </div>
     </DocsLayout>
   );

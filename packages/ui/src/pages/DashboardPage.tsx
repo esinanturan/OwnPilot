@@ -7,6 +7,7 @@ import {
   FileText,
   Bookmark,
   Repeat,
+  Receipt,
   Users,
   Calendar,
   AlertTriangle,
@@ -151,6 +152,7 @@ export function DashboardPage() {
   const tasksTotal = summary?.tasks.total ?? 0;
   const completionPct = tasksTotal > 0 ? Math.round((tasksCompleted / tasksTotal) * 100) : 0;
   const habits = summary?.habits;
+  const expenses = summary?.expenses;
 
   const stats = summary
     ? [
@@ -229,6 +231,22 @@ export function DashboardPage() {
                 bgColor: 'bg-emerald-500/10',
                 alert: false,
                 link: '/habits',
+              },
+            ]
+          : []),
+        ...(expenses
+          ? [
+              {
+                label: 'Expenses',
+                value: expenses.total,
+                sub: expenses.thisMonth > 0
+                  ? `${expenses.thisMonth.toFixed(0)} this month`
+                  : undefined,
+                icon: Receipt,
+                color: 'text-orange-500',
+                bgColor: 'bg-orange-500/10',
+                alert: false,
+                link: '/expenses',
               },
             ]
           : []),

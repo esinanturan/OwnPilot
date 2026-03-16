@@ -70,14 +70,12 @@ export function PomodoroPage() {
     try {
       const [sessionRes, statsRes] = await Promise.all([
         pomodoroApi.getSession().catch(() => ({ session: null })),
-        pomodoroApi
-          .getStats()
-          .catch(() => ({
-            completedSessions: 0,
-            totalWorkMinutes: 0,
-            totalBreakMinutes: 0,
-            interruptions: 0,
-          })),
+        pomodoroApi.getStats().catch(() => ({
+          completedSessions: 0,
+          totalWorkMinutes: 0,
+          totalBreakMinutes: 0,
+          interruptions: 0,
+        })),
       ]);
       setActiveSession(sessionRes.session);
       setStats(statsRes as PomodoroStats);

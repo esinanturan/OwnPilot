@@ -44,6 +44,7 @@ export interface SummaryData {
   calendar: { total: number; today: number; upcoming: number };
   contacts: { total: number; favorites: number; upcomingBirthdays: number };
   habits?: { total: number; completedToday: number; totalToday: number; percentage: number; bestStreak: number };
+  expenses?: { total: number; thisMonth: number; byCategory: Record<string, { amount: number; count: number }> };
 }
 
 /** GET /api/v1/costs/usage */

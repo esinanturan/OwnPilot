@@ -24,6 +24,7 @@ import {
   Users,
   Bookmark,
   Repeat,
+  Receipt,
   AlertCircle,
   TrendingUp,
   Cpu,
@@ -282,6 +283,19 @@ export function StatsPanel({ isCollapsed, onToggle }: StatsPanelProps) {
                         : undefined
                     }
                     color="text-emerald-500"
+                  />
+                )}
+                {summary.expenses && (
+                  <StatCard
+                    icon={Receipt}
+                    label="Expenses"
+                    value={summary.expenses.total}
+                    subValue={
+                      summary.expenses.thisMonth > 0
+                        ? `${summary.expenses.thisMonth.toFixed(0)} this month`
+                        : undefined
+                    }
+                    color="text-orange-500"
                   />
                 )}
               </div>

@@ -58,7 +58,6 @@ import { StatsPanel } from './StatsPanel';
 import { RealtimeBridge, type BadgeCounts } from './RealtimeBridge';
 import { SecurityBanner } from './SecurityBanner';
 import { usePulseSlots, PulseSlotGrid } from './PulseSlots';
-import { STORAGE_KEYS } from '../constants/storage-keys';
 import { DebugDrawer } from './DebugDrawer';
 import { MiniChat } from './MiniChat';
 import { MiniTerminal } from './MiniTerminal';
@@ -76,8 +75,6 @@ interface NavGroup {
   icon: React.ComponentType<{ className?: string }>;
   items: NavItem[];
   defaultOpen?: boolean;
-  /** If true, hidden in simple mode */
-  advancedOnly?: boolean;
   /** Optional badge text (e.g. "Beta") shown next to group label */
   badge?: string;
 }
@@ -111,7 +108,6 @@ const navGroups: NavGroup[] = [
     id: 'ai',
     label: 'AI & Automation',
     icon: Brain,
-    advancedOnly: true,
     items: [
       { to: '/memories', icon: Brain, label: 'Memories' },
       { to: '/goals', icon: Target, label: 'Goals' },
@@ -128,7 +124,6 @@ const navGroups: NavGroup[] = [
     id: 'tools',
     label: 'Tools & Extensions',
     icon: Wrench,
-    advancedOnly: true,
     items: [
       { to: '/tools', icon: Wrench, label: 'Tools' },
       { to: '/custom-tools', icon: Code, label: 'Custom Tools' },
@@ -140,7 +135,6 @@ const navGroups: NavGroup[] = [
     id: 'system',
     label: 'System',
     icon: Cpu,
-    advancedOnly: true,
     items: [
       { to: '/agents', icon: Bot, label: 'Agents' },
       { to: '/models', icon: Cpu, label: 'Models' },
@@ -190,13 +184,6 @@ const navGroups: NavGroup[] = [
       { to: '/settings/system', icon: Container, label: 'System' },
     ],
   },
-];
-
-// Simple mode shows fewer settings
-const simpleSettingsItems: NavItem[] = [
-  { to: '/settings/api-keys', icon: Key, label: 'API Keys' },
-  { to: '/settings/security', icon: Shield, label: 'Security' },
-  { to: '/settings/ai-models', icon: Cpu, label: 'AI Models' },
 ];
 
 // Bottom navigation items
@@ -287,30 +274,6 @@ function CollapsibleGroup({
   );
 }
 
-function ModeToggle({ isAdvanced, onToggle }: { isAdvanced: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-text-muted dark:text-dark-text-muted hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary transition-colors"
-      title={isAdvanced ? 'Switch to Simple Mode' : 'Switch to Advanced Mode'}
-    >
-      <Settings className="w-3.5 h-3.5 shrink-0" />
-      <span className="flex-1 text-left">{isAdvanced ? 'Advanced Mode' : 'Simple Mode'}</span>
-      <div
-        className={`w-7 h-4 rounded-full transition-colors relative ${
-          isAdvanced ? 'bg-primary' : 'bg-border dark:bg-dark-border'
-        }`}
-      >
-        <div
-          className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
-            isAdvanced ? 'translate-x-3.5' : 'translate-x-0.5'
-          }`}
-        />
-      </div>
-    </button>
-  );
-}
-
 const CONNECTION_STYLES: Record<
   ConnectionStatus,
   { color: string; pulse: boolean; label: string }
@@ -340,9 +303,6 @@ export function Layout() {
   const isMobile = useIsMobile();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isStatsPanelCollapsed, setIsStatsPanelCollapsed] = useState(true);
-  const [isAdvancedMode, setIsAdvancedMode] = useState(() => {
-    return localStorage.getItem(STORAGE_KEYS.ADVANCED_MODE) === 'true';
-  });
   const { slots: pulseSlots } = usePulseSlots();
   const [badgeCounts, setBadgeCounts] = useState<BadgeCounts>({ inbox: 0, tasks: 0 });
   const handleBadgeUpdate = useCallback(
@@ -365,24 +325,6 @@ export function Layout() {
       setBadgeCounts((prev) => (prev.tasks === 0 ? prev : { ...prev, tasks: 0 }));
     }
   }, [location.pathname]);
-
-  // Persist mode preference
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.ADVANCED_MODE, String(isAdvancedMode));
-  }, [isAdvancedMode]);
-
-  // Filter nav groups based on mode
-  const visibleGroups = isAdvancedMode
-    ? navGroups
-    : navGroups
-        .filter((g) => !g.advancedOnly)
-        .map((g) => {
-          // In simple mode, show fewer settings items
-          if (g.id === 'settings') {
-            return { ...g, items: simpleSettingsItems };
-          }
-          return g;
-        });
 
   // Initialize open groups based on current path
   const getInitialOpenGroups = () => {
@@ -505,7 +447,7 @@ export function Layout() {
 
             {/* Grouped Items */}
             <div className="space-y-1">
-              {visibleGroups.map((group) => (
+              {navGroups.map((group) => (
                 <CollapsibleGroup
                   key={group.id}
                   group={group}
@@ -526,12 +468,8 @@ export function Layout() {
             </div>
           </nav>
 
-          {/* Mode Toggle + Status */}
+          {/* Status */}
           <div className="p-2 border-t border-border dark:border-dark-border space-y-1">
-            <ModeToggle
-              isAdvanced={isAdvancedMode}
-              onToggle={() => setIsAdvancedMode(!isAdvancedMode)}
-            />
             {passwordConfigured && (
               <button
                 onClick={() => logout()}
@@ -572,8 +510,8 @@ export function Layout() {
       {/* Floating mini terminal widget (desktop only, hidden on CodingAgentsPage) */}
       {!isMobile && <MiniTerminal />}
 
-      {/* Debug Drawer (advanced mode only) */}
-      {isAdvancedMode && <DebugDrawer />}
+      {/* Debug Drawer */}
+      <DebugDrawer />
     </div>
   );
 }

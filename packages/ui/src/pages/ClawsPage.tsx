@@ -39,6 +39,7 @@ import {
   FileText,
   Download,
   ArrowLeft,
+  Copy,
 } from '../components/icons';
 
 // =============================================================================
@@ -201,6 +202,29 @@ export function ClawsPage() {
     }
   };
 
+  const cloneClaw = async (source: ClawConfig) => {
+    try {
+      await clawsApi.create({
+        name: `${source.name} (copy)`,
+        mission: source.mission,
+        mode: source.mode,
+        sandbox: source.sandbox,
+        provider: source.provider,
+        model: source.model,
+        coding_agent_provider: source.codingAgentProvider,
+        skills: source.skills,
+        allowed_tools: source.allowedTools.length > 0 ? source.allowedTools : undefined,
+        interval_ms: source.intervalMs,
+        event_filters: source.eventFilters,
+        stop_condition: source.stopCondition,
+      });
+      toast.success(`Cloned "${source.name}"`);
+      fetchClaws();
+    } catch {
+      toast.error('Failed to clone claw');
+    }
+  };
+
   const runningCount = claws.filter((c) =>
     c.session && ['running', 'starting', 'waiting'].includes(c.session.state)
   ).length;
@@ -290,6 +314,7 @@ export function ClawsPage() {
                     onResume={() => resumeClaw(claw.id)}
                     onStop={() => stopClaw(claw.id)}
                     onDelete={() => deleteClaw(claw.id, claw.name)}
+                    onClone={() => cloneClaw(claw)}
                     onApproveEscalation={() => approveEscalation(claw.id)}
                     onSelect={() => setSelectedClaw(claw)}
                     isSelected={selectedClaw?.id === claw.id}
@@ -490,6 +515,7 @@ function ClawCard({
   onResume,
   onStop,
   onDelete,
+  onClone,
   onApproveEscalation,
   onSelect,
   isSelected,
@@ -500,6 +526,7 @@ function ClawCard({
   onResume: () => void;
   onStop: () => void;
   onDelete: () => void;
+  onClone: () => void;
   onApproveEscalation: () => void;
   onSelect: () => void;
   isSelected: boolean;
@@ -602,6 +629,13 @@ function ClawCard({
           </button>
         )}
         <div className="flex-1" />
+        <button
+          onClick={(e) => { e.stopPropagation(); onClone(); }}
+          className="p-1.5 rounded hover:bg-blue-500/10 transition-colors"
+          title="Clone"
+        >
+          <Copy className="w-3.5 h-3.5 text-text-muted dark:text-dark-text-muted" />
+        </button>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
           className="p-1.5 rounded hover:bg-red-500/10 transition-colors"
@@ -1259,25 +1293,14 @@ function ClawManagementPanel({
             {!claw.workspaceId ? (
               <p className="text-sm text-text-muted dark:text-dark-text-muted py-4 text-center">No workspace assigned. Start the claw to create one.</p>
             ) : viewingFile ? (
-              /* File viewer */
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <button onClick={() => { setViewingFile(null); setFileContent(null); }}
-                    className="p-1 rounded hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary">
-                    <ArrowLeft className="w-4 h-4 text-text-muted" />
-                  </button>
-                  <FileText className="w-4 h-4 text-text-muted shrink-0" />
-                  <span className="text-sm font-medium text-text-primary dark:text-dark-text-primary truncate">{viewingFile}</span>
-                  <div className="flex-1" />
-                  <a href={`/api/v1/file-workspaces/${claw.workspaceId}/file/${viewingFile}?download=true`}
-                    className="p-1 rounded hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary" title="Download">
-                    <Download className="w-4 h-4 text-text-muted" />
-                  </a>
-                </div>
-                <pre className="text-xs bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-lg p-4 overflow-auto max-h-[400px] whitespace-pre-wrap font-mono text-text-primary dark:text-dark-text-primary">
-                  {fileContent ?? 'Loading...'}
-                </pre>
-              </div>
+              /* File viewer/editor */
+              <FileViewerEditor
+                workspaceId={claw.workspaceId!}
+                filePath={viewingFile}
+                content={fileContent}
+                onBack={() => { setViewingFile(null); setFileContent(null); }}
+                onSaved={() => toast.success('File saved')}
+              />
             ) : (
               /* File browser */
               <div>
@@ -1403,6 +1426,100 @@ function ClawManagementPanel({
         )}
 
       </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// FileViewerEditor — view and edit workspace files
+// =============================================================================
+
+function FileViewerEditor({
+  workspaceId,
+  filePath,
+  content,
+  onBack,
+  onSaved,
+}: {
+  workspaceId: string;
+  filePath: string;
+  content: string | null;
+  onBack: () => void;
+  onSaved: () => void;
+}) {
+  const isEditable = filePath.endsWith('.md') || filePath.endsWith('.txt') || filePath.endsWith('.json') || filePath.endsWith('.yaml') || filePath.endsWith('.yml');
+  const isClawFile = filePath.startsWith('.claw/');
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState(content ?? '');
+  const [isSaving, setIsSaving] = useState(false);
+  const toast = useToast();
+
+  useEffect(() => { setEditContent(content ?? ''); }, [content]);
+
+  const saveFile = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/v1/file-workspaces/${workspaceId}/file/${filePath}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body: editContent,
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setEditing(false);
+      onSaved();
+    } catch { toast.error('Failed to save file'); }
+    finally { setIsSaving(false); }
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-3">
+        <button onClick={onBack} className="p-1 rounded hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary">
+          <ArrowLeft className="w-4 h-4 text-text-muted" />
+        </button>
+        <FileText className="w-4 h-4 text-text-muted shrink-0" />
+        <span className="text-sm font-medium text-text-primary dark:text-dark-text-primary truncate">{filePath}</span>
+        {isClawFile && <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary rounded">directive</span>}
+        <div className="flex-1" />
+        {isEditable && !editing && (
+          <button onClick={() => setEditing(true)}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+            Edit
+          </button>
+        )}
+        {editing && (
+          <button onClick={saveFile} disabled={isSaving}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-primary text-white hover:bg-primary/90 disabled:opacity-50">
+            <Save className="w-3 h-3" />{isSaving ? 'Saving...' : 'Save'}
+          </button>
+        )}
+        {editing && (
+          <button onClick={() => { setEditing(false); setEditContent(content ?? ''); }}
+            className="px-2 py-1 text-xs rounded text-text-muted hover:text-text-primary">
+            Cancel
+          </button>
+        )}
+        <a href={`/api/v1/file-workspaces/${workspaceId}/file/${filePath}?download=true`}
+          className="p-1 rounded hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary" title="Download">
+          <Download className="w-4 h-4 text-text-muted" />
+        </a>
+      </div>
+
+      {/* Content */}
+      {editing ? (
+        <textarea
+          value={editContent}
+          onChange={(e) => setEditContent(e.target.value)}
+          className="w-full text-xs bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-lg p-4 font-mono text-text-primary dark:text-dark-text-primary resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
+          style={{ minHeight: '300px', maxHeight: '500px' }}
+          spellCheck={false}
+        />
+      ) : (
+        <pre className="text-xs bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-lg p-4 overflow-auto max-h-[400px] whitespace-pre-wrap font-mono text-text-primary dark:text-dark-text-primary">
+          {content ?? 'Loading...'}
+        </pre>
+      )}
     </div>
   );
 }

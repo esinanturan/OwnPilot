@@ -81,11 +81,27 @@ healthRoutes.get('/', async (c) => {
   const hasWarnings = checks.some((check) => check.status === 'warn');
   const hasFails = checks.some((check) => check.status === 'fail');
 
+  // Claw stats
+  let clawStats: { total: number; running: number; paused: number; waiting: number } | null = null;
+  try {
+    const { getClawManager } = await import('../services/claw-manager.js');
+    const sessions = getClawManager().getAllSessions();
+    clawStats = {
+      total: sessions.length,
+      running: sessions.filter((s) => s.state === 'running').length,
+      paused: sessions.filter((s) => s.state === 'paused').length,
+      waiting: sessions.filter((s) => s.state === 'waiting').length,
+    };
+  } catch {
+    // ClawManager not initialized
+  }
+
   return apiResponse(c, {
     status: hasFails ? 'degraded' : allPassing ? 'healthy' : hasWarnings ? 'degraded' : 'unhealthy',
     version: VERSION,
     uptime,
     checks,
+    claws: clawStats,
     database: databaseStatus,
     sandbox: {
       dockerAvailable: sandboxStatus?.dockerAvailable ?? false,

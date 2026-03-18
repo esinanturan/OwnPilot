@@ -64,6 +64,40 @@ clawRoutes.get('/', async (c) => {
   }
 });
 
+// GET /stats - Aggregate claw statistics
+clawRoutes.get('/stats', async (c) => {
+  try {
+    const userId = getUserId(c);
+    const service = getClawService();
+    const configs = await service.listClaws(userId);
+    const sessions = service.listSessions(userId);
+
+    const totalCost = sessions.reduce((s, ses) => s + ses.totalCostUsd, 0);
+    const totalCycles = sessions.reduce((s, ses) => s + ses.cyclesCompleted, 0);
+    const totalToolCalls = sessions.reduce((s, ses) => s + ses.totalToolCalls, 0);
+
+    const byMode: Record<string, number> = {};
+    const byState: Record<string, number> = {};
+    for (const c of configs) {
+      byMode[c.mode] = (byMode[c.mode] ?? 0) + 1;
+      const state = sessions.find((s) => s.config.id === c.id)?.state ?? 'stopped';
+      byState[state] = (byState[state] ?? 0) + 1;
+    }
+
+    return apiResponse(c, {
+      total: configs.length,
+      running: sessions.filter((s) => ['running', 'starting', 'waiting'].includes(s.state)).length,
+      totalCost: Math.round(totalCost * 10000) / 10000,
+      totalCycles,
+      totalToolCalls,
+      byMode,
+      byState,
+    });
+  } catch (err) {
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
+  }
+});
+
 // POST / - Create a new claw
 clawRoutes.post('/', async (c) => {
   try {

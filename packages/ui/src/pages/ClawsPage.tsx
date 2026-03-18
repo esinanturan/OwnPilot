@@ -628,7 +628,7 @@ interface ClawOutputEvent {
   timestamp: string;
 }
 
-type DetailTab = 'overview' | 'settings' | 'skills' | 'files' | 'history' | 'output';
+type DetailTab = 'overview' | 'settings' | 'skills' | 'files' | 'history' | 'output' | 'conversation';
 
 const DETAIL_TABS: { id: DetailTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'overview', label: 'Overview', icon: Activity },
@@ -637,6 +637,7 @@ const DETAIL_TABS: { id: DetailTab; label: string; icon: React.ComponentType<{ c
   { id: 'files', label: 'Files', icon: FolderOpen },
   { id: 'history', label: 'History', icon: Clock },
   { id: 'output', label: 'Output', icon: Send },
+  { id: 'conversation', label: 'Chat', icon: Bot },
 ];
 
 function ClawManagementPanel({
@@ -674,6 +675,10 @@ function ClawManagementPanel({
   const [selectedSkills, setSelectedSkills] = useState<string[]>(claw.skills ?? []);
   const [isSavingSkills, setIsSavingSkills] = useState(false);
 
+  // Conversation state
+  const [conversation, setConversation] = useState<Array<{ role: string; content: string; createdAt?: string }>>([]);
+  const [isLoadingConvo, setIsLoadingConvo] = useState(false);
+
   // Files state
   const [workspaceFiles, setWorkspaceFiles] = useState<Array<{ name: string; path: string; isDirectory: boolean; size: number; modifiedAt: string }>>([]);
   const [currentFilePath, setCurrentFilePath] = useState('');
@@ -710,6 +715,7 @@ function ClawManagementPanel({
     setCurrentFilePath('');
     setFileContent(null);
     setViewingFile(null);
+    setConversation([]);
   }, [claw.id]);
 
   // WS output feed
@@ -723,6 +729,18 @@ function ClawManagementPanel({
   // Load history on tab switch
   useEffect(() => {
     if (tab === 'history') loadHistory();
+  }, [tab, claw.id]);
+
+  // Load conversation on conversation tab
+  useEffect(() => {
+    if (tab === 'conversation') {
+      setIsLoadingConvo(true);
+      fetch(`/api/v1/chat/claw-${claw.id}/messages?limit=50`)
+        .then((r) => r.ok ? r.json() : { data: [] })
+        .then((body) => setConversation(body.data ?? []))
+        .catch(() => setConversation([]))
+        .finally(() => setIsLoadingConvo(false));
+    }
   }, [tab, claw.id]);
 
   // Load files on files tab
@@ -873,6 +891,43 @@ function ClawManagementPanel({
         {/* ===== OVERVIEW TAB ===== */}
         {tab === 'overview' && (
           <>
+            {/* Live status banner */}
+            {claw.session && ['running', 'starting'].includes(claw.session.state) && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                <div className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                    Claw is running
+                    {claw.session.lastCycleAt && ` · last cycle ${timeAgo(claw.session.lastCycleAt)}`}
+                  </p>
+                  <p className="text-xs text-green-600/70 dark:text-green-500/70">
+                    Mode: {claw.mode}
+                    {claw.mode === 'interval' && claw.intervalMs && ` · every ${Math.round((claw.intervalMs) / 1000)}s`}
+                    {claw.mode === 'event' && ' · waiting for events'}
+                  </p>
+                </div>
+              </div>
+            )}
+            {claw.session?.state === 'waiting' && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                <div className="relative flex h-3 w-3">
+                  <span className="animate-pulse relative inline-flex rounded-full h-3 w-3 bg-cyan-500" />
+                </div>
+                <p className="text-sm text-cyan-700 dark:text-cyan-400">
+                  Waiting for event{claw.eventFilters?.length ? `: ${claw.eventFilters.join(', ')}` : ''}
+                </p>
+              </div>
+            )}
+            {claw.session?.lastCycleError && (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+                <p className="text-xs text-red-600 dark:text-red-400 truncate">Last error: {claw.session.lastCycleError}</p>
+              </div>
+            )}
+
             {/* Mission */}
             <div>
               <p className={lbl}>Mission</p>
@@ -1207,6 +1262,36 @@ function ClawManagementPanel({
           </>
         )}
 
+        {/* ===== CONVERSATION TAB ===== */}
+        {tab === 'conversation' && (
+          <>
+            <p className="text-xs text-text-muted dark:text-dark-text-muted mb-3">
+              Messages stored by claw_send_output and claw_complete_report in the claw's conversation.
+            </p>
+            {isLoadingConvo ? <LoadingSpinner message="Loading..." /> : conversation.length === 0 ? (
+              <p className="text-sm text-text-muted dark:text-dark-text-muted py-4 text-center">No conversation messages yet. The claw will write here when it uses claw_send_output or claw_complete_report.</p>
+            ) : (
+              <div className="space-y-3">
+                {conversation.map((msg, i) => (
+                  <div key={i} className={`p-3 rounded-lg ${
+                    msg.role === 'assistant'
+                      ? 'bg-primary/5 border border-primary/10'
+                      : 'bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase">{msg.role}</span>
+                      {msg.createdAt && <span className="text-xs text-text-muted dark:text-dark-text-muted">{timeAgo(msg.createdAt)}</span>}
+                    </div>
+                    <div className="text-sm text-text-primary dark:text-dark-text-primary whitespace-pre-wrap leading-relaxed">
+                      {msg.content.length > 2000 ? msg.content.slice(0, 2000) + '...' : msg.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
       </div>
     </div>
   );
@@ -1215,6 +1300,66 @@ function ClawManagementPanel({
 // =============================================================================
 // CreateClawModal
 // =============================================================================
+
+const CLAW_TEMPLATES: Array<{
+  name: string;
+  icon: string;
+  mission: string;
+  mode: 'continuous' | 'interval' | 'event' | 'single-shot';
+  sandbox: 'auto' | 'docker' | 'local';
+  codingAgent?: string;
+  description: string;
+}> = [
+  {
+    name: 'Research Agent',
+    icon: '🔍',
+    mission: 'Research the given topic thoroughly using web search, browse relevant pages, extract key information, and compile a comprehensive report with sources.',
+    mode: 'single-shot',
+    sandbox: 'auto',
+    description: 'Web research with final report',
+  },
+  {
+    name: 'Code Reviewer',
+    icon: '🔎',
+    mission: 'Review the codebase for quality issues, security vulnerabilities, performance problems, and best practice violations. Use CLI tools (eslint, tsc) and coding agents to analyze. Produce a detailed review report.',
+    mode: 'single-shot',
+    sandbox: 'local',
+    codingAgent: 'claude-code',
+    description: 'Deep code review with CLI tools',
+  },
+  {
+    name: 'Data Analyst',
+    icon: '📊',
+    mission: 'Analyze the provided data using Python scripts. Install necessary packages (pandas, matplotlib), process data, generate charts as artifacts, and write an analysis report.',
+    mode: 'single-shot',
+    sandbox: 'docker',
+    description: 'Python-powered data analysis',
+  },
+  {
+    name: 'Monitor & Alert',
+    icon: '🔔',
+    mission: 'Periodically check the specified URLs/APIs for availability, response time, and content changes. Send alerts via claw_send_output when issues are detected.',
+    mode: 'interval',
+    sandbox: 'auto',
+    description: 'Periodic health checks with alerts',
+  },
+  {
+    name: 'Content Creator',
+    icon: '✍️',
+    mission: 'Create high-quality content based on the brief. Research the topic, write drafts, refine, and publish final content as artifacts. Support HTML, Markdown, and SVG formats.',
+    mode: 'single-shot',
+    sandbox: 'auto',
+    description: 'Write and publish content',
+  },
+  {
+    name: 'Event Reactor',
+    icon: '⚡',
+    mission: 'Listen for system events and react intelligently. Process incoming data, make decisions, update goals, and coordinate with other claws via messaging.',
+    mode: 'event',
+    sandbox: 'auto',
+    description: 'Event-driven reactive automation',
+  },
+];
 
 function CreateClawModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState('');
@@ -1317,6 +1462,44 @@ function CreateClawModal({ onClose, onCreated }: { onClose: () => void; onCreate
         </div>
 
         <div className="space-y-4">
+          {/* Templates */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-2">
+              Start from template
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {CLAW_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.name}
+                  type="button"
+                  onClick={() => {
+                    setName(tpl.name);
+                    setMission(tpl.mission);
+                    setMode(tpl.mode);
+                    setSandbox(tpl.sandbox);
+                    if (tpl.codingAgent) setCodingAgent(tpl.codingAgent);
+                  }}
+                  className={`flex flex-col items-center gap-1 p-3 rounded-lg border transition-all text-center ${
+                    name === tpl.name
+                      ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                      : 'border-border dark:border-dark-border hover:border-primary/40 hover:bg-bg-secondary dark:hover:bg-dark-bg-secondary'
+                  }`}
+                >
+                  <span className="text-xl">{tpl.icon}</span>
+                  <span className="text-xs font-medium text-text-primary dark:text-dark-text-primary">{tpl.name}</span>
+                  <span className="text-[10px] text-text-muted dark:text-dark-text-muted leading-tight">{tpl.description}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 border-t border-border dark:border-dark-border" />
+            <span className="text-xs text-text-muted dark:text-dark-text-muted">or customize</span>
+            <div className="flex-1 border-t border-border dark:border-dark-border" />
+          </div>
+
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-text-secondary dark:text-dark-text-secondary mb-1">

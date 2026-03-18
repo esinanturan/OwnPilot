@@ -36,3 +36,8 @@ export { CREW_TOOLS, CREW_TOOL_NAMES, executeCrewTool } from './crew-tools.js';
 export { HABIT_TOOLS, HABIT_TOOL_NAMES, executeHabitTool } from './habit-tools.js';
 export { FLEET_TOOLS, executeFleetTool } from './fleet-tools.js';
 export { CLAW_TOOLS, CLAW_TOOL_NAMES, executeClawTool } from './claw-tools.js';
+export {
+  CLAW_MANAGEMENT_TOOLS,
+  CLAW_MANAGEMENT_TOOL_NAMES,
+  executeClawManagementTool,
+} from './claw-management-tools.js';

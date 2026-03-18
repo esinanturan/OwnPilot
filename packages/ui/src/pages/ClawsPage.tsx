@@ -46,6 +46,16 @@ import {
 // Helpers
 // =============================================================================
 
+/** Fetch with session token auth */
+function authedFetch(url: string, init?: RequestInit): Promise<Response> {
+  const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) };
+  try {
+    const token = localStorage.getItem('ownpilot-session-token');
+    if (token) headers['X-Session-Token'] = token;
+  } catch { /* ignore */ }
+  return fetch(url, { ...init, headers });
+}
+
 function getStateBadge(state: ClawState | null): { text: string; classes: string } {
   switch (state) {
     case 'running':
@@ -783,7 +793,7 @@ function ClawManagementPanel({
     setIsLoadingAudit(true);
     try {
       const qs = cat ? `?limit=50&category=${cat}` : '?limit=50';
-      const res = await fetch(`/api/v1/claws/${claw.id}/audit${qs}`);
+      const res = await authedFetch(`/api/v1/claws/${claw.id}/audit${qs}`);
       if (res.ok) {
         const body = await res.json();
         setAuditEntries(body.data?.entries ?? []);
@@ -801,7 +811,7 @@ function ClawManagementPanel({
   useEffect(() => {
     if (tab === 'conversation') {
       setIsLoadingConvo(true);
-      fetch(`/api/v1/chat/claw-${claw.id}/messages?limit=50`)
+      authedFetch(`/api/v1/chat/claw-${claw.id}/messages?limit=50`)
         .then((r) => r.ok ? r.json() : { data: [] })
         .then((body) => setConversation(body.data ?? []))
         .catch(() => setConversation([]))
@@ -827,7 +837,7 @@ function ClawManagementPanel({
   const loadFileContent = async (filePath: string) => {
     if (!claw.workspaceId) return;
     try {
-      const res = await fetch(`/api/v1/file-workspaces/${claw.workspaceId}/file/${filePath}?raw=true`);
+      const res = await authedFetch(`/api/v1/file-workspaces/${claw.workspaceId}/file/${filePath}?raw=true`);
       if (!res.ok) { setFileContent('(failed to read file)'); return; }
       const text = await res.text();
       setFileContent(text);
@@ -1459,7 +1469,7 @@ function FileViewerEditor({
   const saveFile = async () => {
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/v1/file-workspaces/${workspaceId}/file/${filePath}`, {
+      const res = await authedFetch(`/api/v1/file-workspaces/${workspaceId}/file/${filePath}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/octet-stream' },
         body: editContent,

@@ -351,4 +351,11 @@ export const TOOL_SEARCH_TAGS: Record<string, readonly string[]> = {
   claw_update_config: ['claw', 'config', 'update', 'self', 'adapt', 'modify', 'settings'],
   claw_send_agent_message: ['claw', 'message', 'send', 'agent', 'communicate', 'inbox'],
   claw_reflect: ['claw', 'reflect', 'evaluate', 'introspect', 'performance', 'progress'],
+  create_claw: ['claw', 'create', 'agent', 'autonomous', 'spawn', 'new'],
+  list_claws: ['claw', 'list', 'status', 'agents', 'running'],
+  start_claw: ['claw', 'start', 'run', 'begin', 'launch'],
+  stop_claw: ['claw', 'stop', 'halt', 'terminate'],
+  get_claw_status: ['claw', 'status', 'info', 'details', 'check'],
+  message_claw: ['claw', 'message', 'send', 'inbox', 'communicate'],
+  get_claw_history: ['claw', 'history', 'results', 'cycles', 'log'],
 };

@@ -216,6 +216,16 @@ export function ClawsPage() {
     }
   };
 
+  const denyEscalation = async (id: string) => {
+    try {
+      await clawsApi.denyEscalation(id);
+      toast.success('Escalation denied — claw resumed without the request');
+      fetchClaws();
+    } catch {
+      toast.error('Failed to deny escalation');
+    }
+  };
+
   const cloneClaw = async (source: ClawConfig) => {
     try {
       await clawsApi.create({
@@ -258,7 +268,7 @@ export function ClawsPage() {
   };
 
   const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) { n.delete(id); } else { n.add(id); } return n; });
   };
 
   // Filtering
@@ -413,6 +423,7 @@ export function ClawsPage() {
                     onDelete={() => deleteClaw(claw.id, claw.name)}
                     onClone={() => cloneClaw(claw)}
                     onApproveEscalation={() => approveEscalation(claw.id)}
+                    onDenyEscalation={() => denyEscalation(claw.id)}
                     onSelect={() => setSelectedClaw(claw)}
                     isSelected={selectedClaw?.id === claw.id}
                     isChecked={selectedIds.has(claw.id)}
@@ -616,6 +627,7 @@ function ClawCard({
   onDelete,
   onClone,
   onApproveEscalation,
+  onDenyEscalation,
   onSelect,
   isSelected,
   isChecked,
@@ -629,6 +641,7 @@ function ClawCard({
   onDelete: () => void;
   onClone: () => void;
   onApproveEscalation: () => void;
+  onDenyEscalation: () => void;
   isChecked?: boolean;
   onToggleCheck?: () => void;
   onSelect: () => void;
@@ -692,12 +705,20 @@ function ClawCard({
           <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">
             {claw.session.pendingEscalation.type}: {claw.session.pendingEscalation.reason}
           </p>
-          <button
-            onClick={(e) => { e.stopPropagation(); onApproveEscalation(); }}
-            className="mt-1.5 px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors"
-          >
-            Approve
-          </button>
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <button
+              onClick={(e) => { e.stopPropagation(); onApproveEscalation(); }}
+              className="px-2 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors"
+            >
+              Approve
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDenyEscalation(); }}
+              className="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              Deny
+            </button>
+          </div>
         </div>
       )}
 
@@ -848,6 +869,26 @@ function ClawManagementPanel({
   const toast = useToast();
   const { subscribe } = useGateway();
 
+  const approveEscalation = async (id: string) => {
+    try {
+      await clawsApi.approveEscalation(id);
+      toast.success('Escalation approved');
+      onUpdate();
+    } catch {
+      toast.error('Failed to approve escalation');
+    }
+  };
+
+  const denyEscalation = async (id: string) => {
+    try {
+      await clawsApi.denyEscalation(id);
+      toast.success('Escalation denied — claw resumed without the request');
+      onUpdate();
+    } catch {
+      toast.error('Failed to deny escalation');
+    }
+  };
+
   // Reset state when claw changes
   useEffect(() => {
     setHistory([]);
@@ -893,13 +934,9 @@ function ClawManagementPanel({
   const loadAudit = useCallback(async (cat?: string) => {
     setIsLoadingAudit(true);
     try {
-      const qs = cat ? `?limit=50&category=${cat}` : '?limit=50';
-      const res = await authedFetch(`/api/v1/claws/${claw.id}/audit${qs}`);
-      if (res.ok) {
-        const body = await res.json();
-        setAuditEntries(body.data?.entries ?? []);
-        setAuditTotal(body.data?.total ?? 0);
-      }
+      const result = await clawsApi.getAuditLog(claw.id, 50, 0, cat || undefined);
+      setAuditEntries(result.entries);
+      setAuditTotal(result.total);
     } catch { /* ignore */ }
     finally { setIsLoadingAudit(false); }
   }, [claw.id]);
@@ -1176,6 +1213,20 @@ function ClawManagementPanel({
               <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
                 <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Escalation Pending</p>
                 <p className="text-xs text-purple-500 mt-1">{claw.session.pendingEscalation.type}: {claw.session.pendingEscalation.reason}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    onClick={() => approveEscalation(claw.id)}
+                    className="px-3 py-1 text-xs bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors font-medium"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => denyEscalation(claw.id)}
+                    className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors font-medium"
+                  >
+                    Deny
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1614,7 +1665,7 @@ function FileBrowser({
               key={file.path}
               onClick={() => {
                 const fPath = currentPath ? `${currentPath}/${file.name}` : file.name;
-                file.isDirectory ? onNavigate(fPath) : onOpenFile(fPath);
+                if (file.isDirectory) { onNavigate(fPath); } else { onOpenFile(fPath); }
               }}
               className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-bg-secondary dark:hover:bg-dark-bg-secondary transition-colors text-left"
             >

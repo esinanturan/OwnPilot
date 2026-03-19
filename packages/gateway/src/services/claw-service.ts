@@ -141,6 +141,10 @@ export class ClawServiceImpl implements IClawService {
     return getClawManager().approveEscalation(clawId);
   }
 
+  async denyEscalation(clawId: string, _userId: string, reason?: string): Promise<boolean> {
+    return getClawManager().denyEscalation(clawId, reason);
+  }
+
   // ---- Service lifecycle ----
 
   async start(): Promise<void> {

@@ -123,6 +123,8 @@ function setupRepo(config: ClawConfig) {
     update: vi.fn().mockResolvedValue(config),
     create: vi.fn().mockResolvedValue(config),
     delete: vi.fn().mockResolvedValue(true),
+    cleanupOldHistory: vi.fn().mockResolvedValue(0),
+    cleanupOldAuditLog: vi.fn().mockResolvedValue(0),
   };
   mockGetClawsRepo.mockReturnValue(repo);
   return repo;
@@ -403,7 +405,7 @@ describe('ClawManager', () => {
   });
 
   describe('resource limits', () => {
-    it('should auto-pause on consecutive errors', async () => {
+    it('should auto-fail on consecutive errors', async () => {
       const config = makeConfig({ mode: 'continuous' });
       setupRepo(config);
 
@@ -413,13 +415,14 @@ describe('ClawManager', () => {
 
       await manager.startClaw('claw-1', 'user-1');
 
-      // Run enough cycles to trigger auto-pause (5 consecutive errors)
+      // Run enough cycles to trigger auto-fail (5 consecutive errors)
       // Continuous error backoff is MAX_DELAY (10s), so advance enough time
       for (let i = 0; i < 6; i++) {
         await vi.advanceTimersByTimeAsync(11_000);
       }
 
-      expect(manager.getSession('claw-1')?.state).toBe('paused');
+      // After 5 consecutive errors, claw is auto-failed and removed from active claws
+      expect(manager.getSession('claw-1')).toBeNull();
     });
   });
 

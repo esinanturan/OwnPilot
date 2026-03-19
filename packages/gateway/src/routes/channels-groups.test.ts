@@ -14,13 +14,16 @@ import { requestId } from '../middleware/request-id.js';
 import { errorHandler } from '../middleware/error-handler.js';
 
 // Mock Channel Service
-const mockGetChannel = vi.fn();
-const mockGetStatus = vi.fn();
-const mockListGroups = vi.fn();
-const mockGetGroup = vi.fn();
-const mockFetchGroupHistory = vi.fn();
+const { mockGetChannel, mockGetStatus, mockListGroups, mockGetGroup, mockFetchGroupHistory } = vi.hoisted(() => ({
+  mockGetChannel: vi.fn(),
+  mockGetStatus: vi.fn(),
+  mockListGroups: vi.fn(),
+  mockGetGroup: vi.fn(),
+  mockFetchGroupHistory: vi.fn(),
+}));
 
-vi.mock('@ownpilot/core', () => ({
+vi.mock('@ownpilot/core', async (importOriginal) => ({
+  ...await importOriginal<Record<string, unknown>>(),
   getChannelService: vi.fn().mockReturnValue({
     getChannel: mockGetChannel,
   }),

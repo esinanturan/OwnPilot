@@ -2,11 +2,12 @@
  * Claws Widget - Shows active claws with status, cycles, cost
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Zap, Play, Pause, Square, AlertCircle, Clock, DollarSign, RefreshCw } from '../icons';
-import { clawsApi, type ClawConfig } from '../../api';
+import { clawsApi, type ClawConfig, type ClawState } from '../../api';
 import { Skeleton } from '../Skeleton';
+import { useGateway } from '../../hooks/useWebSocket';
 
 function getStateColor(state: string): string {
   switch (state) {
@@ -50,22 +51,55 @@ export function ClawsWidget({ limit = 6 }: ClawsWidgetProps) {
   const [claws, setClaws] = useState<ClawConfig[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { subscribe } = useGateway();
+
+  const fetchData = useCallback(async () => {
+    try {
+      setError(null);
+      const result = await clawsApi.list();
+      setClaws(result);
+    } catch {
+      setError('Failed to load claws');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setError(null);
-        const result = await clawsApi.list();
-        setClaws(result);
-      } catch {
-        setError('Failed to load claws');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchData();
-  }, []);
+  }, [fetchData]);
+
+  // Live updates via WebSocket
+  useEffect(() => {
+    const unsubs = [
+      subscribe<{ clawId: string; state: ClawState; cyclesCompleted?: number; totalToolCalls?: number; totalCostUsd?: number; lastCycleAt?: string }>(
+        'claw.update',
+        (data) => {
+          setClaws((prev) =>
+            prev.map((c) => {
+              if (c.id !== data.clawId) return c;
+              return {
+                ...c,
+                session: c.session
+                  ? {
+                      ...c.session,
+                      state: data.state ?? c.session.state,
+                      cyclesCompleted: data.cyclesCompleted ?? c.session.cyclesCompleted,
+                      totalToolCalls: data.totalToolCalls ?? c.session.totalToolCalls,
+                      totalCostUsd: data.totalCostUsd ?? c.session.totalCostUsd,
+                      lastCycleAt: data.lastCycleAt ?? c.session.lastCycleAt,
+                    }
+                  : null,
+              };
+            })
+          );
+        }
+      ),
+      subscribe('claw.started', () => fetchData()),
+      subscribe('claw.stopped', () => fetchData()),
+    ];
+    return () => unsubs.forEach((u) => u());
+  }, [subscribe, fetchData]);
 
   const displayClaws = claws.slice(0, limit);
   const runningCount = claws.filter(

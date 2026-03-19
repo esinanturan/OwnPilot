@@ -304,6 +304,28 @@ clawRoutes.post('/:id/approve-escalation', async (c) => {
   }
 });
 
+// POST /:id/deny-escalation
+clawRoutes.post('/:id/deny-escalation', async (c) => {
+  try {
+    const userId = getUserId(c);
+    const { id } = c.req.param();
+    const body = await c.req.json().catch(() => ({}));
+    const reason = typeof body.reason === 'string' ? body.reason : undefined;
+    const service = getClawService();
+
+    const denied = await service.denyEscalation(id, userId, reason);
+    if (!denied) {
+      return apiError(c, {
+        code: ERROR_CODES.NOT_FOUND,
+        message: 'No pending escalation or claw not found',
+      }, 404);
+    }
+    return apiResponse(c, { denied: true });
+  } catch (err) {
+    return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);
+  }
+});
+
 // =============================================================================
 // 3. GENERIC DYNAMIC ROUTE (must be last)
 // =============================================================================
@@ -357,6 +379,11 @@ clawRoutes.put('/:id', async (c) => {
     if (!updated) {
       return apiError(c, { code: ERROR_CODES.NOT_FOUND, message: 'Claw not found' }, 404);
     }
+
+    // Hot-reload in-memory config so changes take effect without restart
+    const { getClawManager } = await import('../services/claw-manager.js');
+    getClawManager().updateClawConfig(id, updated);
+
     return apiResponse(c, updated);
   } catch (err) {
     return apiError(c, { code: ERROR_CODES.INTERNAL_ERROR, message: getErrorMessage(err) }, 500);

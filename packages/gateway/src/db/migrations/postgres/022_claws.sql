@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS claws (
   user_id TEXT NOT NULL DEFAULT 'default',
   name TEXT NOT NULL,
   mission TEXT NOT NULL,
-  mode TEXT NOT NULL DEFAULT 'cyclic',
+  mode TEXT NOT NULL DEFAULT 'continuous',
   allowed_tools JSONB DEFAULT '[]',
   limits JSONB NOT NULL DEFAULT '{}',
   interval_ms INTEGER,

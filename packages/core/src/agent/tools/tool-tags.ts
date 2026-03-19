@@ -351,6 +351,8 @@ export const TOOL_SEARCH_TAGS: Record<string, readonly string[]> = {
   claw_update_config: ['claw', 'config', 'update', 'self', 'adapt', 'modify', 'settings'],
   claw_send_agent_message: ['claw', 'message', 'send', 'agent', 'communicate', 'inbox'],
   claw_reflect: ['claw', 'reflect', 'evaluate', 'introspect', 'performance', 'progress'],
+  claw_set_context: ['claw', 'context', 'set', 'memory', 'persistent', 'working memory', 'state'],
+  claw_get_context: ['claw', 'context', 'get', 'memory', 'retrieve', 'working memory', 'state'],
   create_claw: ['claw', 'create', 'agent', 'autonomous', 'spawn', 'new'],
   list_claws: ['claw', 'list', 'status', 'agents', 'running'],
   start_claw: ['claw', 'start', 'run', 'begin', 'launch'],

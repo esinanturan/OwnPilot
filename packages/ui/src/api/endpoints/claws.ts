@@ -154,6 +154,39 @@ export const clawsApi = {
       `/claws/${id}/history?limit=${limit}&offset=${offset}`
     ),
 
+  getAuditLog: (id: string, limit = 50, offset = 0, category?: string) =>
+    apiClient.get<{
+      entries: Array<{
+        id: string;
+        clawId: string;
+        cycleNumber: number;
+        toolName: string;
+        toolArgs: Record<string, unknown>;
+        toolResult: string;
+        success: boolean;
+        durationMs: number;
+        category: string;
+        executedAt: string;
+      }>;
+      total: number;
+    }>(
+      `/claws/${id}/audit?limit=${limit}&offset=${offset}${category ? `&category=${encodeURIComponent(category)}` : ''}`
+    ),
+
+  stats: () =>
+    apiClient.get<{
+      total: number;
+      running: number;
+      totalCost: number;
+      totalCycles: number;
+      totalToolCalls: number;
+      byMode: Record<string, number>;
+      byState: Record<string, number>;
+    }>('/claws/stats'),
+
   approveEscalation: (id: string) =>
     apiClient.post<{ approved: boolean }>(`/claws/${id}/approve-escalation`),
+
+  denyEscalation: (id: string, reason?: string) =>
+    apiClient.post<{ denied: boolean }>(`/claws/${id}/deny-escalation`, reason ? { reason } : {}),
 };

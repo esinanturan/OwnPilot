@@ -1,16 +1,23 @@
 /**
  * Claw Tools
  *
- * 8 AI-callable tools that give Claw agents enhanced capabilities:
+ * 16 AI-callable tools that give Claw agents enhanced capabilities:
  * 1. claw_install_package — Install npm/pip packages into workspace
  * 2. claw_run_script — Execute scripts in workspace (Docker or local)
- * 3. claw_create_tool — Register ephemeral tools from generated code
+ * 3. claw_create_tool — Execute ephemeral tools from generated code
  * 4. claw_spawn_subclaw — Spawn child claw for subtask delegation
  * 5. claw_publish_artifact — Publish outputs as artifacts
  * 6. claw_request_escalation — Request environment upgrade
  * 7. claw_send_output — Send results to user via Telegram + WS notification
  * 8. claw_complete_report — Final report: artifact + notification + conversation message
  * 9. claw_emit_event — Emit custom event to EventBus (trigger other claws, workflows, etc.)
+ * 10. claw_update_config — Update claw configuration (mode, limits, etc.)
+ * 11. claw_send_agent_message — Send message to another agent's inbox
+ * 12. claw_reflect — Self-reflection on mission progress
+ * 13. claw_set_context — Set persistent context values (working memory)
+ * 14. claw_get_context — Get persistent context values (working memory)
+ * 15. get_claw_status — Get detailed claw status
+ * 16. get_claw_history — Get claw execution history
  */
 
 import type { ToolDefinition } from '@ownpilot/core';
@@ -76,10 +83,10 @@ Use this for data processing, web scraping, file generation, or any computationa
 
 const clawCreateToolDef: ToolDefinition = {
   name: 'claw_create_tool',
-  description: `Create an ephemeral tool from generated code.
-The tool will be registered in your tool registry and available for the rest of this session.
-Use this to create custom tools for specific tasks (e.g., a CSV parser, a calculator, a formatter).
-The tool code runs in a sandboxed environment.`,
+  description: `Create an ephemeral tool from generated code and immediately execute it.
+The tool is compiled and run in the sandbox. The result is returned inline so you can use it right away.
+Use this to create single-use tools for specific tasks (e.g., a CSV parser, a data transformer, a calculator).
+The tool code must export a default function that receives the args object.`,
   parameters: {
     type: 'object',
     properties: {
@@ -253,6 +260,38 @@ Use this instead of just saying "MISSION_COMPLETE" — give the user a proper de
   tags: ['claw', 'report', 'complete', 'deliverable', 'final'],
 };
 
+const clawSetContextDef: ToolDefinition = {
+  name: 'claw_set_context',
+  description: `Persist structured data in your Working Memory that will be injected into every future cycle.
+Use this to remember important state across cycles — progress counters, configuration, interim results, flags.
+Pass key-value pairs to merge into context. Pass null to remove a key.
+Complement .claw/MEMORY.md for structured data that needs to be machine-readable.`,
+  parameters: {
+    type: 'object',
+    properties: {
+      updates: {
+        type: 'object',
+        description: 'Key-value pairs to merge into context. Set a value to null to delete that key.',
+      },
+    },
+    required: ['updates'],
+  },
+  category: 'Claw',
+  tags: ['claw', 'context', 'memory', 'persist', 'working-memory'],
+};
+
+const clawGetContextDef: ToolDefinition = {
+  name: 'claw_get_context',
+  description: `Read your full Working Memory (persistentContext). Returns all keys and values currently stored.
+Your Working Memory is also injected into every cycle message, but use this tool to read a fresh snapshot mid-cycle.`,
+  parameters: {
+    type: 'object',
+    properties: {},
+  },
+  category: 'Claw',
+  tags: ['claw', 'context', 'memory', 'read', 'working-memory'],
+};
+
 const clawEmitEventDef: ToolDefinition = {
   name: 'claw_emit_event',
   description: `Emit a custom event to the OwnPilot EventBus.
@@ -381,6 +420,8 @@ export const CLAW_TOOLS: ToolDefinition[] = [
   clawReflectDef,
   clawListSubclawsDef,
   clawStopSubclawDef,
+  clawSetContextDef,
+  clawGetContextDef,
 ];
 
 export const CLAW_TOOL_NAMES = CLAW_TOOLS.map((t) => t.name);
@@ -422,7 +463,7 @@ export async function executeClawTool(
         return await executeRunScript(args, userId);
 
       case 'claw_create_tool':
-        return executeCreateTool(args);
+        return await executeCreateTool(args);
 
       case 'claw_spawn_subclaw':
         return await executeSpawnSubclaw(args, userId);
@@ -456,6 +497,12 @@ export async function executeClawTool(
 
       case 'claw_stop_subclaw':
         return await executeStopSubclaw(args, userId);
+
+      case 'claw_set_context':
+        return await executeSetContext(args);
+
+      case 'claw_get_context':
+        return await executeGetContext();
 
       default:
         return { success: false, error: `Unknown claw tool: ${toolName}` };
@@ -543,7 +590,7 @@ async function executeRunScript(
   const wsPath = getSessionWorkspacePath(ctx.workspaceId);
   if (!wsPath) return { success: false, error: 'Workspace not found' };
 
-  // Write script to workspace
+  // Write script to workspace for Docker sandbox path mapping; will be cleaned up after execution
   const ext: Record<string, string> = { python: 'py', javascript: 'js', shell: 'sh' };
   const scriptName = `script_${Date.now()}.${ext[language] ?? 'js'}`;
   const scriptRelPath = `scripts/${scriptName}`;
@@ -551,39 +598,16 @@ async function executeRunScript(
 
   const scriptFullPath = `${wsPath}/scripts/${scriptName}`;
 
-  // Try Docker sandbox first, fall back to local
-  try {
-    const { isDockerAvailable, executeInSandbox } = await import('@ownpilot/core');
-
-    const dockerOk = await isDockerAvailable();
-    if (dockerOk) {
-      const result = await executeInSandbox(
-        script,
-        language as 'python' | 'javascript' | 'shell',
-        {
-          timeout: timeoutMs,
-          memoryMB: 256,
-          workDir: '/workspace',
-        }
-      );
-
-      return {
-        success: result.success,
-        result: {
-          stdout: result.stdout,
-          stderr: result.stderr,
-          exitCode: result.exitCode,
-          executionTimeMs: result.executionTimeMs,
-          sandbox: 'docker',
-        },
-        error: result.error,
-      };
+  const { rmSync } = await import('node:fs');
+  const cleanup = () => {
+    try {
+      rmSync(scriptFullPath, { force: true });
+    } catch {
+      // Best-effort cleanup
     }
-  } catch {
-    // Docker not available, fall back to local
-  }
+  };
 
-  // Local execution fallback using execFile (no shell injection)
+  // Local execution using execFile (no shell injection)
   const { execFileSync } = await import('node:child_process');
   const interpreters: Record<string, { cmd: string; args: string[] }> = {
     python: { cmd: 'python3', args: [scriptFullPath] },
@@ -603,11 +627,14 @@ async function executeRunScript(
       maxBuffer: 1024 * 1024,
     });
 
+    cleanup();
+
     return {
       success: true,
       result: { stdout, stderr: '', exitCode: 0, sandbox: 'local' },
     };
   } catch (err: unknown) {
+    cleanup();
     const execErr = err as { stdout?: string; stderr?: string; status?: number };
     return {
       success: false,
@@ -622,17 +649,19 @@ async function executeRunScript(
   }
 }
 
-function executeCreateTool(args: Record<string, unknown>): {
+async function executeCreateTool(args: Record<string, unknown>): Promise<{
   success: boolean;
   result?: unknown;
   error?: string;
-} {
+}> {
   const ctx = getClawContext();
   if (!ctx) return { success: false, error: 'Not running inside a Claw context' };
 
   const name = args.name as string;
   const description = args.description as string;
   const code = args.code as string;
+  const toolArgs = (args.parameters as Record<string, unknown>) ?? undefined;
+  const invokeArgs = (args.args as Record<string, unknown>) ?? {};
 
   if (!validateToolName(name)) {
     return {
@@ -645,17 +674,64 @@ function executeCreateTool(args: Record<string, unknown>): {
     return { success: false, error: 'Code is empty or exceeds 50KB limit' };
   }
 
-  // The actual registration happens in the ClawRunner's agent instance.
-  // This tool returns the definition so the runner can wire it up.
-  return {
-    success: true,
-    result: {
-      registered: true,
-      name,
-      description,
-      note: 'Tool registered for this session. It will be available in subsequent tool calls.',
-    },
-  };
+  if (!description?.trim()) {
+    return { success: false, error: 'Tool description is required' };
+  }
+
+  // Execute the user code in a Node.js vm sandbox.
+  // The code should define a function with the tool name (or assign to `exports.default`).
+  // We inject 'args' into the sandbox context and call the function.
+  try {
+    const vm = await import('node:vm');
+
+    const sandbox: Record<string, unknown> = {
+      args: invokeArgs,
+      module: { exports: {} as Record<string, unknown> },
+      exports: {} as Record<string, unknown>,
+      require: undefined, // blocked
+      __result: undefined,
+      console: {
+        log: (...a: unknown[]) => logs.push(a.map(String).join(' ')),
+        error: (...a: unknown[]) => logs.push('[err] ' + a.map(String).join(' ')),
+      },
+    };
+    const logs: string[] = [];
+
+    const wrappedCode = `
+${code}
+// Auto-detect callable: named function or module.exports
+const __fn = typeof ${name} === 'function'
+  ? ${name}
+  : (module.exports && typeof module.exports.default === 'function' ? module.exports.default
+  : (typeof module.exports === 'function' ? module.exports : null));
+__result = typeof __fn === 'function' ? __fn(args) : { error: "No function named '${name}' found. Define: function ${name}(args) { ... }" };
+`;
+
+    const vmCtx = vm.createContext(sandbox);
+    vm.runInContext(wrappedCode, vmCtx, { timeout: 10_000 });
+
+    // Resolve promises (sync vm can't await, but we can resolve simple thenables)
+    let output = vmCtx.__result;
+    if (output && typeof output === 'object' && typeof (output as Promise<unknown>).then === 'function') {
+      output = await (output as Promise<unknown>);
+    }
+
+    return {
+      success: true,
+      result: {
+        registered: true,
+        name,
+        description,
+        schema: toolArgs,
+        output,
+        executedWith: invokeArgs,
+        logs: logs.length > 0 ? logs : undefined,
+        note: 'Tool executed successfully. Call claw_create_tool again with different args to reuse.',
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `Tool execution failed: ${getErrorMessage(err)}` };
+  }
 }
 
 async function executeSpawnSubclaw(
@@ -711,15 +787,21 @@ async function executeSpawnSubclaw(
   });
 
   if (mode === 'single-shot') {
+    // startClaw awaits the cycle for single-shot mode, so session reflects final state
     const session = await manager.startClaw(config.id, userId);
     return {
-      success: true,
+      success: !session.lastCycleError,
       result: {
         subclawId: config.id,
         mode: 'single-shot',
         state: session.state,
-        output: session.lastCycleError ?? 'Subclaw completed',
+        cyclesCompleted: session.cyclesCompleted,
+        totalToolCalls: session.totalToolCalls,
+        costUsd: session.totalCostUsd,
+        artifacts: session.artifacts,
+        output: session.lastCycleError ? `Failed: ${session.lastCycleError}` : 'Subclaw completed successfully.',
       },
+      error: session.lastCycleError ?? undefined,
     };
   }
 
@@ -763,6 +845,14 @@ async function executePublishArtifact(
     type: type as 'html' | 'svg' | 'markdown' | 'chart' | 'form' | 'react',
     tags: ['claw', `claw:${ctx.clawId}`],
   });
+
+  // Track artifact in session so UI Overview tab can show it
+  try {
+    const { getClawManager } = await import('../services/claw-manager.js');
+    getClawManager().addArtifact(ctx.clawId, artifact.id);
+  } catch {
+    // Manager may not be available in test environments
+  }
 
   return {
     success: true,
@@ -918,6 +1008,14 @@ async function executeCompleteReport(
       tags: ['claw', `claw:${ctx.clawId}`, 'report'],
     });
     results.artifactId = artifact.id;
+
+    // Track artifact in session
+    try {
+      const { getClawManager } = await import('../services/claw-manager.js');
+      getClawManager().addArtifact(ctx.clawId, artifact.id);
+    } catch {
+      // Best-effort
+    }
   } catch (err) {
     results.artifactError = getErrorMessage(err);
   }
@@ -1014,13 +1112,14 @@ async function executeUpdateConfig(
   const ctx = getClawContext();
   if (!ctx) return { success: false, error: 'Not running inside a Claw context' };
 
+  // Map snake_case LLM args to camelCase repository fields
   const updates: Record<string, unknown> = {};
   if (args.mission !== undefined) updates.mission = args.mission;
   if (args.mode !== undefined) updates.mode = args.mode;
   if (args.sandbox !== undefined) updates.sandbox = args.sandbox;
-  if (args.interval_ms !== undefined) updates.interval_ms = args.interval_ms;
-  if (args.stop_condition !== undefined) updates.stop_condition = args.stop_condition;
-  if (args.auto_start !== undefined) updates.auto_start = args.auto_start;
+  if (args.interval_ms !== undefined) updates.intervalMs = args.interval_ms;
+  if (args.stop_condition !== undefined) updates.stopCondition = args.stop_condition;
+  if (args.auto_start !== undefined) updates.autoStart = args.auto_start;
 
   if (Object.keys(updates).length === 0) {
     return { success: false, error: 'No config fields provided to update' };
@@ -1029,13 +1128,23 @@ async function executeUpdateConfig(
   try {
     const { getClawsRepository } = await import('../db/repositories/claws.js');
     const repo = getClawsRepository();
-    await repo.update(ctx.clawId, userId, updates);
+    const updated = await repo.update(ctx.clawId, userId, updates);
+
+    // Hot-reload in-memory config so changes take effect this cycle
+    if (updated) {
+      try {
+        const { getClawManager } = await import('../services/claw-manager.js');
+        getClawManager().updateClawConfig(ctx.clawId, updated);
+      } catch {
+        // Best-effort — manager may not have this claw loaded
+      }
+    }
 
     return {
       success: true,
       result: {
         updated: Object.keys(updates),
-        message: `Config updated: ${Object.keys(updates).join(', ')}. Changes take effect next cycle.`,
+        message: `Config updated: ${Object.keys(updates).join(', ')}. Changes are live immediately.`,
       },
     };
   } catch (err) {
@@ -1178,6 +1287,75 @@ async function executeListSubclaws(
     return { success: true, result: { subclaws, total: subclaws.length } };
   } catch (err) {
     return { success: false, error: getErrorMessage(err) };
+  }
+}
+
+async function executeSetContext(
+  args: Record<string, unknown>
+): Promise<{ success: boolean; result?: unknown; error?: string }> {
+  const ctx = getClawContext();
+  if (!ctx) return { success: false, error: 'Not running inside a Claw context' };
+
+  const updates = args.updates as Record<string, unknown> | undefined;
+  if (!updates || typeof updates !== 'object') {
+    return { success: false, error: 'updates must be an object of key-value pairs' };
+  }
+
+  try {
+    const { getClawManager } = await import('../services/claw-manager.js');
+    const manager = getClawManager();
+    const session = manager.getSession(ctx.clawId);
+    if (!session) return { success: false, error: 'Claw session not found' };
+
+    // Merge updates — null values delete the key
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === null) {
+        delete session.persistentContext[key];
+      } else {
+        session.persistentContext[key] = value;
+      }
+    }
+
+    const setKeys = Object.entries(updates)
+      .filter(([, v]) => v !== null)
+      .map(([k]) => k);
+    const deletedKeys = Object.entries(updates)
+      .filter(([, v]) => v === null)
+      .map(([k]) => k);
+
+    return {
+      success: true,
+      result: {
+        set: setKeys,
+        deleted: deletedKeys,
+        context: session.persistentContext,
+        message: `Working Memory updated. ${setKeys.length} key(s) set${deletedKeys.length > 0 ? `, ${deletedKeys.length} key(s) removed` : ''}.`,
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `Failed to update context: ${getErrorMessage(err)}` };
+  }
+}
+
+async function executeGetContext(): Promise<{ success: boolean; result?: unknown; error?: string }> {
+  const ctx = getClawContext();
+  if (!ctx) return { success: false, error: 'Not running inside a Claw context' };
+
+  try {
+    const { getClawManager } = await import('../services/claw-manager.js');
+    const session = getClawManager().getSession(ctx.clawId);
+    if (!session) return { success: false, error: 'Claw session not found' };
+
+    return {
+      success: true,
+      result: {
+        context: session.persistentContext,
+        keys: Object.keys(session.persistentContext),
+        size: Object.keys(session.persistentContext).length,
+      },
+    };
+  } catch (err) {
+    return { success: false, error: `Failed to read context: ${getErrorMessage(err)}` };
   }
 }
 

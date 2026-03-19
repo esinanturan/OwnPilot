@@ -162,6 +162,12 @@ vi.mock('./index.js', () => ({
   executeHabitTool: vi.fn(),
   SKILL_TOOLS: [],
   executeSkillTool: vi.fn(),
+  CLAW_TOOLS: [],
+  executeClawTool: vi.fn(),
+  CLAW_MANAGEMENT_TOOLS: [],
+  executeClawManagementTool: vi.fn(),
+  FLEET_TOOLS: [],
+  executeFleetTool: vi.fn(),
 }));
 vi.mock('../services/config-tools.js', () => ({
   CONFIG_TOOLS: [],

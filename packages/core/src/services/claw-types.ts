@@ -255,6 +255,7 @@ export interface IClawService {
 
   // ---- Escalation ----
   approveEscalation(clawId: string, userId: string): Promise<boolean>;
+  denyEscalation(clawId: string, userId: string, reason?: string): Promise<boolean>;
 
   // ---- Service Lifecycle ----
   start(): Promise<void>;

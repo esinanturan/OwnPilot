@@ -74,8 +74,8 @@ describe('Claw Tools', () => {
   });
 
   describe('CLAW_TOOLS', () => {
-    it('should export 14 tool definitions', () => {
-      expect(CLAW_TOOLS).toHaveLength(14);
+    it('should export 16 tool definitions', () => {
+      expect(CLAW_TOOLS).toHaveLength(16);
     });
 
     it('should have correct tool names', () => {
@@ -94,6 +94,8 @@ describe('Claw Tools', () => {
         'claw_reflect',
         'claw_list_subclaws',
         'claw_stop_subclaw',
+        'claw_set_context',
+        'claw_get_context',
       ]);
     });
 
@@ -215,12 +217,17 @@ describe('Claw Tools', () => {
       expect(result.error).toContain('Invalid tool name');
     });
 
-    it('should accept valid tool creation', async () => {
+    it('should accept valid tool creation and execute', async () => {
       setClawContext();
 
       const result = await executeClawTool(
         'claw_create_tool',
-        { name: 'parse_csv', description: 'Parse CSV data', code: 'return args.data' },
+        {
+          name: 'parse_csv',
+          description: 'Parse CSV data',
+          code: 'function parse_csv(args) { return { parsed: true, input: args.data }; }',
+          args: { data: 'a,b,c' },
+        },
         'user-1'
       );
       expect(result.success).toBe(true);
@@ -228,6 +235,7 @@ describe('Claw Tools', () => {
         expect.objectContaining({
           registered: true,
           name: 'parse_csv',
+          output: { parsed: true, input: 'a,b,c' },
         })
       );
     });

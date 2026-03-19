@@ -592,9 +592,33 @@ export class ClawsRepository extends BaseRepository {
     durationMs: number;
     category?: string;
   }>): Promise<void> {
+    if (entries.length === 0) return;
+
+    // Single batch INSERT instead of N serial queries
+    const valuePlaceholders: string[] = [];
+    const params: unknown[] = [];
+    let idx = 1;
+
     for (const entry of entries) {
-      await this.saveAuditEntry(entry);
+      valuePlaceholders.push(`($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`);
+      params.push(
+        generateId('aud'),
+        entry.clawId,
+        entry.cycleNumber,
+        entry.toolName,
+        JSON.stringify(entry.toolArgs),
+        (entry.toolResult ?? '').slice(0, 10_000),
+        entry.success,
+        entry.durationMs,
+        entry.category ?? this.categorizeToolCall(entry.toolName)
+      );
     }
+
+    await this.execute(
+      `INSERT INTO claw_audit_log (id, claw_id, cycle_number, tool_name, tool_args, tool_result, success, duration_ms, category)
+       VALUES ${valuePlaceholders.join(', ')}`,
+      params
+    );
   }
 
   async getAuditLog(

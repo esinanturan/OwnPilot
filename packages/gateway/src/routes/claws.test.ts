@@ -17,6 +17,13 @@ vi.mock('../services/claw-service.js', () => ({
   getClawService: mockGetClawService,
 }));
 
+const mockGetClawManager = vi.fn().mockReturnValue({
+  updateClawConfig: vi.fn(),
+});
+vi.mock('../services/claw-manager.js', () => ({
+  getClawManager: mockGetClawManager,
+}));
+
 vi.mock('./helpers.js', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
@@ -58,6 +65,7 @@ function createMockService() {
     getHistory: vi.fn(),
     sendMessage: vi.fn(),
     approveEscalation: vi.fn(),
+    denyEscalation: vi.fn(),
   };
 }
 
@@ -348,6 +356,37 @@ describe('Claws Routes', () => {
       service.approveEscalation.mockResolvedValue(false);
 
       const res = await app.request('/claws/claw-1/approve-escalation', { method: 'POST' });
+      expect(res.status).toBe(404);
+    });
+  });
+
+  describe('POST /claws/:id/deny-escalation', () => {
+    it('should deny escalation', async () => {
+      service.denyEscalation.mockResolvedValue(true);
+
+      const res = await app.request('/claws/claw-1/deny-escalation', { method: 'POST' });
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body.data.denied).toBe(true);
+    });
+
+    it('should pass reason to service', async () => {
+      service.denyEscalation.mockResolvedValue(true);
+
+      const res = await app.request('/claws/claw-1/deny-escalation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Not needed' }),
+      });
+      expect(res.status).toBe(200);
+      expect(service.denyEscalation).toHaveBeenCalledWith('claw-1', 'user-1', 'Not needed');
+    });
+
+    it('should return 404 if no pending escalation', async () => {
+      service.denyEscalation.mockResolvedValue(false);
+
+      const res = await app.request('/claws/claw-1/deny-escalation', { method: 'POST' });
       expect(res.status).toBe(404);
     });
   });

@@ -34,6 +34,9 @@ const SESSION_PERSIST_INTERVAL_MS = 30_000;
 const DEFAULT_INTERVAL_MS = 300_000; // 5 min
 const MISSION_COMPLETE_SENTINEL = 'MISSION_COMPLETE';
 const MAX_CONCURRENT_CLAWS = 50;
+const HISTORY_RETENTION_DAYS = 90;
+const AUDIT_RETENTION_DAYS = 30;
+const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // once per day
 
 // Continuous mode adaptive delays
 const CONTINUOUS_MIN_DELAY_MS = 500;   // Active: fast loop
@@ -55,6 +58,7 @@ interface ManagedClaw {
   persistTimer: ReturnType<typeof setInterval> | null;
   lastCycleToolCalls: number;
   cycleInProgress: boolean;
+  idleCycles: number;
 }
 
 // ============================================================================
@@ -64,6 +68,7 @@ interface ManagedClaw {
 export class ClawManager {
   private claws = new Map<string, ManagedClaw>();
   private running = false;
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
   /**
    * Boot: resume autoStart claws and interrupted sessions.
@@ -109,6 +114,10 @@ export class ClawManager {
       log.error('Failed to load autoStart claws', { error: getErrorMessage(err) });
     }
 
+    // Run initial cleanup, then schedule daily
+    this.runCleanup();
+    this.cleanupTimer = setInterval(() => this.runCleanup(), CLEANUP_INTERVAL_MS);
+
     log.info(`Claw Manager started (${this.claws.size} claws running)`);
   }
 
@@ -118,6 +127,11 @@ export class ClawManager {
   async stop(): Promise<void> {
     if (!this.running) return;
     this.running = false;
+
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
 
     const stopPromises: Promise<void>[] = [];
     for (const [clawId, managed] of this.claws) {
@@ -209,6 +223,7 @@ export class ClawManager {
       persistTimer: null,
       lastCycleToolCalls: 0,
       cycleInProgress: false,
+      idleCycles: 0,
     };
 
     this.claws.set(clawId, managed);
@@ -229,13 +244,16 @@ export class ClawManager {
       });
     }, SESSION_PERSIST_INTERVAL_MS);
 
+    // Ensure conversation row exists so Chat tab works
+    this.ensureConversationRow(clawId, config.userId, config.name).catch((err) => {
+      log.warn(`[${clawId}] Failed to create conversation row: ${getErrorMessage(err)}`);
+    });
+
     // Schedule first cycle based on mode
     if (config.mode === 'single-shot') {
-      this.executeCycle(clawId).then(() => {
-        this.stopClawInternal(clawId, managed, 'completed').catch((err) => {
-          log.error(`Failed to stop single-shot claw: ${getErrorMessage(err)}`);
-        });
-      });
+      // Await so callers (claw_spawn_subclaw) get real output back
+      await this.executeCycle(clawId);
+      await this.stopClawInternal(clawId, managed, 'completed');
     } else {
       this.scheduleNext(clawId, managed);
     }
@@ -337,6 +355,54 @@ export class ClawManager {
     this.emitEvent('claw.resumed', { clawId });
     this.scheduleNext(clawId, managed);
     return true;
+  }
+
+  /**
+   * Deny pending escalation — resume without granting and inform the claw via inbox.
+   */
+  async denyEscalation(clawId: string, reason?: string): Promise<boolean> {
+    const managed = this.claws.get(clawId);
+    if (!managed) return false;
+    if (managed.session.state !== 'escalation_pending') return false;
+
+    const escalation = managed.session.pendingEscalation;
+    managed.session.pendingEscalation = null;
+    managed.session.state = managed.session.config.mode === 'event' ? 'waiting' : 'running';
+
+    // Inject denial notice into inbox so the claw knows on next cycle
+    const denialMsg = `[ESCALATION_DENIED] Your escalation request "${escalation?.type}" was denied.${reason ? ` Reason: ${reason}` : ''} Continue with your current capabilities.`;
+    managed.session.inbox.push(denialMsg);
+
+    const repo = getClawsRepository();
+    await repo.appendToInbox(clawId, denialMsg);
+    await this.persistSession(clawId, managed);
+
+    this.emitEvent('claw.resumed', { clawId });
+    this.scheduleNext(clawId, managed);
+    return true;
+  }
+
+  /**
+   * Add an artifact ID to the session's artifact list.
+   * Called by claw tools after publishing an artifact.
+   */
+  addArtifact(clawId: string, artifactId: string): void {
+    const managed = this.claws.get(clawId);
+    if (!managed) return;
+    if (!managed.session.artifacts.includes(artifactId)) {
+      managed.session.artifacts.push(artifactId);
+    }
+  }
+
+  /**
+   * Hot-reload runner config so changes from REST PUT take effect immediately.
+   */
+  updateClawConfig(clawId: string, config: import('@ownpilot/core').ClawConfig): void {
+    const managed = this.claws.get(clawId);
+    if (!managed) return;
+    managed.session.config = config;
+    managed.runner.updateConfig(config);
+    log.info(`[${clawId}] Config hot-reloaded`);
   }
 
   // ============================================================================
@@ -443,15 +509,21 @@ export class ClawManager {
         return result;
       }
 
-      // Check consecutive errors
+      // Check consecutive errors — set 'failed' state to distinguish from manual pause
       if (managed.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-        log.warn(`Claw ${clawId} auto-paused after ${MAX_CONSECUTIVE_ERRORS} consecutive errors`);
-        managed.session.state = 'paused';
+        log.warn(`Claw ${clawId} auto-failed after ${MAX_CONSECUTIVE_ERRORS} consecutive errors`);
+        managed.session.state = 'failed';
         await this.persistSession(clawId, managed);
-        this.emitEvent('claw.error', {
+        this.claws.delete(clawId);
+        if (managed.persistTimer) {
+          clearInterval(managed.persistTimer);
+          managed.persistTimer = null;
+        }
+        this.emitEvent('claw.stopped', {
           clawId,
-          error: `Auto-paused after ${MAX_CONSECUTIVE_ERRORS} consecutive errors`,
-          cycleNumber,
+          userId: managed.session.config.userId,
+          reason: 'failed',
+          error: `Auto-failed after ${MAX_CONSECUTIVE_ERRORS} consecutive errors. Last error: ${result.error ?? 'unknown'}`,
         });
         return result;
       }
@@ -488,11 +560,35 @@ export class ClawManager {
     // Check stop condition
     const stopCondition = managed.session.config.stopCondition;
     if (stopCondition) {
-      const maxCyclesMatch = stopCondition.match(/^max_cycles:(\d+)$/);
+      // max_cycles:N — stop after N cycles
+      const maxCyclesMatch = stopCondition.match(/^max_cycles:(\d+)$/i);
       if (maxCyclesMatch?.[1]) {
         const maxCycles = parseInt(maxCyclesMatch[1], 10);
         if (managed.session.cyclesCompleted >= maxCycles) {
           return true;
+        }
+      }
+
+      // on_report — stop when claw_complete_report was called this cycle
+      if (stopCondition === 'on_report') {
+        const calledReport = result.toolCalls.some((tc) => tc.tool === 'claw_complete_report' && tc.success);
+        if (calledReport) return true;
+      }
+
+      // on_error — stop on first cycle failure
+      if (stopCondition === 'on_error' && !result.success) {
+        return true;
+      }
+
+      // idle:N — stop after N consecutive cycles with 0 tool calls
+      const idleMatch = stopCondition.match(/^idle:(\d+)$/i);
+      if (idleMatch?.[1]) {
+        const idleLimit = parseInt(idleMatch[1], 10);
+        if (managed.lastCycleToolCalls === 0) {
+          managed.idleCycles = (managed.idleCycles ?? 0) + 1;
+          if (managed.idleCycles >= idleLimit) return true;
+        } else {
+          managed.idleCycles = 0;
         }
       }
     }
@@ -657,6 +753,44 @@ export class ClawManager {
       } as never);
     } catch {
       // Event system may not be initialized
+    }
+  }
+
+  private runCleanup(): void {
+    const repo = getClawsRepository();
+
+    repo.cleanupOldHistory(HISTORY_RETENTION_DAYS).then((deleted) => {
+      if (deleted > 0) log.info(`Cleaned up ${deleted} old claw history entries`);
+    }).catch((err) => {
+      log.warn(`History cleanup failed: ${getErrorMessage(err)}`);
+    });
+
+    repo.cleanupOldAuditLog(AUDIT_RETENTION_DAYS).then((deleted) => {
+      if (deleted > 0) log.info(`Cleaned up ${deleted} old claw audit log entries`);
+    }).catch((err) => {
+      log.warn(`Audit log cleanup failed: ${getErrorMessage(err)}`);
+    });
+  }
+
+  /**
+   * Ensure a conversation row exists for the claw's chat history.
+   * The Chat tab fetches /api/v1/chat/claw-{id}/messages — this needs a row in conversations.
+   */
+  private async ensureConversationRow(clawId: string, _userId: string, clawName: string): Promise<void> {
+    const conversationId = `claw-${clawId}`;
+    try {
+      const { ConversationsRepository } = await import('../db/repositories/conversations.js');
+      const repo = new ConversationsRepository();
+      const existing = await repo.getById(conversationId).catch(() => null);
+      if (!existing) {
+        await repo.create({
+          id: conversationId,
+          agentName: `claw-${clawId}`,
+          metadata: { clawId, clawName, type: 'claw' },
+        });
+      }
+    } catch {
+      // conversations table may not exist or repo may differ — best-effort
     }
   }
 

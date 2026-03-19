@@ -76,15 +76,15 @@ vi.mock('../services/soul-heartbeat-service.js', () => ({
 }));
 
 // Mock @ownpilot/core
-const mockListMemories = vi.fn();
-const mockListGoals = vi.fn();
+const { mockListMemories, mockListGoals, MockMemorySymbol, MockGoalSymbol } = vi.hoisted(() => ({
+  mockListMemories: vi.fn(),
+  mockListGoals: vi.fn(),
+  MockMemorySymbol: Symbol.for('ownpilot.memory'),
+  MockGoalSymbol: Symbol.for('ownpilot.goal'),
+}));
 
-// Define the mock Services symbols
-const MockMemorySymbol = Symbol.for('ownpilot.memory');
-const MockGoalSymbol = Symbol.for('ownpilot.goal');
-
-vi.mock('@ownpilot/core', async () => {
-  const actual = await vi.importActual<typeof import('@ownpilot/core')>('@ownpilot/core');
+vi.mock('@ownpilot/core', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     getServiceRegistry: vi.fn().mockReturnValue({

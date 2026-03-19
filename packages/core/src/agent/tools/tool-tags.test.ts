@@ -1072,12 +1072,13 @@ describe('TOOL_SEARCH_TAGS — aggregate statistics', () => {
     }
   });
 
-  it('the exact tool count matches the source (159 tools)', () => {
+  it('the exact tool count matches the source (180 tools)', () => {
     // Count from source: email(6) + git(7) + memory(7) + tasks(6) + notes(5) +
     // calendar(5) + contacts(5) + bookmarks(5) + expenses(8) + habits(8) +
     // files(8) + web(4) + code(5) + image(3) + audio(5) + pdf(3) + goals(8) +
     // extraction(2) + custom_data(11) + weather(2) + utility(22) +
-    // dynamic(8) + config(3) + triggers(6) + plans(7) = 159
-    expect(Object.keys(TOOL_SEARCH_TAGS).length).toBe(159);
+    // dynamic(8) + config(3) + triggers(6) + plans(7) + claw(16) + subagent(6) + crew(3) +
+    // fleet(7) + mcp(7) + souls(3) = 180
+    expect(Object.keys(TOOL_SEARCH_TAGS).length).toBe(180);
   });
 });

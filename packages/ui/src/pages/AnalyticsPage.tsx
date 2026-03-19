@@ -1,11 +1,12 @@
 /**
  * AnalyticsPage — System-wide analytics dashboard with rich visualizations
  *
- * Charts: Cost trend, provider breakdown, agent activity, task completion,
- * claw execution, token usage, and real-time KPI cards.
+ * Uses the same design tokens as DashboardPage:
+ *   card-elevated, bg-bg-secondary, border-border, text-text-primary, text-text-muted
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   AreaChart,
   Area,
@@ -25,6 +26,24 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import {
+  DollarSign,
+  Zap,
+  MessageSquare,
+  Activity,
+  Bot,
+  CheckCircle2,
+  TrendingUp,
+  BarChart3,
+  Layers,
+  Repeat,
+  FileText,
+  Bookmark,
+  Users,
+  Calendar,
+  Receipt,
+  RefreshCw,
+} from '../components/icons';
 import {
   costsApi,
   summaryApi,
@@ -80,19 +99,19 @@ interface AgentCounts {
 // Constants
 // ---------------------------------------------------------------------------
 
-const COLORS = [
-  '#6366f1', // indigo
-  '#8b5cf6', // violet
-  '#a855f7', // purple
-  '#ec4899', // pink
-  '#f43f5e', // rose
-  '#f97316', // orange
-  '#eab308', // yellow
-  '#22c55e', // green
-  '#14b8a6', // teal
-  '#06b6d4', // cyan
-  '#3b82f6', // blue
-  '#64748b', // slate
+const CHART_COLORS = [
+  '#6366f1',
+  '#8b5cf6',
+  '#a855f7',
+  '#ec4899',
+  '#f43f5e',
+  '#f97316',
+  '#eab308',
+  '#22c55e',
+  '#14b8a6',
+  '#06b6d4',
+  '#3b82f6',
+  '#64748b',
 ];
 
 const STATE_COLORS: Record<string, string> = {
@@ -110,13 +129,13 @@ const STATE_COLORS: Record<string, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatCost(val: number): string {
+function fmtCost(val: number): string {
   if (val >= 1) return `$${val.toFixed(2)}`;
   if (val >= 0.01) return `$${val.toFixed(3)}`;
   return `$${val.toFixed(4)}`;
 }
 
-function formatTokens(val: number): string {
+function fmtTokens(val: number): string {
   if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
   if (val >= 1_000) return `${(val / 1_000).toFixed(1)}K`;
   return String(val);
@@ -128,67 +147,92 @@ function shortDate(iso: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Small Components
+// Reusable — matches dashboard card-elevated pattern
 // ---------------------------------------------------------------------------
 
-function KpiCard({
-  label,
-  value,
-  sub,
-  color = 'indigo',
-  icon,
-}: {
-  label: string;
-  value: string | number;
-  sub?: string;
-  color?: string;
-  icon: React.ReactNode;
-}) {
-  const ring = `ring-${color}-500/20`;
-  return (
-    <div
-      className={`relative overflow-hidden rounded-xl bg-white dark:bg-dark-bg-secondary border border-border-primary dark:border-dark-border-primary p-4 shadow-sm hover:shadow-md transition-shadow ${ring}`}
-    >
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-xs font-medium text-text-secondary dark:text-dark-text-secondary uppercase tracking-wider">
-            {label}
-          </p>
-          <p className="text-2xl font-bold text-text-primary dark:text-dark-text-primary">
-            {value}
-          </p>
-          {sub && (
-            <p className="text-xs text-text-secondary dark:text-dark-text-secondary">{sub}</p>
-          )}
-        </div>
-        <div className="p-2 rounded-lg bg-bg-secondary dark:bg-dark-bg-tertiary text-text-secondary dark:text-dark-text-secondary">
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ChartCard({
+function SectionCard({
   title,
+  icon: Icon,
+  iconColor = 'text-primary',
+  action,
   children,
   className = '',
 }: {
   title: string;
+  icon: React.ElementType;
+  iconColor?: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
     <div
-      className={`rounded-xl bg-white dark:bg-dark-bg-secondary border border-border-primary dark:border-dark-border-primary p-5 shadow-sm ${className}`}
+      className={`card-elevated p-4 bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-xl ${className}`}
     >
-      <h3 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary mb-4">
-        {title}
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-medium text-text-primary dark:text-dark-text-primary flex items-center gap-2">
+          <Icon className={`w-4 h-4 ${iconColor}`} />
+          {title}
+        </h3>
+        {action}
+      </div>
       {children}
     </div>
   );
 }
+
+function StatCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+  color,
+  bgColor,
+  link,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+  link?: string;
+}) {
+  const inner = (
+    <>
+      <div className="flex items-center gap-3">
+        <div
+          className={`w-10 h-10 rounded-lg ${bgColor} flex items-center justify-center flex-shrink-0`}
+        >
+          <Icon className={`w-5 h-5 ${color}`} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xl font-bold text-text-primary dark:text-dark-text-primary leading-tight">
+            {value}
+          </p>
+          <p className="text-xs text-text-muted dark:text-dark-text-muted truncate">{label}</p>
+        </div>
+      </div>
+      {sub && <p className="mt-2 text-xs text-text-muted dark:text-dark-text-muted">{sub}</p>}
+    </>
+  );
+
+  const cls =
+    'card-elevated card-hover p-4 bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border hover:border-primary rounded-xl transition-colors';
+
+  if (link) {
+    return (
+      <Link to={link} className={cls}>
+        {inner}
+      </Link>
+    );
+  }
+  return <div className={cls}>{inner}</div>;
+}
+
+// ---------------------------------------------------------------------------
+// Mini charts
+// ---------------------------------------------------------------------------
 
 function MiniDonut({
   data,
@@ -200,7 +244,7 @@ function MiniDonut({
   const total = data.reduce((s, d) => s + d.value, 0);
   if (total === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-xs text-text-secondary dark:text-dark-text-secondary">
+      <div className="flex items-center justify-center h-full text-xs text-text-muted dark:text-dark-text-muted">
         No data
       </div>
     );
@@ -224,10 +268,11 @@ function MiniDonut({
         </Pie>
         <Tooltip
           contentStyle={{
-            background: 'var(--color-bg-secondary, #1e293b)',
-            border: '1px solid var(--color-border-primary, #334155)',
+            background: 'var(--color-bg-tertiary, #1e293b)',
+            border: '1px solid var(--color-border, #334155)',
             borderRadius: '8px',
             fontSize: '12px',
+            color: 'var(--color-text-primary, #e2e8f0)',
           }}
           formatter={(value: unknown, name: unknown) => [
             `${value} (${total > 0 ? ((Number(value) / total) * 100).toFixed(0) : 0}%)`,
@@ -247,17 +292,15 @@ function DonutLegend({
   colors: string[];
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 min-w-0">
       {data.map((d, i) => (
         <div key={d.name} className="flex items-center gap-2 text-xs">
           <span
             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
             style={{ background: colors[i % colors.length] }}
           />
-          <span className="text-text-secondary dark:text-dark-text-secondary truncate">
-            {d.name}
-          </span>
-          <span className="ml-auto font-medium text-text-primary dark:text-dark-text-primary">
+          <span className="text-text-muted dark:text-dark-text-muted truncate">{d.name}</span>
+          <span className="ml-auto font-semibold text-text-primary dark:text-dark-text-primary">
             {d.value}
           </span>
         </div>
@@ -267,7 +310,7 @@ function DonutLegend({
 }
 
 // ---------------------------------------------------------------------------
-// Custom Tooltip
+// Custom chart tooltip — matching site's muted aesthetic
 // ---------------------------------------------------------------------------
 
 function ChartTooltip({
@@ -281,21 +324,42 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg bg-bg-primary dark:bg-dark-bg-tertiary border border-border-primary dark:border-dark-border-primary p-2.5 shadow-lg text-xs">
+    <div className="rounded-lg bg-bg-secondary dark:bg-dark-bg-tertiary border border-border dark:border-dark-border p-2.5 shadow-lg text-xs">
       <p className="font-medium text-text-primary dark:text-dark-text-primary mb-1">{label}</p>
       {payload.map((p, i) => (
         <div key={i} className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-          <span className="text-text-secondary dark:text-dark-text-secondary">{p.name}:</span>
+          <span className="text-text-muted dark:text-dark-text-muted">{p.name}:</span>
           <span className="font-medium text-text-primary dark:text-dark-text-primary">
             {typeof p.value === 'number' && p.name.toLowerCase().includes('cost')
-              ? formatCost(p.value)
+              ? fmtCost(p.value)
               : typeof p.value === 'number' && p.name.toLowerCase().includes('token')
-                ? formatTokens(p.value)
+                ? fmtTokens(p.value)
                 : p.value}
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Empty state for charts
+// ---------------------------------------------------------------------------
+
+function EmptyChart({
+  height = 240,
+  message = 'No data for this period',
+}: {
+  height?: number;
+  message?: string;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-center text-xs text-text-muted dark:text-dark-text-muted`}
+      style={{ height }}
+    >
+      {message}
     </div>
   );
 }
@@ -307,6 +371,7 @@ function ChartTooltip({
 export function AnalyticsPage() {
   const [period, setPeriod] = useState<'week' | 'month'>('week');
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Data
   const [usage, setUsage] = useState<CostsData | null>(null);
@@ -324,11 +389,21 @@ export function AnalyticsPage() {
     workflows: 0,
   });
 
-  const fetchAll = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [usageRes, breakdownRes, summaryRes, clawStatsRes, soulsRes, bgRes, fleetsRes, wfRes] =
-        await Promise.allSettled([
+  const fetchAll = useCallback(
+    async (showRefresh = false) => {
+      if (showRefresh) setIsRefreshing(true);
+      else setIsLoading(true);
+      try {
+        const [
+          usageRes,
+          breakdownRes,
+          summaryRes,
+          clawStatsRes,
+          soulsRes,
+          bgRes,
+          fleetsRes,
+          wfRes,
+        ] = await Promise.allSettled([
           costsApi.usage(),
           costsApi.getBreakdown(period),
           summaryApi.get(),
@@ -339,32 +414,35 @@ export function AnalyticsPage() {
           workflowsApi.list(),
         ]);
 
-      if (usageRes.status === 'fulfilled') setUsage(usageRes.value);
-      if (breakdownRes.status === 'fulfilled') setBreakdown(breakdownRes.value);
-      if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
-      if (clawStatsRes.status === 'fulfilled') setClawStats(clawStatsRes.value);
+        if (usageRes.status === 'fulfilled') setUsage(usageRes.value);
+        if (breakdownRes.status === 'fulfilled') setBreakdown(breakdownRes.value);
+        if (summaryRes.status === 'fulfilled') setSummary(summaryRes.value);
+        if (clawStatsRes.status === 'fulfilled') setClawStats(clawStatsRes.value);
 
-      const count = (res: PromiseSettledResult<unknown>) => {
-        if (res.status !== 'fulfilled') return 0;
-        const v = res.value;
-        if (Array.isArray(v)) return v.length;
-        if (v && typeof v === 'object' && 'total' in v) return (v as { total: number }).total;
-        if (v && typeof v === 'object' && 'items' in v)
-          return (v as { items: unknown[] }).items.length;
-        return 0;
-      };
+        const count = (res: PromiseSettledResult<unknown>) => {
+          if (res.status !== 'fulfilled') return 0;
+          const v = res.value;
+          if (Array.isArray(v)) return v.length;
+          if (v && typeof v === 'object' && 'total' in v) return (v as { total: number }).total;
+          if (v && typeof v === 'object' && 'items' in v)
+            return (v as { items: unknown[] }).items.length;
+          return 0;
+        };
 
-      setAgentCounts({
-        souls: count(soulsRes),
-        background: count(bgRes),
-        claws: clawStatsRes.status === 'fulfilled' ? (clawStatsRes.value as ClawStats).total : 0,
-        fleets: count(fleetsRes),
-        workflows: count(wfRes),
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [period]);
+        setAgentCounts({
+          souls: count(soulsRes),
+          background: count(bgRes),
+          claws: clawStatsRes.status === 'fulfilled' ? (clawStatsRes.value as ClawStats).total : 0,
+          fleets: count(fleetsRes),
+          workflows: count(wfRes),
+        });
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [period]
+  );
 
   useEffect(() => {
     fetchAll();
@@ -424,185 +502,149 @@ export function AnalyticsPage() {
       }
     : null;
 
-  const taskRadial = taskProgress
-    ? [{ name: 'Completed', value: taskProgress.pct, fill: '#22c55e' }]
-    : [];
-
   const habitData = summary?.habits;
 
+  // Axis styling
+  const axisProps = { tick: { fontSize: 11 }, stroke: 'var(--color-text-muted, #94a3b8)' };
+  const gridProps = {
+    strokeDasharray: '3 3' as const,
+    stroke: 'var(--color-border, #334155)',
+    opacity: 0.4,
+  };
+
+  // ---- Loading skeleton ----
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-4 max-w-[1600px] mx-auto">
         <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
+            <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <Skeleton className="h-72 rounded-xl" />
           <Skeleton className="h-72 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Skeleton className="h-56 rounded-xl" />
+          <Skeleton className="h-56 rounded-xl" />
+          <Skeleton className="h-56 rounded-xl" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* Header */}
+    <div className="p-4 md:p-6 space-y-4 max-w-[1600px] mx-auto">
+      {/* ---- Header ---- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-text-primary dark:text-dark-text-primary">
+          <h1 className="text-xl font-bold text-text-primary dark:text-dark-text-primary">
             Analytics
           </h1>
-          <p className="text-sm text-text-secondary dark:text-dark-text-secondary mt-0.5">
+          <p className="text-xs text-text-muted dark:text-dark-text-muted mt-0.5">
             System-wide metrics and performance insights
           </p>
         </div>
-        <div className="flex items-center gap-1 bg-bg-secondary dark:bg-dark-bg-tertiary rounded-lg p-0.5">
-          {(['week', 'month'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                period === p
-                  ? 'bg-white dark:bg-dark-bg-secondary text-text-primary dark:text-dark-text-primary shadow-sm'
-                  : 'text-text-secondary dark:text-dark-text-secondary hover:text-text-primary dark:hover:text-dark-text-primary'
-              }`}
-            >
-              {p === 'week' ? '7 Days' : '30 Days'}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchAll(true)}
+            disabled={isRefreshing}
+            className="p-1.5 rounded-lg hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary text-text-muted dark:text-dark-text-muted transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
+          <div className="flex items-center bg-bg-secondary dark:bg-dark-bg-secondary border border-border dark:border-dark-border rounded-lg p-0.5">
+            {(['week', 'month'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                  period === p
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-text-muted dark:text-dark-text-muted hover:text-text-primary dark:hover:text-dark-text-primary'
+                }`}
+              >
+                {p === 'week' ? '7 Days' : '30 Days'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KpiCard
+      {/* ---- KPI Row — matches dashboard stat cards exactly ---- */}
+      <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">
+        <StatCard
           label="Today Cost"
-          value={usage ? formatCost(usage.daily.totalCost) : '$0'}
+          value={usage ? fmtCost(usage.daily.totalCost) : '$0'}
           sub={`${usage?.daily.totalRequests ?? 0} requests`}
-          color="indigo"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          }
+          icon={DollarSign}
+          color="text-indigo-500"
+          bgColor="bg-indigo-500/10"
+          link="/costs"
         />
-        <KpiCard
+        <StatCard
           label="Month Cost"
-          value={usage ? formatCost(usage.monthly.totalCost) : '$0'}
+          value={usage ? fmtCost(usage.monthly.totalCost) : '$0'}
           sub={`${usage?.monthly.totalRequests ?? 0} requests`}
-          color="violet"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-              />
-            </svg>
-          }
+          icon={TrendingUp}
+          color="text-violet-500"
+          bgColor="bg-violet-500/10"
+          link="/costs"
         />
-        <KpiCard
+        <StatCard
           label="Tokens Today"
-          value={formatTokens(usage?.daily.totalTokens ?? 0)}
-          sub={`${formatTokens(usage?.daily.totalInputTokens ?? 0)} in / ${formatTokens(usage?.daily.totalOutputTokens ?? 0)} out`}
-          color="cyan"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
-              />
-            </svg>
-          }
+          value={fmtTokens(usage?.daily.totalTokens ?? 0)}
+          sub={`${fmtTokens(usage?.daily.totalInputTokens ?? 0)} in / ${fmtTokens(usage?.daily.totalOutputTokens ?? 0)} out`}
+          icon={MessageSquare}
+          color="text-cyan-500"
+          bgColor="bg-cyan-500/10"
         />
-        <KpiCard
+        <StatCard
           label="Active Agents"
           value={agentCounts.souls + agentCounts.background + (clawStats?.running ?? 0)}
           sub={`${agentCounts.souls} souls, ${agentCounts.background} bg, ${clawStats?.running ?? 0} claws`}
-          color="green"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z"
-              />
-            </svg>
-          }
+          icon={Bot}
+          color="text-emerald-500"
+          bgColor="bg-emerald-500/10"
+          link="/autonomous"
         />
-        <KpiCard
+        <StatCard
           label="Claw Cycles"
           value={clawStats?.totalCycles ?? 0}
           sub={`${clawStats?.totalToolCalls ?? 0} tool calls`}
-          color="pink"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-          }
+          icon={Zap}
+          color="text-pink-500"
+          bgColor="bg-pink-500/10"
+          link="/claws"
         />
-        <KpiCard
+        <StatCard
           label="Tasks"
           value={summary?.tasks.total ?? 0}
-          sub={`${summary?.tasks.completed ?? 0} done, ${summary?.tasks.overdue ?? 0} overdue`}
-          color="yellow"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-              />
-            </svg>
-          }
+          sub={`${summary?.tasks.completed ?? 0} done${summary?.tasks.overdue ? `, ${summary.tasks.overdue} overdue` : ''}`}
+          icon={CheckCircle2}
+          color="text-amber-500"
+          bgColor="bg-amber-500/10"
+          link="/tasks"
         />
       </div>
 
-      {/* Row 2: Cost Trend + Token Volume */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ChartCard title="Cost Trend">
+      {/* ---- Row 2: Cost Trend + Token Volume ---- */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SectionCard title="Cost Trend" icon={TrendingUp} iconColor="text-indigo-500">
           {dailyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={240}>
               <AreaChart data={dailyData}>
                 <defs>
                   <linearGradient id="costGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
                     <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="var(--color-border-primary, #334155)"
-                  opacity={0.3}
-                />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11 }}
-                  stroke="var(--color-text-secondary, #94a3b8)"
-                />
-                <YAxis
-                  tick={{ fontSize: 11 }}
-                  stroke="var(--color-text-secondary, #94a3b8)"
-                  tickFormatter={(v) => `$${v}`}
-                />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="date" {...axisProps} />
+                <YAxis {...axisProps} tickFormatter={(v) => `$${v}`} />
                 <Tooltip content={<ChartTooltip />} />
                 <Area
                   type="monotone"
@@ -615,92 +657,60 @@ export function AnalyticsPage() {
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[260px] flex items-center justify-center text-sm text-text-secondary dark:text-dark-text-secondary">
-              No cost data for this period
-            </div>
+            <EmptyChart message="No cost data for this period" />
           )}
-        </ChartCard>
+        </SectionCard>
 
-        <ChartCard title="Token Volume">
+        <SectionCard title="Token Volume" icon={BarChart3} iconColor="text-violet-500">
           {dailyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart data={dailyData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="var(--color-border-primary, #334155)"
-                  opacity={0.3}
-                />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11 }}
-                  stroke="var(--color-text-secondary, #94a3b8)"
-                />
-                <YAxis
-                  tick={{ fontSize: 11 }}
-                  stroke="var(--color-text-secondary, #94a3b8)"
-                  tickFormatter={formatTokens}
-                />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="date" {...axisProps} />
+                <YAxis {...axisProps} tickFormatter={fmtTokens} />
                 <Tooltip content={<ChartTooltip />} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                 <Bar
                   dataKey="inputTokens"
                   name="Input Tokens"
                   fill="#6366f1"
-                  radius={[2, 2, 0, 0]}
+                  radius={[3, 3, 0, 0]}
                 />
                 <Bar
                   dataKey="outputTokens"
                   name="Output Tokens"
                   fill="#a855f7"
-                  radius={[2, 2, 0, 0]}
+                  radius={[3, 3, 0, 0]}
                 />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[260px] flex items-center justify-center text-sm text-text-secondary dark:text-dark-text-secondary">
-              No token data for this period
-            </div>
+            <EmptyChart message="No token data for this period" />
           )}
-        </ChartCard>
+        </SectionCard>
       </div>
 
-      {/* Row 3: Provider Breakdown + Agent Distribution + Request Activity */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Provider Cost Breakdown */}
-        <ChartCard title="Cost by Provider">
-          <div className="flex items-center gap-4">
-            <div className="w-36 h-36">
-              <MiniDonut data={providerDonut} colors={COLORS} />
+      {/* ---- Row 3: Provider Breakdown + Agent Distribution + Requests ---- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <SectionCard title="Cost by Provider" icon={DollarSign} iconColor="text-pink-500">
+          {providerDonut.length > 0 ? (
+            <div className="flex items-center gap-4">
+              <div className="w-32 h-32 flex-shrink-0">
+                <MiniDonut data={providerDonut} colors={CHART_COLORS} />
+              </div>
+              <DonutLegend data={providerDonut} colors={CHART_COLORS} />
             </div>
-            <DonutLegend
-              data={providerDonut.map((p) => ({ name: p.name, value: p.value }))}
-              colors={COLORS}
-            />
-          </div>
-        </ChartCard>
+          ) : (
+            <EmptyChart height={140} message="No cost data" />
+          )}
+        </SectionCard>
 
-        {/* Agent Distribution */}
-        <ChartCard title="Agent Distribution">
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={agentBarData} layout="vertical" margin={{ left: 10 }}>
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="var(--color-border-primary, #334155)"
-                opacity={0.3}
-                horizontal={false}
-              />
-              <XAxis
-                type="number"
-                tick={{ fontSize: 11 }}
-                stroke="var(--color-text-secondary, #94a3b8)"
-              />
-              <YAxis
-                dataKey="name"
-                type="category"
-                tick={{ fontSize: 11 }}
-                stroke="var(--color-text-secondary, #94a3b8)"
-                width={85}
-              />
+        <SectionCard title="Agent Distribution" icon={Bot} iconColor="text-emerald-500">
+          <ResponsiveContainer width="100%" height={170}>
+            <BarChart data={agentBarData} layout="vertical" margin={{ left: 0 }}>
+              <CartesianGrid {...gridProps} horizontal={false} />
+              <XAxis type="number" {...axisProps} />
+              <YAxis dataKey="name" type="category" {...axisProps} width={80} />
               <Tooltip content={<ChartTooltip />} />
               <Bar dataKey="count" name="Count" radius={[0, 4, 4, 0]}>
                 {agentBarData.map((d, i) => (
@@ -709,49 +719,30 @@ export function AnalyticsPage() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </ChartCard>
+        </SectionCard>
 
-        {/* Requests by Provider */}
-        <ChartCard title="Requests by Provider">
+        <SectionCard title="Requests by Provider" icon={Activity} iconColor="text-blue-500">
           {providerRequests.length > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={providerRequests} layout="vertical" margin={{ left: 10 }}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="var(--color-border-primary, #334155)"
-                  opacity={0.3}
-                  horizontal={false}
-                />
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 11 }}
-                  stroke="var(--color-text-secondary, #94a3b8)"
-                />
-                <YAxis
-                  dataKey="name"
-                  type="category"
-                  tick={{ fontSize: 11 }}
-                  stroke="var(--color-text-secondary, #94a3b8)"
-                  width={85}
-                />
+            <ResponsiveContainer width="100%" height={170}>
+              <BarChart data={providerRequests} layout="vertical" margin={{ left: 0 }}>
+                <CartesianGrid {...gridProps} horizontal={false} />
+                <XAxis type="number" {...axisProps} />
+                <YAxis dataKey="name" type="category" {...axisProps} width={80} />
                 <Tooltip content={<ChartTooltip />} />
                 <Bar dataKey="requests" name="Requests" fill="#3b82f6" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[180px] flex items-center justify-center text-sm text-text-secondary dark:text-dark-text-secondary">
-              No request data
-            </div>
+            <EmptyChart height={170} message="No request data" />
           )}
-        </ChartCard>
+        </SectionCard>
       </div>
 
-      {/* Row 4: Claw Stats + Task Completion + Habits */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Claw by Mode */}
-        <ChartCard title="Claws by Mode">
-          <div className="flex items-center gap-4">
-            <div className="w-28 h-28">
+      {/* ---- Row 4: Claw Mode/State + Task Gauge + Habits ---- */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <SectionCard title="Claws by Mode" icon={Zap} iconColor="text-pink-500">
+          <div className="flex items-center gap-3">
+            <div className="w-24 h-24 flex-shrink-0">
               <MiniDonut
                 data={clawModeData}
                 colors={['#6366f1', '#ec4899', '#f97316', '#22c55e']}
@@ -762,12 +753,11 @@ export function AnalyticsPage() {
               colors={['#6366f1', '#ec4899', '#f97316', '#22c55e']}
             />
           </div>
-        </ChartCard>
+        </SectionCard>
 
-        {/* Claw by State */}
-        <ChartCard title="Claws by State">
-          <div className="flex items-center gap-4">
-            <div className="w-28 h-28">
+        <SectionCard title="Claws by State" icon={Layers} iconColor="text-cyan-500">
+          <div className="flex items-center gap-3">
+            <div className="w-24 h-24 flex-shrink-0">
               <MiniDonut
                 data={clawStateData}
                 colors={clawStateData.map((d) => STATE_COLORS[d.name] ?? '#64748b')}
@@ -778,13 +768,12 @@ export function AnalyticsPage() {
               colors={clawStateData.map((d) => STATE_COLORS[d.name] ?? '#64748b')}
             />
           </div>
-        </ChartCard>
+        </SectionCard>
 
-        {/* Task Completion Gauge */}
-        <ChartCard title="Task Completion">
-          {taskProgress ? (
+        <SectionCard title="Task Completion" icon={CheckCircle2} iconColor="text-success">
+          {taskProgress && taskProgress.total > 0 ? (
             <div className="flex flex-col items-center">
-              <div className="w-28 h-28">
+              <div className="w-24 h-24">
                 <ResponsiveContainer width="100%" height="100%">
                   <RadialBarChart
                     cx="50%"
@@ -793,35 +782,32 @@ export function AnalyticsPage() {
                     outerRadius="100%"
                     startAngle={180}
                     endAngle={0}
-                    data={taskRadial}
+                    data={[{ name: 'Done', value: taskProgress.pct, fill: '#22c55e' }]}
                   >
                     <RadialBar
                       dataKey="value"
                       cornerRadius={10}
-                      background={{ fill: 'var(--color-bg-secondary, #1e293b)' }}
+                      background={{ fill: 'var(--color-bg-tertiary, #1e293b)' }}
                     />
                   </RadialBarChart>
                 </ResponsiveContainer>
               </div>
-              <p className="text-2xl font-bold text-text-primary dark:text-dark-text-primary -mt-4">
+              <p className="text-2xl font-bold text-text-primary dark:text-dark-text-primary -mt-3">
                 {taskProgress.pct}%
               </p>
-              <p className="text-xs text-text-secondary dark:text-dark-text-secondary mt-0.5">
+              <p className="text-xs text-text-muted dark:text-dark-text-muted mt-0.5">
                 {taskProgress.completed}/{taskProgress.total} tasks
               </p>
             </div>
           ) : (
-            <div className="h-28 flex items-center justify-center text-sm text-text-secondary">
-              No tasks
-            </div>
+            <EmptyChart height={120} message="No tasks" />
           )}
-        </ChartCard>
+        </SectionCard>
 
-        {/* Habits */}
-        <ChartCard title="Habits Today">
-          {habitData ? (
+        <SectionCard title="Habits Today" icon={Repeat} iconColor="text-emerald-500">
+          {habitData && habitData.totalToday > 0 ? (
             <div className="flex flex-col items-center">
-              <div className="w-28 h-28">
+              <div className="w-24 h-24">
                 <ResponsiveContainer width="100%" height="100%">
                   <RadialBarChart
                     cx="50%"
@@ -835,44 +821,39 @@ export function AnalyticsPage() {
                     <RadialBar
                       dataKey="value"
                       cornerRadius={10}
-                      background={{ fill: 'var(--color-bg-secondary, #1e293b)' }}
+                      background={{ fill: 'var(--color-bg-tertiary, #1e293b)' }}
                     />
                   </RadialBarChart>
                 </ResponsiveContainer>
               </div>
-              <p className="text-2xl font-bold text-text-primary dark:text-dark-text-primary -mt-4">
+              <p className="text-2xl font-bold text-text-primary dark:text-dark-text-primary -mt-3">
                 {habitData.percentage}%
               </p>
-              <p className="text-xs text-text-secondary dark:text-dark-text-secondary mt-0.5">
-                {habitData.completedToday}/{habitData.totalToday} habits | Best streak:{' '}
-                {habitData.bestStreak}
+              <p className="text-xs text-text-muted dark:text-dark-text-muted mt-0.5">
+                {habitData.completedToday}/{habitData.totalToday} habits | {habitData.bestStreak}d
+                streak
               </p>
             </div>
           ) : (
-            <div className="h-28 flex items-center justify-center text-sm text-text-secondary dark:text-dark-text-secondary">
-              No habits
-            </div>
+            <EmptyChart height={120} message="No habits today" />
           )}
-        </ChartCard>
+        </SectionCard>
       </div>
 
-      {/* Row 5: Daily Requests Line + Claw Summary Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <ChartCard title="Daily Requests" className="lg:col-span-2">
+      {/* ---- Row 5: Daily Requests + Claw Summary ---- */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <SectionCard
+          title="Daily Requests"
+          icon={Activity}
+          iconColor="text-blue-500"
+          className="lg:col-span-2"
+        >
           {dailyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <LineChart data={dailyData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="var(--color-border-primary, #334155)"
-                  opacity={0.3}
-                />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11 }}
-                  stroke="var(--color-text-secondary, #94a3b8)"
-                />
-                <YAxis tick={{ fontSize: 11 }} stroke="var(--color-text-secondary, #94a3b8)" />
+                <CartesianGrid {...gridProps} />
+                <XAxis dataKey="date" {...axisProps} />
+                <YAxis {...axisProps} />
                 <Tooltip content={<ChartTooltip />} />
                 <Line
                   type="monotone"
@@ -885,105 +866,120 @@ export function AnalyticsPage() {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-sm text-text-secondary dark:text-dark-text-secondary">
-              No request data
-            </div>
+            <EmptyChart height={200} message="No request data" />
           )}
-        </ChartCard>
+        </SectionCard>
 
-        {/* Claw Summary */}
-        <ChartCard title="Claw Runtime Summary">
-          <div className="grid grid-cols-2 gap-3">
+        <SectionCard title="Claw Runtime" icon={Zap} iconColor="text-pink-500">
+          <div className="grid grid-cols-2 gap-2">
             {[
-              { label: 'Total Claws', value: clawStats?.total ?? 0, color: 'text-indigo-500' },
-              { label: 'Running', value: clawStats?.running ?? 0, color: 'text-green-500' },
-              {
-                label: 'Total Cycles',
-                value: clawStats?.totalCycles ?? 0,
-                color: 'text-purple-500',
-              },
+              { label: 'Total', value: clawStats?.total ?? 0, color: 'text-indigo-500' },
+              { label: 'Running', value: clawStats?.running ?? 0, color: 'text-emerald-500' },
+              { label: 'Cycles', value: clawStats?.totalCycles ?? 0, color: 'text-violet-500' },
               {
                 label: 'Tool Calls',
                 value: clawStats?.totalToolCalls ?? 0,
                 color: 'text-pink-500',
               },
-              {
-                label: 'Total Cost',
-                value: formatCost(clawStats?.totalCost ?? 0),
-                color: 'text-amber-500',
-              },
+              { label: 'Cost', value: fmtCost(clawStats?.totalCost ?? 0), color: 'text-amber-500' },
               { label: 'Workflows', value: agentCounts.workflows, color: 'text-cyan-500' },
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-lg bg-bg-secondary dark:bg-dark-bg-tertiary p-3 text-center"
+                className="rounded-lg bg-bg-tertiary dark:bg-dark-bg-tertiary p-2.5 text-center"
               >
-                <p className={`text-xl font-bold ${item.color}`}>{item.value}</p>
-                <p className="text-[10px] font-medium text-text-secondary dark:text-dark-text-secondary uppercase tracking-wider mt-0.5">
+                <p className={`text-lg font-bold ${item.color}`}>{item.value}</p>
+                <p className="text-[10px] font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
                   {item.label}
                 </p>
               </div>
             ))}
           </div>
-        </ChartCard>
+        </SectionCard>
       </div>
 
-      {/* Row 6: Personal Data Overview */}
+      {/* ---- Row 6: Personal Data Overview ---- */}
       {summary && (
-        <ChartCard title="Personal Data Overview">
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+        <SectionCard title="Personal Data" icon={FileText} iconColor="text-indigo-500">
+          <div className="grid grid-cols-3 md:grid-cols-7 gap-3">
             {[
+              {
+                label: 'Tasks',
+                value: summary.tasks.total,
+                icon: CheckCircle2,
+                color: 'text-indigo-500',
+                bgColor: 'bg-indigo-500/10',
+                link: '/tasks',
+              },
               {
                 label: 'Notes',
                 value: summary.notes.total,
-                recent: summary.notes.recent,
-                color: '#6366f1',
-              },
-              {
-                label: 'Bookmarks',
-                value: summary.bookmarks.total,
-                recent: summary.bookmarks.favorites,
-                color: '#8b5cf6',
-              },
-              {
-                label: 'Contacts',
-                value: summary.contacts.total,
-                recent: summary.contacts.favorites,
-                color: '#ec4899',
+                icon: FileText,
+                color: 'text-orange-500',
+                bgColor: 'bg-orange-500/10',
+                link: '/notes',
               },
               {
                 label: 'Events',
                 value: summary.calendar.total,
-                recent: summary.calendar.today,
-                color: '#f97316',
+                icon: Calendar,
+                color: 'text-emerald-500',
+                bgColor: 'bg-emerald-500/10',
+                link: '/calendar',
+              },
+              {
+                label: 'Contacts',
+                value: summary.contacts.total,
+                icon: Users,
+                color: 'text-purple-500',
+                bgColor: 'bg-purple-500/10',
+                link: '/contacts',
+              },
+              {
+                label: 'Bookmarks',
+                value: summary.bookmarks.total,
+                icon: Bookmark,
+                color: 'text-blue-500',
+                bgColor: 'bg-blue-500/10',
+                link: '/bookmarks',
+              },
+              {
+                label: 'Habits',
+                value: habitData?.total ?? 0,
+                icon: Repeat,
+                color: 'text-emerald-500',
+                bgColor: 'bg-emerald-500/10',
+                link: '/habits',
               },
               {
                 label: 'Expenses',
                 value: summary.expenses?.total ?? 0,
-                recent: 0,
-                color: '#eab308',
+                icon: Receipt,
+                color: 'text-orange-500',
+                bgColor: 'bg-orange-500/10',
+                link: '/expenses',
               },
-              { label: 'Memories', value: 0, recent: 0, color: '#22c55e' },
             ].map((item) => (
-              <div key={item.label} className="text-center">
+              <Link
+                key={item.label}
+                to={item.link}
+                className="flex flex-col items-center p-3 rounded-lg hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary transition-colors group"
+              >
                 <div
-                  className="w-12 h-12 rounded-full mx-auto mb-2 flex items-center justify-center text-white font-bold text-lg"
-                  style={{ background: item.color }}
+                  className={`w-10 h-10 rounded-lg ${item.bgColor} flex items-center justify-center mb-1.5`}
                 >
-                  {item.value}
+                  <item.icon className={`w-5 h-5 ${item.color}`} />
                 </div>
-                <p className="text-xs font-medium text-text-primary dark:text-dark-text-primary">
+                <p className="text-lg font-bold text-text-primary dark:text-dark-text-primary">
+                  {item.value}
+                </p>
+                <p className="text-[10px] text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
                   {item.label}
                 </p>
-                {item.recent > 0 && (
-                  <p className="text-[10px] text-text-secondary dark:text-dark-text-secondary">
-                    {item.recent} active
-                  </p>
-                )}
-              </div>
+              </Link>
             ))}
           </div>
-        </ChartCard>
+        </SectionCard>
       )}
     </div>
   );

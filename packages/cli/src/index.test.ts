@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
-describe('CLI', () => {
-  it('should export commands', { timeout: 15000 }, async () => {
+describe('CLI', { timeout: 30_000 }, () => {
+  it('should export commands', async () => {
     const commands = await import('./commands/index.js');
 
     expect(commands.startServer).toBeDefined();

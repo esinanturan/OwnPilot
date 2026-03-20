@@ -1,7 +1,7 @@
 # OwnPilot
 
 <p align="center">
-  <img src="ownpilot_.png" alt="OwnPilot — Privacy-First Personal AI Assistant Platform" width="100%" />
+  <img src="ownpilot_.jpeg" alt="OwnPilot — Privacy-First Personal AI Assistant Platform" width="100%" />
 </p>
 
 <p align="center">

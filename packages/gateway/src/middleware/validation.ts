@@ -526,6 +526,9 @@ export const providerConfigSchema = z.object({
   isEnabled: z.boolean().optional(),
   apiKeyEnv: z.string().max(200).optional(),
   notes: z.string().max(2000).optional(),
+  billingType: z.enum(['pay-per-use', 'subscription', 'free']).optional(),
+  subscriptionCostUsd: z.number().min(0).max(10000).optional(),
+  subscriptionPlan: z.string().max(200).optional(),
 });
 
 // ─── Workspace File & Execute Schemas ───────────────────────────

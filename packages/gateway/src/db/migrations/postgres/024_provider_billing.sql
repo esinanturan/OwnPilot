@@ -7,7 +7,16 @@ ALTER TABLE custom_providers ADD COLUMN IF NOT EXISTS subscription_cost_usd REAL
 ALTER TABLE custom_providers ADD COLUMN IF NOT EXISTS subscription_plan TEXT;
 ALTER TABLE custom_providers ADD COLUMN IF NOT EXISTS billing_notes TEXT;
 
+-- Add billing columns to user_provider_configs (built-in provider overrides)
+ALTER TABLE user_provider_configs ADD COLUMN IF NOT EXISTS billing_type TEXT NOT NULL DEFAULT 'pay-per-use';
+ALTER TABLE user_provider_configs ADD COLUMN IF NOT EXISTS subscription_cost_usd REAL;
+ALTER TABLE user_provider_configs ADD COLUMN IF NOT EXISTS subscription_plan TEXT;
+
 -- Set known free providers
 UPDATE custom_providers SET billing_type = 'free'
+WHERE provider_id IN ('local', 'ollama', 'lmstudio', 'localai', 'vllm')
+  AND billing_type = 'pay-per-use';
+
+UPDATE user_provider_configs SET billing_type = 'free'
 WHERE provider_id IN ('local', 'ollama', 'lmstudio', 'localai', 'vllm')
   AND billing_type = 'pay-per-use';

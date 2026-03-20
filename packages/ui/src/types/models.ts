@@ -17,6 +17,9 @@ export interface ModelInfo {
   recommended?: boolean;
 }
 
+/** Billing type for AI providers */
+export type BillingType = 'pay-per-use' | 'subscription' | 'free';
+
 /** Full provider info as returned by /api/v1/providers */
 export interface ProviderInfo {
   id: string;
@@ -28,6 +31,9 @@ export interface ProviderInfo {
   isConfigured: boolean;
   isEnabled: boolean;
   hasOverride: boolean;
+  billingType?: BillingType;
+  subscriptionCostUsd?: number;
+  subscriptionPlan?: string;
   color?: string;
   modelCount: number;
   features: {
@@ -58,6 +64,9 @@ export interface UserOverride {
   isEnabled: boolean;
   apiKeyEnv?: string;
   notes?: string;
+  billingType?: BillingType;
+  subscriptionCostUsd?: number;
+  subscriptionPlan?: string;
 }
 
 /** Local provider (Ollama, LM Studio, etc.) */

@@ -37,11 +37,15 @@ export function ProvidersTab() {
     providerType: string;
     isEnabled: boolean;
     notes: string;
+    billingType?: 'pay-per-use' | 'subscription' | 'free';
+    subscriptionCostUsd?: number;
+    subscriptionPlan?: string;
   }>({
     baseUrl: '',
     providerType: '',
     isEnabled: true,
     notes: '',
+    billingType: 'pay-per-use',
   });
   const [saving, setSaving] = useState(false);
 
@@ -85,6 +89,9 @@ export function ProvidersTab() {
         providerType: override.providerType || (baseConfig as Record<string, string>).type || '',
         isEnabled: override.isEnabled !== false,
         notes: override.notes || '',
+        billingType: override.billingType ?? 'pay-per-use',
+        subscriptionCostUsd: override.subscriptionCostUsd,
+        subscriptionPlan: override.subscriptionPlan,
       });
       setEditingProvider(providerId);
     } catch {
@@ -101,6 +108,11 @@ export function ProvidersTab() {
         providerType: editForm.providerType || undefined,
         isEnabled: editForm.isEnabled,
         notes: editForm.notes || undefined,
+        billingType: editForm.billingType,
+        subscriptionCostUsd:
+          editForm.billingType === 'subscription' ? editForm.subscriptionCostUsd : undefined,
+        subscriptionPlan:
+          editForm.billingType === 'subscription' ? editForm.subscriptionPlan : undefined,
       });
       // Refresh providers
       await fetchProviders();
@@ -177,6 +189,17 @@ export function ProvidersTab() {
               {provider.hasOverride && (
                 <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
                   Override
+                </span>
+              )}
+              {provider.billingType === 'subscription' && (
+                <span className="text-xs px-1.5 py-0.5 bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 rounded">
+                  Subscription
+                  {provider.subscriptionCostUsd ? ` $${provider.subscriptionCostUsd}/mo` : ''}
+                </span>
+              )}
+              {provider.billingType === 'free' && (
+                <span className="text-xs px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded">
+                  Free
                 </span>
               )}
             </div>
@@ -433,6 +456,72 @@ export function ProvidersTab() {
                     className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                   />
                 </div>
+
+                {/* Billing Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Billing Type
+                  </label>
+                  <select
+                    value={editForm.billingType ?? 'pay-per-use'}
+                    onChange={(e) =>
+                      setEditForm((f) => ({ ...f, billingType: e.target.value as never }))
+                    }
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="pay-per-use">Pay-per-use (API)</option>
+                    <option value="subscription">Subscription (flat monthly fee)</option>
+                    <option value="free">Free (local / free tier)</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Pay-per-use: billed per token. Subscription: fixed monthly fee, no per-token
+                    cost. Free: no cost.
+                  </p>
+                </div>
+
+                {/* Subscription details (only if subscription) */}
+                {editForm.billingType === 'subscription' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Monthly Cost (USD)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editForm.subscriptionCostUsd ?? ''}
+                        onChange={(e) =>
+                          setEditForm((f) => ({
+                            ...f,
+                            subscriptionCostUsd: e.target.value
+                              ? parseFloat(e.target.value)
+                              : undefined,
+                          }))
+                        }
+                        placeholder="e.g. 20.00"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Plan Name
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.subscriptionPlan ?? ''}
+                        onChange={(e) =>
+                          setEditForm((f) => ({
+                            ...f,
+                            subscriptionPlan: e.target.value || undefined,
+                          }))
+                        }
+                        placeholder="e.g. ChatGPT Plus"
+                        className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}

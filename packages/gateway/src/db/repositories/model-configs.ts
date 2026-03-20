@@ -100,6 +100,9 @@ export interface UserProviderConfig {
   isEnabled: boolean;
   apiKeyEnv?: string;
   notes?: string;
+  billingType: 'pay-per-use' | 'subscription' | 'free';
+  subscriptionCostUsd?: number;
+  subscriptionPlan?: string;
   config: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -196,6 +199,9 @@ interface UserProviderConfigRow {
   is_enabled: boolean;
   api_key_env: string | null;
   notes: string | null;
+  billing_type: string | null;
+  subscription_cost_usd: number | null;
+  subscription_plan: string | null;
   config: string;
   created_at: string;
   updated_at: string;
@@ -247,6 +253,7 @@ function rowToProvider(row: CustomProviderRow): CustomProvider {
 }
 
 function rowToUserProviderConfig(row: UserProviderConfigRow): UserProviderConfig {
+  const billingType = row.billing_type as UserProviderConfig['billingType'] | null;
   return {
     id: row.id,
     userId: row.user_id,
@@ -256,6 +263,9 @@ function rowToUserProviderConfig(row: UserProviderConfigRow): UserProviderConfig
     isEnabled: row.is_enabled,
     apiKeyEnv: row.api_key_env || undefined,
     notes: row.notes || undefined,
+    billingType: billingType ?? 'pay-per-use',
+    subscriptionCostUsd: row.subscription_cost_usd ?? undefined,
+    subscriptionPlan: row.subscription_plan ?? undefined,
     config: parseJsonField(row.config, {}),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),

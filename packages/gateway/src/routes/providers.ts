@@ -257,6 +257,10 @@ app.get('/', async (c) => {
       isEnabled: override?.isEnabled !== false,
       // Has user override
       hasOverride: !!override,
+      // Billing
+      billingType: override?.billingType ?? 'pay-per-use',
+      subscriptionCostUsd: override?.subscriptionCostUsd,
+      subscriptionPlan: override?.subscriptionPlan,
       // Configuration source: 'database' = set via UI, 'environment' = set via env var
       configSource,
       // UI metadata
@@ -298,6 +302,9 @@ app.get('/', async (c) => {
       isConfigured: true,
       isEnabled: true,
       hasOverride: false,
+      billingType: 'free' as const,
+      subscriptionCostUsd: undefined,
+      subscriptionPlan: undefined,
       configSource: 'database' as const,
       color: localProviderColors[lp.providerType] ?? '#10b981',
       apiKeyPlaceholder: undefined,
@@ -331,6 +338,9 @@ app.get('/', async (c) => {
       isConfigured: cli.authenticated,
       isEnabled: true,
       hasOverride: false,
+      billingType: 'free' as const,
+      subscriptionCostUsd: undefined,
+      subscriptionPlan: undefined,
       configSource: 'database' as const, // CLI providers are auto-detected
       color: cliProviderColors[cli.id] ?? '#666666',
       apiKeyPlaceholder: undefined,
@@ -423,6 +433,9 @@ app.get('/:id', async (c) => {
     isEnabled: override?.isEnabled !== false,
     hasOverride: !!override,
     // Include user override details if present
+    billingType: override?.billingType ?? 'pay-per-use',
+    subscriptionCostUsd: override?.subscriptionCostUsd,
+    subscriptionPlan: override?.subscriptionPlan,
     userOverride: override
       ? {
           baseUrl: override.baseUrl,
@@ -430,6 +443,9 @@ app.get('/:id', async (c) => {
           isEnabled: override.isEnabled,
           apiKeyEnv: override.apiKeyEnv,
           notes: override.notes,
+          billingType: override.billingType,
+          subscriptionCostUsd: override.subscriptionCostUsd,
+          subscriptionPlan: override.subscriptionPlan,
         }
       : null,
     // UI metadata

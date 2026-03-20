@@ -37,7 +37,6 @@
       "capabilities": [
         "chat",
         "vision",
-        "function_calling",
         "reasoning",
         "streaming"
       ],

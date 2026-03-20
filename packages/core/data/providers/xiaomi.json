@@ -12,6 +12,40 @@
   },
   "models": [
     {
+      "id": "mimo-v2-omni",
+      "name": "MiMo-V2-Omni",
+      "contextWindow": 256000,
+      "maxOutput": 128000,
+      "inputPrice": 0.4,
+      "outputPrice": 2,
+      "capabilities": [
+        "chat",
+        "vision",
+        "audio",
+        "function_calling",
+        "reasoning",
+        "streaming"
+      ],
+      "default": true,
+      "releaseDate": "2026-03-18"
+    },
+    {
+      "id": "mimo-v2-pro",
+      "name": "MiMo-V2-Pro",
+      "contextWindow": 1000000,
+      "maxOutput": 128000,
+      "inputPrice": 1,
+      "outputPrice": 3,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "reasoning",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2026-03-18"
+    },
+    {
       "id": "mimo-v2-flash",
       "name": "MiMo-V2-Flash",
       "contextWindow": 256000,
@@ -24,7 +58,7 @@
         "reasoning",
         "streaming"
       ],
-      "default": true,
+      "default": false,
       "releaseDate": "2025-12-16"
     }
   ],

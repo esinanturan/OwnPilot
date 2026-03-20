@@ -12,6 +12,40 @@
   },
   "models": [
     {
+      "id": "mimo-v2-omni-free",
+      "name": "MiMo V2 Omni Free",
+      "contextWindow": 262144,
+      "maxOutput": 64000,
+      "inputPrice": 0,
+      "outputPrice": 0,
+      "capabilities": [
+        "chat",
+        "vision",
+        "audio",
+        "function_calling",
+        "reasoning",
+        "streaming"
+      ],
+      "default": true,
+      "releaseDate": "2026-03-18"
+    },
+    {
+      "id": "mimo-v2-pro-free",
+      "name": "MiMo V2 Pro Free",
+      "contextWindow": 1048576,
+      "maxOutput": 64000,
+      "inputPrice": 0,
+      "outputPrice": 0,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "reasoning",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2026-03-18"
+    },
+    {
       "id": "gpt-5.4-nano",
       "name": "GPT-5.4 Nano",
       "contextWindow": 400000,
@@ -26,7 +60,7 @@
         "reasoning",
         "streaming"
       ],
-      "default": true,
+      "default": false,
       "releaseDate": "2026-03-17"
     },
     {

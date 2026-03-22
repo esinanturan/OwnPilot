@@ -417,7 +417,7 @@ export type { CrewMemberInfo, CrewContextInfo } from './soul/index.js';
 // Crew Orchestrator helpers (values — not types)
 export { buildCrewContextSection, COORDINATION_GUIDANCE } from './soul/index.js';
 
-// Fleet System (coordinated background agent army)
+// Fleet System (coordinated multi-worker agent fleet)
 export type {
   FleetWorkerType,
   FleetScheduleType,

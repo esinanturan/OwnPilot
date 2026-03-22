@@ -1,7 +1,7 @@
 /**
  * Agent Runner Utils Tests
  *
- * Tests for shared utilities used by BackgroundAgentRunner,
+ * Tests for shared utilities used by ClawRunner,
  * SubagentRunner, and FleetWorker.
  */
 

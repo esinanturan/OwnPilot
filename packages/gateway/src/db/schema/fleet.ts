@@ -1,10 +1,10 @@
 /**
- * Fleet Schema — Coordinated background agent army tables
+ * Fleet Schema — Coordinated multi-worker agent fleet tables
  */
 
 export const FLEET_TABLES_SQL = `
 -- =====================================================
--- FLEET TABLES (coordinated background agent army)
+-- FLEET TABLES (coordinated multi-worker agent fleet)
 -- =====================================================
 
 -- Fleet configurations

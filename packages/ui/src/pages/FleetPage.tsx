@@ -2209,7 +2209,7 @@ export function FleetPage() {
             icon: Layers,
             title: 'Built on Top of Existing Services',
             description:
-              'Fleet workers reuse the same engines as background agents, coding agents, and MCP servers. No new infrastructure needed — just orchestration.',
+              'Fleet workers reuse the same engines as claw agents, coding agents, and MCP servers. No new infrastructure needed — just orchestration.',
             color: 'blue',
           }}
         />

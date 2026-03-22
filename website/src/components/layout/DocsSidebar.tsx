@@ -44,7 +44,7 @@ export const docsNav: NavItem[] = [
     items: [
       { title: 'Agent Overview', href: '/docs/agents' },
       { title: 'Soul Agents', href: '/docs/agents/soul' },
-      { title: 'Background Agents', href: '/docs/agents/background' },
+      { title: 'Claw Agents', href: '/docs/agents/claw' },
       { title: 'Subagents', href: '/docs/agents/subagents' },
       { title: 'Agent Orchestra', href: '/docs/agents/orchestra' },
       { title: 'Crew System', href: '/docs/agents/crew' },

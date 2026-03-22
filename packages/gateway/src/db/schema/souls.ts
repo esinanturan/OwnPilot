@@ -1,5 +1,5 @@
 /**
- * Agent Souls, Crews, Heartbeat, Background Agents & Subagent Tables
+ * Agent Souls, Crews, Heartbeat & Subagent Tables
  */
 
 export const SOULS_TABLES_SQL = `

@@ -72,7 +72,7 @@ export interface AgentResult {
  * Unified lifecycle interface for all agent types.
  *
  * Not all methods apply to all agent types — `pause()` and `resume()`
- * are only meaningful for background agents. Implementations that don't
+ * are only meaningful for autonomous agents. Implementations that don't
  * support these should throw or no-op.
  */
 export interface IAgentLifecycle {
@@ -90,10 +90,10 @@ export interface IAgentLifecycle {
   /** Cancel the current execution. */
   cancel(): Promise<void>;
 
-  /** Pause execution (background agents only). */
+  /** Pause execution (autonomous agents only). */
   pause?(): Promise<void>;
 
-  /** Resume execution (background agents only). */
+  /** Resume execution (autonomous agents only). */
   resume?(): Promise<void>;
 
   /** Get resource usage metrics. */

@@ -1,6 +1,6 @@
 # OwnPilot
 
-> Privacy-first personal AI assistant platform with Claw autonomous agents, soul agents, autonomous background agents, multi-agent orchestration, AI agent creator, tool orchestration, multi-provider support, MCP integration, voice pipeline, browser automation, IoT edge device control, and Telegram + WhatsApp connectivity.
+> Privacy-first personal AI assistant platform with Claw autonomous agents, soul agents, multi-agent orchestration, AI agent creator, tool orchestration, multi-provider support, MCP integration, voice pipeline, browser automation, IoT edge device control, and Telegram + WhatsApp connectivity.
 >
 >**Self-hosted. Your data stays yours.**
 
@@ -36,7 +36,6 @@
 - [Autonomous Hub](#autonomous-hub)
 - [Agent Orchestra](#agent-orchestra)
 - [Claw Agents](#claw-agents)
-- [Background Agents](#background-agents-1)
 - [Subagents](#subagents)
 - [Tool System](#tool-system)
 - [MCP Integration](#mcp-integration)
@@ -141,20 +140,9 @@
 - **6 Templates** — Research Agent, Code Reviewer, Data Analyst, Monitor & Alert, Content Creator, Event Reactor
 - **Resource Limits** — MAX_CONCURRENT_CLAWS=50, generous defaults (50 turns, 500 tool calls, 10min timeout, unlimited budget)
 
-### Background Agents
-
-- **Persistent Autonomous Agents** — Long-running agents that operate independently with configurable missions, schedules, and tool access
-- **3 Scheduling Modes** — Interval (fixed timer), continuous (adaptive delays), event-driven (reactive to triggers)
-- **Full Tool Access** — Same capabilities as chat agents: 250+ tools, extensions, plugins, MCP tools, memory injection
-- **Configurable Provider/Model** — Each agent can use a different AI provider and model, with fallback to system defaults
-- **Workspace Isolation** — Each agent gets an isolated file workspace for safe file operations
-- **Rate Limiting & Budget** — Cycles-per-hour enforcement, budget tracking with auto-stop, auto-pause on consecutive errors
-- **Session Persistence** — Agent state persisted to DB every 30 seconds, auto-recovery on server restart
-- **Inbox Messaging** — Send messages to running agents; agents process inbox at the start of each cycle
-
 ### Subagents
 
-- **Parallel Task Delegation** — Chat agents and background agents can spawn lightweight child agents for concurrent task execution
+- **Parallel Task Delegation** — Chat agents and claw agents can spawn lightweight child agents for concurrent task execution
 - **Fire-and-Forget Model** — Spawn returns immediately with a session ID; parent polls for results via `check_subagent`/`get_subagent_result`
 - **Budget Enforcement** — Configurable concurrent limit (default 5), total spawn limit (default 20), and nesting depth cap (max 2 levels)
 - **Full Tool Access** — Subagents inherit the parent's full tool pipeline; optional `allowedTools` restriction
@@ -524,7 +512,7 @@ The API server built on [Hono](https://hono.dev/). Handles HTTP/WebSocket commun
 | **AI Configuration**   | `models.ts`, `providers.ts`, `model-configs.ts`, `local-providers.ts`, `model-routing.ts`                                                                                         |
 | **Personal Data**      | `personal-data.ts`, `personal-data-tools.ts`, `memories.ts`, `goals.ts`, `expenses.ts`, `custom-data.ts`                                                                          |
 | **Productivity**       | `productivity.ts` (Pomodoro, Habits, Captures)                                                                                                                                    |
-| **Automation**         | `triggers.ts`, `heartbeats.ts`, `plans.ts`, `autonomy.ts`, `workflows.ts`, `workflow-copilot.ts`, `background-agents.ts`, `souls.ts`                                              |
+| **Automation**         | `triggers.ts`, `heartbeats.ts`, `plans.ts`, `autonomy.ts`, `workflows.ts`, `workflow-copilot.ts`, `souls.ts`                                              |
 | **Tools & Extensions** | `tools.ts`, `custom-tools.ts`, `plugins.ts`, `extensions.ts`, `skills.ts`, `mcp.ts`, `composio.ts`                                                                                |
 | **Coding & CLI**       | `coding-agents.ts`, `cli-tools.ts`, `cli-providers.ts`                                                                                                                            |
 | **Orchestration**      | `orchestra.ts`, `artifacts.ts`, `browser.ts`, `voice.ts`, `bridges.ts`                                                                                                            |
@@ -533,9 +521,9 @@ The API server built on [Hono](https://hono.dev/). Handles HTTP/WebSocket commun
 | **Configuration**      | `settings.ts`, `config-services.ts`, `ui-auth.ts`                                                                                                                                 |
 | **System**             | `health.ts`, `dashboard.ts`, `costs.ts`, `audit.ts`, `debug.ts`, `database.ts`, `profile.ts`, `workspaces.ts`, `file-workspaces.ts`, `execution-permissions.ts`, `error-codes.ts` |
 
-**Services (108):** MessageBus, ConfigCenter, ToolExecutor, ProviderService, McpClientService, McpServerService, ExtensionService, ComposioService, EmbeddingService, HeartbeatService, AuditService, PluginService, MemoryService, GoalService, TriggerService, PlanService, WorkspaceService, DatabaseService, SessionService, LogService, ResourceService, LocalDiscovery, WorkflowService, AgentSkillsParser, CodingAgentService, CodingAgentSessions, CliToolService, CliToolsDiscovery, ModelRouting, ExecutionApproval, BackgroundAgentManager, BackgroundAgentRunner, ChannelVerificationService, OrchestraEngine, ArtifactService, ArtifactDataResolver, VoiceService, BrowserService, EdgeService, EdgeMqttClient, SubagentService, SubagentManager, SoulService, CrewService, AgentMessagesService, and more.
+**Services (108):** MessageBus, ConfigCenter, ToolExecutor, ProviderService, McpClientService, McpServerService, ExtensionService, ComposioService, EmbeddingService, HeartbeatService, AuditService, PluginService, MemoryService, GoalService, TriggerService, PlanService, WorkspaceService, DatabaseService, SessionService, LogService, ResourceService, LocalDiscovery, WorkflowService, AgentSkillsParser, CodingAgentService, CodingAgentSessions, CliToolService, CliToolsDiscovery, ModelRouting, ExecutionApproval, ClawManager, ClawRunner, ChannelVerificationService, OrchestraEngine, ArtifactService, ArtifactDataResolver, VoiceService, BrowserService, EdgeService, EdgeMqttClient, SubagentService, SubagentManager, SoulService, CrewService, AgentMessagesService, and more.
 
-**Repositories (67):** agents, conversations, messages, tasks, notes, bookmarks, calendar, contacts, memories, goals, triggers, plans, expenses, custom-data, custom-tools, plugins, channels, channel-messages, channel-users, channel-sessions, channel-verification, costs, settings, config-services, pomodoro, habits, captures, workspaces, model-configs, execution-permissions, logs, mcp-servers, extensions, local-providers, heartbeats, embedding-cache, workflows, autonomy-log, coding-agent-results, cli-providers, cli-tool-policies, background-agents, orchestra, artifacts, channel-bridges, browser-workflows, edge-devices, edge-commands, edge-telemetry, subagent-history, souls, crews, agent-messages.
+**Repositories (67):** agents, conversations, messages, tasks, notes, bookmarks, calendar, contacts, memories, goals, triggers, plans, expenses, custom-data, custom-tools, plugins, channels, channel-messages, channel-users, channel-sessions, channel-verification, costs, settings, config-services, pomodoro, habits, captures, workspaces, model-configs, execution-permissions, logs, mcp-servers, extensions, local-providers, heartbeats, embedding-cache, workflows, autonomy-log, coding-agent-results, cli-providers, cli-tool-policies, claws, orchestra, artifacts, channel-bridges, browser-workflows, edge-devices, edge-commands, edge-telemetry, subagent-history, souls, crews, agent-messages.
 
 ### UI (`@ownpilot/ui`)
 
@@ -573,8 +561,7 @@ Modern web interface built with React 19, Vite 7, and Tailwind CSS 4. Minimal de
 | **Models / AI Models / Costs**                      | AI model browser, configuration, and usage tracking                                        |
 | **Providers**                                       | Provider management and status                                                             |
 | **Model Routing**                                   | Per-process model selection with fallback chains                                           |
-| **Autonomous Hub**                                  | Unified command center for soul agents, background agents, crews, messaging, and activity  |
-| **Background Agents**                               | Create, monitor, and manage persistent autonomous agents with cycle history                |
+| **Autonomous Hub**                                  | Unified command center for soul agents, claw agents, crews, messaging, and activity        |
 | **Event Monitor**                                   | Live EventBus event stream viewer for real-time debugging                                  |
 | **Channels**                                        | Channel management with connect/disconnect/logout, user approval, QR code display          |
 | **Plugins / Workspaces / Wizards**                  | Extension management, workspace management, guided setup wizards                           |
@@ -722,7 +709,7 @@ Agents are AI assistants with specific system prompts, tool assignments, model p
 
 ## Soul Agents
 
-Soul agents are autonomous agents with rich identity, personality, and heartbeat-driven lifecycle. They combine the scheduling power of background agents with a full identity framework.
+Soul agents are autonomous agents with rich identity, personality, and heartbeat-driven lifecycle. They combine scheduling with a full identity framework.
 
 ### Soul Configuration
 
@@ -804,59 +791,14 @@ The creator uses a dedicated agent with a specialized system prompt, ensuring it
 
 ---
 
-## Background Agents
-
-Persistent autonomous agents that run independently from user chat sessions.
-
-### Configuration
-
-```typescript
-{
-  name: string               // Agent name
-  mission: string            // What the agent should accomplish
-  mode: 'interval' | 'continuous' | 'event'  // Scheduling mode
-  intervalMs: number         // Cycle interval (for interval mode)
-  provider?: string          // AI provider (optional, uses system default)
-  model?: string             // AI model (optional, uses system default)
-  allowedTools: string[]     // Tool whitelist (empty = all tools)
-  autoStart: boolean         // Start on server boot
-  limits: {
-    maxTurnsPerCycle: number   // Max LLM round-trips per cycle
-    maxToolCallsPerCycle: number // Max tool invocations per cycle
-    maxCyclesPerHour: number   // Rate limit
-    cycleTimeoutMs: number     // Per-cycle timeout
-  }
-}
-```
-
-### Lifecycle
-
-| State     | Description                                                         |
-| --------- | ------------------------------------------------------------------- |
-| `running` | Agent is actively executing cycles                                  |
-| `paused`  | Agent is paused, can be resumed                                     |
-| `stopped` | Agent has been terminated                                           |
-| `error`   | Agent encountered an error (auto-pauses after 5 consecutive errors) |
-
-### Features
-
-- **Full tool access** — Same 250+ tools as chat agents, plus extensions, plugins, and MCP tools
-- **Memory injection** — Agent system prompt enhanced with relevant memories and active goals
-- **Workspace isolation** — Each agent gets a dedicated file workspace
-- **Stop conditions** — `MISSION_COMPLETE` sentinel or `max_cycles:N` to auto-stop
-- **Budget tracking** — Auto-stop when budget exceeded
-- **Session persistence** — State saved to DB every 30 seconds; auto-recovery on restart
-
----
-
 ## Subagents
 
-Ephemeral child agents for parallel task delegation. Unlike background agents (which are persistent and cycle-based), subagents run once to completion and are discarded.
+Ephemeral child agents for parallel task delegation. Unlike claw agents (which are persistent and cycle-based), subagents run once to completion and are discarded.
 
 ### How It Works
 
 ```
-Parent Agent (chat or background agent)
+Parent Agent (chat or claw agent)
   ├─ spawn_subagent("Research pricing")  →  SubagentRunner #1
   ├─ spawn_subagent("Analyze competitors") → SubagentRunner #2
   ├─ spawn_subagent("Draft summary")     →  SubagentRunner #3
@@ -1235,7 +1177,7 @@ PostgreSQL with 85+ repositories via the `pg` adapter.
 
 **Productivity:** `pomodoro_sessions`, `habits`, `captures`
 
-**Autonomous AI:** `memories`, `goals`, `triggers`, `plans`, `heartbeats`, `workflows`, `autonomy_log`, `background_agents`, `background_agent_sessions`, `background_agent_history`, `souls`, `crews`, `agent_messages`, `claws`, `claw_sessions`, `claw_history`, `claw_audit_log`
+**Autonomous AI:** `memories`, `goals`, `triggers`, `plans`, `heartbeats`, `workflows`, `autonomy_log`, `souls`, `crews`, `agent_messages`, `claws`, `claw_sessions`, `claw_history`, `claw_audit_log`
 
 **Channels:** `channel_messages`, `channel_users`, `channel_sessions`, `channel_verification`
 
@@ -1471,22 +1413,6 @@ Sliding window algorithm with configurable window (default 60s), max requests (d
 | `GET`    | `/api/v1/souls/messages`             | List inter-agent messages          |
 | `POST`   | `/api/v1/souls/messages`             | Send a message between agents      |
 
-### Background Agents
-
-| Method   | Endpoint                                | Description                   |
-| -------- | --------------------------------------- | ----------------------------- |
-| `GET`    | `/api/v1/background-agents`             | List all background agents    |
-| `POST`   | `/api/v1/background-agents`             | Create a new background agent |
-| `GET`    | `/api/v1/background-agents/:id`         | Get agent details + session   |
-| `PATCH`  | `/api/v1/background-agents/:id`         | Update agent config           |
-| `DELETE` | `/api/v1/background-agents/:id`         | Delete agent                  |
-| `POST`   | `/api/v1/background-agents/:id/start`   | Start agent                   |
-| `POST`   | `/api/v1/background-agents/:id/pause`   | Pause agent                   |
-| `POST`   | `/api/v1/background-agents/:id/resume`  | Resume paused agent           |
-| `POST`   | `/api/v1/background-agents/:id/stop`    | Stop agent                    |
-| `GET`    | `/api/v1/background-agents/:id/history` | Paginated cycle history       |
-| `POST`   | `/api/v1/background-agents/:id/message` | Send message to agent inbox   |
-
 ### Claw Agents
 
 | Method   | Endpoint                               | Description                         |
@@ -1571,7 +1497,6 @@ Real-time broadcasts via WebSocket at `ws://localhost:8080/ws` (attached to the 
 | `channel:user:*`          | User events (first_seen, pending, blocked, etc.)  |
 | `trigger:executed`        | Trigger execution result                          |
 | `coding-agent:session:*`  | Coding agent session lifecycle and output         |
-| `bg-agent:*`              | Background agent lifecycle and cycle results      |
 | `subagent:*`              | Subagent spawned, progress, and completion        |
 | `pulse:activity`          | Pulse system proactive activity                   |
 | `claw:*`                  | Claw lifecycle, cycle results, output, escalation |

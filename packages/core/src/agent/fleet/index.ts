@@ -1,5 +1,5 @@
 /**
- * Fleet System — Coordinated background agent army
+ * Fleet System — Coordinated multi-worker agent fleet
  */
 
 export type {

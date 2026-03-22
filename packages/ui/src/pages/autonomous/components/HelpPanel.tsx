@@ -65,12 +65,12 @@ export function HelpPanel({ onClose }: Props) {
               <div className="flex items-center gap-2 mb-2">
                 <Zap className="w-4 h-4 text-text-muted dark:text-dark-text-muted" />
                 <h4 className="font-medium text-text-primary dark:text-dark-text-primary">
-                  Background Agents
+                  Claw Agents
                 </h4>
               </div>
               <p className="text-xs text-text-muted dark:text-dark-text-muted">
-                Lightweight workers that run continuously, on intervals, or on demand. Great for
-                monitoring, data processing, or event-driven tasks.
+                Autonomous agents with workspace, directives, and audit trail. Run continuously,
+                on intervals, event-driven, or single-shot. Use Fleet for multi-worker coordination.
               </p>
             </div>
           </section>

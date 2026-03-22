@@ -30,9 +30,7 @@ export interface AgentTemplate {
   heartbeatInterval: string;
   autonomyLevel: number;
   estimatedCost: string;
-  kind: 'soul' | 'background';
-  bgMode?: 'continuous' | 'interval' | 'event';
-  bgIntervalMs?: number;
+  kind: 'soul';
   tags: string[];
   /** Default provider for this agent */
   provider?: string;
@@ -210,8 +208,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     heartbeatInterval: '',
     autonomyLevel: 2,
     estimatedCost: '$0.10-$0.50/use',
-    kind: 'background',
-    bgMode: 'event',
+    kind: 'soul',
     tags: ['research', 'papers', 'academic'],
   },
   {
@@ -285,8 +282,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     heartbeatInterval: '',
     autonomyLevel: 1,
     estimatedCost: '$0.10-$0.30/use',
-    kind: 'background',
-    bgMode: 'event',
+    kind: 'soul',
     tags: ['blog', 'writing', 'content'],
   },
   {
@@ -336,8 +332,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     heartbeatInterval: '',
     autonomyLevel: 2,
     estimatedCost: '$0.10-$0.50/review',
-    kind: 'background',
-    bgMode: 'event',
+    kind: 'soul',
     tags: ['code-review', 'github', 'quality'],
   },
   {
@@ -385,8 +380,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     heartbeatInterval: '',
     autonomyLevel: 2,
     estimatedCost: '$0.05-$0.20/bug',
-    kind: 'background',
-    bgMode: 'event',
+    kind: 'soul',
     tags: ['bugs', 'triage', 'quality'],
   },
 
@@ -412,8 +406,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     heartbeatInterval: '',
     autonomyLevel: 1,
     estimatedCost: '$0.10-$0.30/meeting',
-    kind: 'background',
-    bgMode: 'event',
+    kind: 'soul',
     tags: ['meetings', 'notes', 'action-items'],
   },
   {
@@ -463,9 +456,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     heartbeatInterval: '',
     autonomyLevel: 3,
     estimatedCost: '$1-$5/day',
-    kind: 'background',
-    bgMode: 'interval',
-    bgIntervalMs: 900_000,
+    kind: 'soul',
     tags: ['uptime', 'monitoring', 'alerts'],
   },
   {
@@ -554,22 +545,3 @@ export function templateToSoulPayload(template: AgentTemplate, defaults: { provi
   };
 }
 
-export function templateToBgPayload(template: AgentTemplate, defaults: { provider: string; model: string }): Record<string, unknown> {
-  return {
-    name: template.name,
-    mission: template.mission,
-    mode: template.bgMode || 'interval',
-    allowed_tools: template.tools || [],
-    interval_ms: template.bgIntervalMs || 300_000,
-    auto_start: false,
-    limits: {
-      maxTurnsPerCycle: 10,
-      maxToolCallsPerCycle: 50,
-      maxCyclesPerHour: 60,
-      cycleTimeoutMs: 120_000,
-    },
-    provider: template.provider || defaults.provider,
-    model: template.model || defaults.model,
-    skills: template.skills || [],
-  };
-}

@@ -81,21 +81,12 @@ function extractAgentConfig(content: string): ProposedAgentConfig | null {
       return null;
     }
 
-    // Validate kind
-    const kind = parsed.kind === 'background' ? 'background' : 'soul';
+    // All agents are soul agents now (background agents deprecated in favor of Claw)
+    const kind = 'soul' as const;
 
     // Validate autonomy level (1-4)
     let autonomyLevel = typeof parsed.autonomyLevel === 'number' ? parsed.autonomyLevel : 2;
     autonomyLevel = Math.max(1, Math.min(4, autonomyLevel));
-
-    // Validate background agent fields
-    let bgMode: 'continuous' | 'interval' | 'event' | undefined;
-    let bgIntervalMs: number | undefined;
-    if (kind === 'background') {
-      const validModes = ['continuous', 'interval', 'event'];
-      bgMode = validModes.includes(parsed.bgMode) ? parsed.bgMode : 'interval';
-      bgIntervalMs = typeof parsed.bgIntervalMs === 'number' ? parsed.bgIntervalMs : 300000; // 5 min default
-    }
 
     // Validate provider/model (use defaults if missing)
     const provider = parsed.provider || 'openai';
@@ -114,8 +105,6 @@ function extractAgentConfig(content: string): ProposedAgentConfig | null {
       heartbeatEnabled: kind === 'soul' ? parsed.heartbeatEnabled !== false : false,
       autonomyLevel,
       estimatedCost: parsed.estimatedCost || '~$0.50/day',
-      bgMode,
-      bgIntervalMs,
       provider,
       model,
     };
@@ -193,7 +182,7 @@ When you have enough information, output a COMPLETE JSON configuration block in 
 ## Field Requirements
 
 ### Required Fields (MUST include):
-- **kind**: "soul" for scheduled agents, "background" for workers
+- **kind**: "soul" (always use "soul")
 - **name**: Short, memorable, unique name (2-4 words max)
 - **emoji**: Single relevant emoji representing the agent
 - **role**: Professional role title (e.g., "Research Analyst", "Security Monitor")
@@ -201,16 +190,12 @@ When you have enough information, output a COMPLETE JSON configuration block in 
 - **mission**: 2-3 sentences describing what the agent does, when, and how
 - **tools**: Array of tool names (use "core." prefix for built-in tools)
 - **skills**: Array of skill IDs from the INSTALLED SKILLS list below (use exact IDs)
-- **heartbeatInterval**: Valid cron expression for soul agents (omit for background/event agents)
+- **heartbeatInterval**: Valid cron expression for soul agents
 - **heartbeatEnabled**: boolean (true for soul agents with schedules)
 - **autonomyLevel**: 1-4 (1=ask permission, 2=notify, 3=log only, 4=full autonomy)
 - **estimatedCost**: Daily cost estimate (e.g., "~$0.50/day", "~$2-5/day")
 - **provider**: AI provider ID (use "${defaults.provider}")
 - **model**: AI model ID (use "${defaults.model}")
-
-### Background Agent Fields (when kind="background"):
-- **bgMode**: "continuous" | "interval" | "event"
-- **bgIntervalMs**: number (milliseconds between runs, for interval mode)
 
 ### Tool Selection Guidelines:
 Commonly useful tools:
@@ -501,12 +486,6 @@ export function AIChatCreator({ onCreated, onClose }: Props) {
     if (!config.mission?.trim()) errors.push('Mission is required');
     if (!config.role?.trim()) errors.push('Role is required');
     if (!config.personality?.trim()) errors.push('Personality is required');
-    if (config.kind === 'background') {
-      const validModes = ['continuous', 'interval', 'event'];
-      if (!validModes.includes(config.bgMode || '')) {
-        errors.push('Background agent mode must be: continuous, interval, or event');
-      }
-    }
     return errors;
   };
 

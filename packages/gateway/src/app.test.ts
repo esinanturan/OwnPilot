@@ -85,7 +85,6 @@ vi.mock('./routes/index.js', async (importOriginal) => {
     cliToolsRoutes: createMockRoutes(),
     cliChatRoutes: createMockRoutes(),
     securityRoutes: createMockRoutes(),
-    backgroundAgentsRoutes: createMockRoutes(),
     subagentRoutes: createMockRoutes(),
     bridgeRoutes: createMockRoutes(),
     orchestraRoutes: createMockRoutes(),

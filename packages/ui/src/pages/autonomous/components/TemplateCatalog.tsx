@@ -111,14 +111,8 @@ export function TemplateCatalog({ onSelect, crewTemplates, onDeployCrew }: Props
                       <h4 className="font-medium text-sm text-text-primary dark:text-dark-text-primary truncate">
                         {template.name}
                       </h4>
-                      <span
-                        className={`text-xs px-1.5 py-0.5 rounded-full ${
-                          template.kind === 'soul'
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-text-muted/10 text-text-muted dark:text-dark-text-muted'
-                        }`}
-                      >
-                        {template.kind === 'soul' ? 'Soul' : 'Background'}
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                        Soul
                       </span>
                     </div>
                   </div>
@@ -134,11 +128,7 @@ export function TemplateCatalog({ onSelect, crewTemplates, onDeployCrew }: Props
                   <span>
                     {template.heartbeatInterval
                       ? cronToHuman(template.heartbeatInterval)
-                      : template.bgMode === 'event'
-                        ? 'On demand'
-                        : template.bgMode === 'interval' && template.bgIntervalMs
-                          ? `Every ${Math.round(template.bgIntervalMs / 60_000)}m`
-                          : 'Continuous'}
+                      : 'On demand'}
                   </span>
                   <span>{template.estimatedCost}</span>
                 </div>

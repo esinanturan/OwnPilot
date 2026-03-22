@@ -7,7 +7,7 @@ import { Bot, Repeat, Cpu, Puzzle } from '../../../components/icons';
 import { cronToHuman } from '../helpers';
 
 export interface ProposedAgentConfig {
-  kind: 'soul' | 'background';
+  kind: 'soul';
   name: string;
   emoji: string;
   role: string;
@@ -19,8 +19,6 @@ export interface ProposedAgentConfig {
   heartbeatEnabled?: boolean;
   autonomyLevel?: number;
   estimatedCost?: string;
-  bgMode?: 'continuous' | 'interval' | 'event';
-  bgIntervalMs?: number;
   provider?: string;
   model?: string;
 }
@@ -33,16 +31,9 @@ interface Props {
 }
 
 export function AgentPreviewCard({ config, onConfirm, confirmLabel, isCreating }: Props) {
-  const schedule =
-    config.kind === 'soul' && config.heartbeatInterval
-      ? cronToHuman(config.heartbeatInterval)
-      : config.kind === 'background' && config.bgMode === 'interval' && config.bgIntervalMs
-        ? `Every ${Math.round(config.bgIntervalMs / 60_000)} min`
-        : config.kind === 'background' && config.bgMode === 'event'
-          ? 'On demand'
-          : config.kind === 'background' && config.bgMode === 'continuous'
-            ? 'Continuous'
-            : null;
+  const schedule = config.heartbeatInterval
+    ? cronToHuman(config.heartbeatInterval)
+    : null;
 
   return (
     <div className="border border-primary/30 bg-primary/5 rounded-xl p-4 space-y-3">
@@ -55,13 +46,9 @@ export function AgentPreviewCard({ config, onConfirm, confirmLabel, isCreating }
               {config.name}
             </h4>
             <span
-              className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-                config.kind === 'soul'
-                  ? 'bg-primary/10 text-primary'
-                  : 'bg-text-muted/10 text-text-muted dark:text-dark-text-muted'
-              }`}
+              className="text-xs px-2 py-0.5 rounded-full shrink-0 bg-primary/10 text-primary"
             >
-              {config.kind === 'soul' ? 'Soul Agent' : 'Background'}
+              Soul Agent
             </span>
           </div>
           <p className="text-xs text-text-muted dark:text-dark-text-muted">{config.role}</p>

@@ -57,8 +57,11 @@ Plans:
   2. Clicking the star toggle on any item pins it — navigating back to the sidebar shows it in the pinned list; clicking the star again unpins it and it disappears from the sidebar
   3. Typing in the search field instantly filters the grid to matching items by name (no API call, client-side only)
   4. When the pinned count reaches 15, attempting to pin another item shows a warning toast and the item is not added
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — nav-descriptions.ts constant + CustomizePage.tsx component (CZ-01, CZ-02, CZ-03, CZ-04, CZ-05)
+- [ ] 03-02-PLAN.md — Register /customize route in App.tsx + human verify (CZ-01, CZ-02, CZ-03)
 
 ### Phase 4: Tests + Polish
 **Goal**: A Playwright E2E suite covers the full sidebar feature contract — every critical user flow has a passing test, TypeScript typecheck is clean, and a Docker build confirms all new Tailwind tokens are present in production CSS
@@ -80,9 +83,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete   | 2026-03-28 |
 | 2. Sidebar Rebuild | 1/2 | In Progress|  |
-| 3. Customize Page | 0/TBD | Not started | - |
+| 3. Customize Page | 0/2 | Not started | - |
 | 4. Tests + Polish | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-27 — v1.0 Sidebar Overhaul*
-*Last updated: 2026-03-28 — Phase 2 planned (2 plans)*
+*Last updated: 2026-03-28 — Phase 3 planned (2 plans)*

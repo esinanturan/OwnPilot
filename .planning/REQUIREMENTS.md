@@ -9,21 +9,21 @@ Requirements for sidebar overhaul. Each maps to roadmap phases.
 
 ### Sidebar
 
-- [ ] **SB-01**: User sees only pinned items in sidebar (not 63-item list)
-- [ ] **SB-02**: Customize link is always visible in sidebar
-- [ ] **SB-03**: User sees "Recents" section with last 6 conversations
-- [ ] **SB-04**: User can click a recent conversation to load it
+- [x] **SB-01**: User sees only pinned items in sidebar (not 63-item list)
+- [x] **SB-02**: Customize link is always visible in sidebar
+- [x] **SB-03**: User sees "Recents" section with last 6 conversations
+- [x] **SB-04**: User can click a recent conversation to load it
 - [x] **SB-05**: Default pinned items appear on first load (Chat, Dashboard, Customize)
 - [x] **SB-06**: Sidebar state persists across page refresh (localStorage)
 - [x] **SB-07**: Mobile sidebar preserves slide-in/backdrop behavior
 
 ### Customize Page
 
-- [ ] **CZ-01**: User can view all available pages in categorized grid
-- [ ] **CZ-02**: User can pin/unpin items via star toggle
-- [ ] **CZ-03**: Pinned items immediately appear/disappear in sidebar
-- [ ] **CZ-04**: User can search/filter items by name
-- [ ] **CZ-05**: Pin limit (max 15) shows warning toast
+- [x] **CZ-01**: User can view all available pages in categorized grid
+- [x] **CZ-02**: User can pin/unpin items via star toggle
+- [x] **CZ-03**: Pinned items immediately appear/disappear in sidebar
+- [x] **CZ-04**: User can search/filter items by name
+- [x] **CZ-05**: Pin limit (max 15) shows warning toast
 
 ### Infrastructure
 
@@ -77,18 +77,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SB-01 | Phase 2 | Pending |
-| SB-02 | Phase 2 | Pending |
-| SB-03 | Phase 2 | Pending |
-| SB-04 | Phase 2 | Pending |
+| SB-01 | Phase 2 | Complete |
+| SB-02 | Phase 2 | Complete |
+| SB-03 | Phase 2 | Complete |
+| SB-04 | Phase 2 | Complete |
 | SB-05 | Phase 1 | Complete |
 | SB-06 | Phase 1 | Complete |
 | SB-07 | Phase 1 | Complete |
-| CZ-01 | Phase 3 | Pending |
-| CZ-02 | Phase 3 | Pending |
-| CZ-03 | Phase 3 | Pending |
-| CZ-04 | Phase 3 | Pending |
-| CZ-05 | Phase 3 | Pending |
+| CZ-01 | Phase 3 | Complete |
+| CZ-02 | Phase 3 | Complete |
+| CZ-03 | Phase 3 | Complete |
+| CZ-04 | Phase 3 | Complete |
+| CZ-05 | Phase 3 | Complete |
 | INF-01 | Phase 1 | Complete |
 | INF-02 | Phase 1 | Complete |
 | INF-03 | Phase 1 | Complete |

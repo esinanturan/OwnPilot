@@ -60,7 +60,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — nav-descriptions.ts constant + CustomizePage.tsx component (CZ-01, CZ-02, CZ-03, CZ-04, CZ-05)
+- [x] 03-01-PLAN.md — nav-descriptions.ts constant + CustomizePage.tsx component (CZ-01, CZ-02, CZ-03, CZ-04, CZ-05)
 - [ ] 03-02-PLAN.md — Register /customize route in App.tsx + human verify (CZ-01, CZ-02, CZ-03)
 
 ### Phase 4: Tests + Polish

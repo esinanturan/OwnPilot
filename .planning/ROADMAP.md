@@ -30,7 +30,7 @@ This milestone transforms OwnPilot's chaotic 63-item collapsible sidebar into a 
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Extract constants/nav-items.ts + update STORAGE_KEYS (INF-01, INF-02)
+- [x] 01-01-PLAN.md — Extract constants/nav-items.ts + update STORAGE_KEYS (INF-01, INF-02)
 - [ ] 01-02-PLAN.md — Create usePinnedItems hook + update Layout.tsx imports (INF-01, INF-03, SB-05, SB-06, SB-07)
 
 ### Phase 2: Sidebar Rebuild

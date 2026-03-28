@@ -27,8 +27,8 @@ Requirements for sidebar overhaul. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INF-01**: Nav items extracted to shared constants (sidebar + customize reuse)
-- [ ] **INF-02**: localStorage keys registered in STORAGE_KEYS (no raw strings)
+- [x] **INF-01**: Nav items extracted to shared constants (sidebar + customize reuse)
+- [x] **INF-02**: localStorage keys registered in STORAGE_KEYS (no raw strings)
 - [ ] **INF-03**: Old nav group localStorage state handled gracefully (migration)
 
 ### Testing
@@ -89,8 +89,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CZ-03 | Phase 3 | Pending |
 | CZ-04 | Phase 3 | Pending |
 | CZ-05 | Phase 3 | Pending |
-| INF-01 | Phase 1 | Pending |
-| INF-02 | Phase 1 | Pending |
+| INF-01 | Phase 1 | Complete |
+| INF-02 | Phase 1 | Complete |
 | INF-03 | Phase 1 | Pending |
 | TST-01 | Phase 4 | Pending |
 | TST-02 | Phase 4 | Pending |

@@ -42,8 +42,11 @@ Plans:
   2. The Customize link is always visible in the sidebar regardless of which items are pinned
   3. The Recents section shows up to 6 recent conversations — clicking a recent item loads that conversation
   4. On mobile (375px), the hamburger button opens the sidebar with the slide-in animation intact and the backdrop closes it
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — useSidebarRecents hook + Sidebar.tsx + SidebarFooter sub-component (SB-01, SB-02, SB-03, SB-04)
+- [ ] 02-02-PLAN.md — Layout.tsx surgery: swap <aside> for <Sidebar /> + human verify (SB-01, SB-02, SB-03, SB-04)
 
 ### Phase 3: Customize Page
 **Goal**: A new /customize route delivers a categorized grid of all available pages — users can pin and unpin items via a star toggle, search filters the grid in real time, and changes immediately reflect in the sidebar on the next navigation
@@ -76,10 +79,10 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete   | 2026-03-28 |
-| 2. Sidebar Rebuild | 0/TBD | Not started | - |
+| 2. Sidebar Rebuild | 0/2 | Not started | - |
 | 3. Customize Page | 0/TBD | Not started | - |
 | 4. Tests + Polish | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-27 — v1.0 Sidebar Overhaul*
-*Last updated: 2026-03-27 — Phase 1 planned (2 plans)*
+*Last updated: 2026-03-28 — Phase 2 planned (2 plans)*

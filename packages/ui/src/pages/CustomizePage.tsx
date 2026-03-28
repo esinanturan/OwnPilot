@@ -38,7 +38,8 @@ export function CustomizePage() {
     return DISPLAY_SECTIONS.map((section) => ({
       ...section,
       items: section.items.filter((item) =>
-        item.label.toLowerCase().includes(normalizedQuery),
+        item.label.toLowerCase().includes(normalizedQuery) ||
+        (NAV_DESCRIPTIONS[item.to] ?? '').toLowerCase().includes(normalizedQuery),
       ),
     })).filter((section) => section.items.length > 0);
   }, [normalizedQuery]);

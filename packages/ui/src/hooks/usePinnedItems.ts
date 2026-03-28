@@ -1,15 +1,18 @@
 /**
  * usePinnedItems — manages the user's pinned sidebar navigation items.
  *
+ * Uses React Context so that all consumers (Sidebar, CustomizePage, etc.)
+ * share the same state instance. PinnedItemsProvider must wrap the tree.
+ *
  * Persists to localStorage[STORAGE_KEYS.SIDEBAR_PINNED] as a string[].
  * Runs one-time migration from legacy 'ownpilot_nav_groups' key.
  */
-import { useState } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { STORAGE_KEYS } from '../constants/storage-keys';
 
 export const MAX_PINNED_ITEMS = 15;
 
-const DEFAULT_PINNED: string[] = ['/', '/dashboard', '/customize'];
+const DEFAULT_PINNED: string[] = ['/', '/dashboard'];
 
 function runMigration(): void {
   try {
@@ -41,7 +44,15 @@ function readPinnedItems(): string[] {
   return DEFAULT_PINNED;
 }
 
-export function usePinnedItems() {
+interface PinnedItemsValue {
+  pinnedItems: string[];
+  setPinnedItems: (updater: string[] | ((prev: string[]) => string[])) => void;
+  MAX_PINNED_ITEMS: number;
+}
+
+const PinnedItemsContext = createContext<PinnedItemsValue | null>(null);
+
+export function PinnedItemsProvider({ children }: { children: ReactNode }) {
   const [pinnedItems, setPinnedItemsRaw] = useState<string[]>(() => readPinnedItems());
 
   const setPinnedItems = (updater: string[] | ((prev: string[]) => string[])) => {
@@ -56,5 +67,17 @@ export function usePinnedItems() {
     });
   };
 
-  return { pinnedItems, setPinnedItems, MAX_PINNED_ITEMS };
+  return (
+    <PinnedItemsContext.Provider value={{ pinnedItems, setPinnedItems, MAX_PINNED_ITEMS }}>
+      {children}
+    </PinnedItemsContext.Provider>
+  );
+}
+
+export function usePinnedItems() {
+  const ctx = useContext(PinnedItemsContext);
+  if (!ctx) {
+    throw new Error('usePinnedItems must be used within a PinnedItemsProvider');
+  }
+  return ctx;
 }

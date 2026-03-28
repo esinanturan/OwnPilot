@@ -45,7 +45,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — useSidebarRecents hook + Sidebar.tsx + SidebarFooter sub-component (SB-01, SB-02, SB-03, SB-04)
+- [x] 02-01-PLAN.md — useSidebarRecents hook + Sidebar.tsx + SidebarFooter sub-component (SB-01, SB-02, SB-03, SB-04)
 - [ ] 02-02-PLAN.md — Layout.tsx surgery: swap <aside> for <Sidebar /> + human verify (SB-01, SB-02, SB-03, SB-04)
 
 ### Phase 3: Customize Page
@@ -79,7 +79,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete   | 2026-03-28 |
-| 2. Sidebar Rebuild | 0/2 | Not started | - |
+| 2. Sidebar Rebuild | 1/2 | In Progress|  |
 | 3. Customize Page | 0/TBD | Not started | - |
 | 4. Tests + Polish | 0/TBD | Not started | - |
 

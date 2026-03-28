@@ -10,4 +10,6 @@ export const STORAGE_KEYS = {
   SESSION_TOKEN: 'ownpilot-session-token',
   DEBUG_DRAWER: 'ownpilot-debug-drawer',
   MINI_CHAT_OPEN: 'ownpilot-mini-chat-open',
+  SIDEBAR_PINNED: 'ownpilot-sidebar-pinned',  // string[] of pinned route paths (e.g. ['/', '/dashboard', '/customize'])
+  NAV_GROUPS: 'ownpilot_nav_groups',           // legacy key — kept for migration compat, replaced by SIDEBAR_PINNED
 } as const;

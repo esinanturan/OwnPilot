@@ -9,15 +9,18 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import type { ConnectionStatus } from '../hooks/useWebSocket';
 import { usePinnedItems } from '../hooks/usePinnedItems';
 import { useSidebarRecents } from '../hooks/useSidebarRecents';
+import { useSidebarProjects } from '../hooks/useSidebarProjects';
+import { useSidebarWorkflows } from '../hooks/useSidebarWorkflows';
 import { ALL_NAV_ITEMS } from '../constants/nav-items';
 import { SidebarFooter } from './sidebar/SidebarFooter';
-import { X, ChevronRight } from './icons';
+import { X, ChevronRight, Search, Calendar, FolderOpen, GitBranch, Plus } from './icons';
 import type { NavItem } from '../constants/nav-items';
 
 export interface SidebarProps {
   isMobile: boolean;
   isOpen: boolean;
   onClose: () => void;
+  onSearchOpen: () => void;
   wsStatus: ConnectionStatus;
   badgeCounts: { inbox: number; tasks: number };
 }
@@ -32,7 +35,7 @@ function PinnedNavLink({ item, badge }: { item: NavItem; badge?: number }) {
       to={item.to}
       end={item.to === '/'}
       className={({ isActive }) =>
-        `flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-sm ${
+        `flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base ${
           isActive
             ? 'bg-primary text-white shadow-sm border-l-[3px] border-white/50'
             : 'text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5'
@@ -50,9 +53,11 @@ function PinnedNavLink({ item, badge }: { item: NavItem; badge?: number }) {
   );
 }
 
-export function Sidebar({ isMobile, isOpen, onClose, wsStatus, badgeCounts }: SidebarProps) {
+export function Sidebar({ isMobile, isOpen, onClose, onSearchOpen, wsStatus, badgeCounts }: SidebarProps) {
   const { pinnedItems } = usePinnedItems();
   const { conversations, isLoading: recentsLoading } = useSidebarRecents();
+  const { projects, isLoading: projectsLoading } = useSidebarProjects();
+  const { workflows, isLoading: workflowsLoading } = useSidebarWorkflows();
   const navigate = useNavigate();
 
   // Resolve NavItem objects from pinned route paths.
@@ -72,7 +77,7 @@ export function Sidebar({ isMobile, isOpen, onClose, wsStatus, badgeCounts }: Si
           ? `fixed inset-y-0 left-0 z-40 w-64 bg-bg-secondary dark:bg-dark-bg-secondary flex flex-col transform transition-transform duration-200 ease-out ${
               isOpen ? 'translate-x-0' : '-translate-x-full'
             }`
-          : 'w-56 border-r border-border dark:border-dark-border bg-bg-secondary dark:bg-dark-bg-secondary flex flex-col'
+          : 'w-60 border-r border-border dark:border-dark-border bg-bg-secondary dark:bg-dark-bg-secondary flex flex-col'
       }
     >
       {/* Mobile close button */}
@@ -108,13 +113,40 @@ export function Sidebar({ isMobile, isOpen, onClose, wsStatus, badgeCounts }: Si
           ))}
         </div>
 
+        {/* Search button */}
+        <button
+          onClick={onSearchOpen}
+          data-testid="sidebar-search-btn"
+          className="w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5 text-left"
+        >
+          <Search className="w-4 h-4 shrink-0" />
+          <span className="truncate flex-1">Search</span>
+        </button>
+
+        {/* Scheduled */}
+        <NavLink
+          to="/calendar"
+          end
+          data-testid="sidebar-scheduled-link"
+          className={({ isActive }) =>
+            `flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base ${
+              isActive
+                ? 'bg-primary text-white shadow-sm border-l-[3px] border-white/50'
+                : 'text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5'
+            }`
+          }
+        >
+          <Calendar className="w-4 h-4 shrink-0" />
+          <span className="truncate flex-1">Scheduled</span>
+        </NavLink>
+
         {/* Customize link — always visible (SB-02) */}
         <div className="mb-3" data-testid="sidebar-customize-link">
           <NavLink
             to="/customize"
             end
             className={({ isActive }) =>
-              `flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-sm ${
+              `flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base ${
                 isActive
                   ? 'bg-primary text-white shadow-sm border-l-[3px] border-white/50'
                   : 'text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5'
@@ -129,9 +161,101 @@ export function Sidebar({ isMobile, isOpen, onClose, wsStatus, badgeCounts }: Si
         {/* Divider */}
         <div className="border-t border-border dark:border-dark-border my-2" />
 
+        {/* Projects section */}
+        <div className="mb-2" data-testid="sidebar-projects">
+          <div className="flex items-center justify-between px-3 py-1">
+            <span className="text-sm font-semibold text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
+              Projects
+            </span>
+            <button
+              onClick={() => navigate('/workspaces')}
+              className="p-0.5 rounded text-text-muted dark:text-dark-text-muted hover:text-primary transition-colors"
+              aria-label="New project"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+          {projectsLoading ? (
+            <div className="px-3 py-2 text-xs text-text-muted dark:text-dark-text-muted">
+              Loading...
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-text-muted dark:text-dark-text-muted">
+              No projects
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {projects.map((project) => (
+                <button
+                  key={project.id}
+                  onClick={() => navigate(`/workspaces`)}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5 text-left"
+                  title={project.name}
+                >
+                  <FolderOpen className="w-4 h-4 shrink-0 opacity-60" />
+                  <span className="truncate flex-1">
+                    {project.name.length > 25
+                      ? project.name.slice(0, 25) + '\u2026'
+                      : project.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-border dark:border-dark-border my-2" />
+
+        {/* Workflows section */}
+        <div className="mb-2" data-testid="sidebar-workflows">
+          <div className="flex items-center justify-between px-3 py-1">
+            <span className="text-sm font-semibold text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
+              Workflows
+            </span>
+            <button
+              onClick={() => navigate('/workflows')}
+              className="p-0.5 rounded text-text-muted dark:text-dark-text-muted hover:text-primary transition-colors"
+              aria-label="New workflow"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+          {workflowsLoading ? (
+            <div className="px-3 py-2 text-xs text-text-muted dark:text-dark-text-muted">
+              Loading...
+            </div>
+          ) : workflows.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-text-muted dark:text-dark-text-muted">
+              No workflows
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {workflows.map((wf) => (
+                <button
+                  key={wf.id}
+                  onClick={() => navigate(`/workflows`)}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5 text-left"
+                  title={wf.name}
+                >
+                  <GitBranch className="w-4 h-4 shrink-0 opacity-60" />
+                  <span className="truncate flex-1">
+                    {wf.name.length > 25
+                      ? wf.name.slice(0, 25) + '\u2026'
+                      : wf.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-border dark:border-dark-border my-2" />
+
         {/* Recents section (SB-03, SB-04) */}
         <div className="mb-2" data-testid="sidebar-recents">
-          <div className="px-3 py-1 text-xs font-semibold text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
+          <div className="px-3 py-1 text-sm font-semibold text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
             Recent
           </div>
           {recentsLoading ? (
@@ -149,7 +273,7 @@ export function Sidebar({ isMobile, isOpen, onClose, wsStatus, badgeCounts }: Si
                   key={conv.id}
                   data-testid={`recent-item-${conv.id}`}
                   onClick={() => handleRecentClick(conv.id)}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-sm text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5 text-left"
+                  className="w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5 text-left"
                   title={conv.title || conv.id}
                 >
                   <span className="truncate flex-1">

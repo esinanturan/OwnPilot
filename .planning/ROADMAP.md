@@ -1,91 +1,121 @@
-# Roadmap: OwnPilot v1.0 Sidebar Overhaul
+# Roadmap: OwnPilot UI Redesign
 
-## Overview
+## Milestone v1.0: Sidebar Overhaul (COMPLETED 2026-03-28)
 
-This milestone transforms OwnPilot's chaotic 63-item collapsible sidebar into a clean, Cowork-inspired structural sidebar. The build follows a bottom-up order: foundation constants and hooks first, then sidebar shell extraction with Layout surgery, then the additive Customize page, and finally Playwright E2E coverage locking the full feature contract. The highest-risk step (Layout.tsx modification) is deliberately deferred to Phase 2 after all data-layer dependencies are verified.
+Transformed 63-item chaotic sidebar into Cowork-inspired structural sidebar with Customize page.
+
+- [x] **Phase 1: Foundation** — nav-items.ts, STORAGE_KEYS, usePinnedItems hook (completed 2026-03-28)
+- [x] **Phase 2: Sidebar Rebuild** — Sidebar.tsx, useSidebarRecents, Layout.tsx surgery (completed 2026-03-28)
+- [x] **Phase 3: Customize Page** — CustomizePage.tsx, nav-descriptions.ts, /customize route (completed 2026-03-28)
+- [x] **Phase 4: Tests** — Playwright E2E 15/15 PASS, PinnedItemsContext fix (completed 2026-03-28)
+
+---
+
+## Milestone v1.1: Advanced UI — 2-Tab Customize + Search + Local Files
+
+**Goal:** Evolve CustomizePage from a flat card grid into a Cowork-style 2-tab panel system (Items + Local Files), add global search overlay with Ctrl+K, expand sidebar with Workflows/Projects sections, and integrate host filesystem browsing.
+
+**Reference:** HTML prototype at `~/ownpilot-ui-prototype.html`
+
+**Phase Numbering:**
+- Integer phases (5, 6, 7...): Planned milestone work
+- Decimal phases (5.1): Urgent insertions
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-- [x] **Phase 1: Foundation** - Extract nav items, STORAGE_KEYS, usePinnedItems hook, localStorage migration, mobile sidebar contract (completed 2026-03-28)
-- [ ] **Phase 2: Sidebar Rebuild** - New Sidebar component, Recents section, pinned items rendering, Layout.tsx surgery
-- [ ] **Phase 3: Customize Page** - /customize route, categorized grid, pin/unpin star toggle, search filter
-- [ ] **Phase 4: Tests + Polish** - Playwright E2E suite, mobile regression, Docker build verify, typecheck gate
+- [ ] **Phase 5: Sidebar Enhancement** — Search button, Scheduled link, Workflows [+] section, Projects [+] section, sidebar width 240px
+- [ ] **Phase 6: Customize 2-Tab Restructure** — Items tab with collapsible groups + pin buttons, Local Files tab placeholder, search + pin counter footer
+- [ ] **Phase 7: Detail Panel** — CustomizeDetailPanel in right panel when /customize active, item selection → detail view, pin/unpin/navigate actions
+- [ ] **Phase 8: Global Search Overlay** — Ctrl+K overlay, search across pages/workflows/conversations, grouped results, click-to-navigate
+- [ ] **Phase 9: Local Files Tab** — Host filesystem tree via File API, Nautilus-style bookmarks, Edge Devices section, machine profiles, file detail view
+- [ ] **Phase 10: E2E Tests + Polish** — Playwright full suite, mobile regression, Docker build verify, typecheck gate
 
 ## Phase Details
 
-### Phase 1: Foundation
-**Goal**: The data layer and constants are in place — nav items are extracted to a shared constant, STORAGE_KEYS registry contains all new keys, localStorage migration handles existing users, and the mobile sidebar contract is defined before any UI is touched
-**Depends on**: Nothing (first phase)
-**Requirements**: INF-01, INF-02, INF-03, SB-05, SB-06, SB-07
-**Success Criteria** (what must be TRUE):
-  1. All nav items are importable from `constants/nav-items.ts` — both Sidebar and CustomizePage can import from the same source without circular dependency
-  2. `STORAGE_KEYS.SIDEBAR_PINNED` and `STORAGE_KEYS.NAV_GROUPS` exist in the registry — no raw localStorage string literals in any new code
-  3. A user who had `ownpilot_nav_groups` in their browser localStorage sees the sidebar load correctly on first run of the new code (old key read, new key written, old key cleared)
-  4. Default pinned items (Chat, Dashboard, Customize) appear in the sidebar on first load for a brand-new user with no localStorage state
-  5. Sidebar state (pinned items, section collapse) survives a full browser refresh
-**Plans**: 2 plans
+### Phase 5: Sidebar Enhancement
+**Goal**: Sidebar gets Search button (opens overlay), Scheduled link, dynamic Workflows section with last 5 workflows, dynamic Projects section with workspaces, wider layout (240px)
+**Depends on**: Phase 4 (v1.0 complete)
+**Requirements**: SIDE-01 through SIDE-05
+**Success Criteria**:
+  1. Search button visible in sidebar, clicking triggers onSearchOpen callback
+  2. Scheduled link navigates to /calendar
+  3. Projects section shows workspaces from API with [+] button
+  4. Workflows section shows last 5 workflows from API with [+] button
+  5. Sidebar width is 240px (w-60)
+**Plans**: TBD
 
-Plans:
-- [x] 01-01-PLAN.md — Extract constants/nav-items.ts + update STORAGE_KEYS (INF-01, INF-02)
-- [x] 01-02-PLAN.md — Create usePinnedItems hook + update Layout.tsx imports (INF-01, INF-03, SB-05, SB-06, SB-07)
+### Phase 6: Customize 2-Tab Restructure
+**Goal**: CustomizePage transforms from full-page card grid into a 2-tab panel: Items tab (collapsible group list with separate pin buttons per item) + Local Files tab (placeholder). Groups collapse/expand with state persisted to localStorage
+**Depends on**: Phase 5
+**Requirements**: CUST-01 through CUST-06
+**Success Criteria**:
+  1. Two tabs visible: "Items" and "Local Files"
+  2. Items tab shows all 56 items in collapsible groups matching nav-items.ts navGroups structure
+  3. Each group header clicks to collapse/expand, state persists across page refresh
+  4. Each item row has a separate pin button (hover-visible, pinned=always-visible)
+  5. Item click selects it (distinct from pin toggle), pin button click pins/unpins
+  6. Search bar filters across all groups, pin counter in footer
+**Plans**: TBD
 
-### Phase 2: Sidebar Rebuild
-**Goal**: The old Layout.tsx aside block is replaced by a new Sidebar component — pinned items render in place of the 63-item collapsible list, the Recents section shows the 6 most recent conversations, and the mobile slide-in behavior is fully preserved
-**Depends on**: Phase 1
-**Requirements**: SB-01, SB-02, SB-03, SB-04
-**Success Criteria** (what must be TRUE):
-  1. The sidebar shows only pinned items (not the old 63-item collapsible groups) — clicking any pinned item navigates to its route
-  2. The Customize link is always visible in the sidebar regardless of which items are pinned
-  3. The Recents section shows up to 6 recent conversations — clicking a recent item loads that conversation
-  4. On mobile (375px), the hamburger button opens the sidebar with the slide-in animation intact and the backdrop closes it
-**Plans**: 2 plans
+### Phase 7: Detail Panel
+**Goal**: When /customize route is active, Layout.tsx replaces StatsPanel with CustomizeDetailPanel. Selecting an item in the Items tab shows its detail (icon, title, description, route, pin/unpin button, Navigate button, Show in Files button)
+**Depends on**: Phase 6
+**Requirements**: DET-01 through DET-04
+**Success Criteria**:
+  1. On /customize route, right panel shows CustomizeDetailPanel instead of StatsPanel
+  2. Clicking any item in Items tab shows its detail in the right panel
+  3. Pin/Unpin button in detail panel works (syncs with sidebar via PinnedItemsContext)
+  4. "Open Page" button navigates to the item's route
+  5. Empty state "Select an item to see details" when nothing selected
+**Plans**: TBD
 
-Plans:
-- [x] 02-01-PLAN.md — useSidebarRecents hook + Sidebar.tsx + SidebarFooter sub-component (SB-01, SB-02, SB-03, SB-04)
-- [ ] 02-02-PLAN.md — Layout.tsx surgery: swap <aside> for <Sidebar /> + human verify (SB-01, SB-02, SB-03, SB-04)
+### Phase 8: Global Search Overlay
+**Goal**: A full-screen search overlay triggered by sidebar Search button or Ctrl+K/Cmd+K, searches across pages (ALL_NAV_ITEMS), workflows (workflowsApi), conversations (chatApi.listHistory). Results grouped by category, click navigates to result
+**Depends on**: Phase 5
+**Requirements**: SRCH-01 through SRCH-05
+**Success Criteria**:
+  1. Clicking Search in sidebar opens overlay
+  2. Ctrl+K / Cmd+K keyboard shortcut opens overlay
+  3. ESC or backdrop click closes overlay
+  4. Typing filters results across pages, workflows, conversations in real time
+  5. Clicking a result navigates to that route and closes overlay
+**Plans**: TBD
 
-### Phase 3: Customize Page
-**Goal**: A new /customize route delivers a categorized grid of all available pages — users can pin and unpin items via a star toggle, search filters the grid in real time, and changes immediately reflect in the sidebar on the next navigation
-**Depends on**: Phase 2
-**Requirements**: CZ-01, CZ-02, CZ-03, CZ-04, CZ-05
-**Success Criteria** (what must be TRUE):
-  1. Navigating to /customize shows all available pages grouped by category (Personal Data, AI & Automation, Tools & Extensions, System, Settings)
-  2. Clicking the star toggle on any item pins it — navigating back to the sidebar shows it in the pinned list; clicking the star again unpins it and it disappears from the sidebar
-  3. Typing in the search field instantly filters the grid to matching items by name (no API call, client-side only)
-  4. When the pinned count reaches 15, attempting to pin another item shows a warning toast and the item is not added
-**Plans**: 2 plans
+### Phase 9: Local Files Tab
+**Goal**: The "Local Files" tab in Customize panel becomes a full filesystem browser. Uses File Workspace API to browse /host-home mount. Nautilus-style bookmarks (Home, Downloads, Projects...), Edge Devices clickable header, machine profiles (ayaz@IP), file detail in right panel on click
+**Depends on**: Phase 7
+**Requirements**: FILE-01 through FILE-06
+**Success Criteria**:
+  1. Local Files tab shows bookmark list matching Nautilus sidebar
+  2. Clicking a bookmark expands inline as a drawer showing directory contents
+  3. Subdirectories expand recursively with arrow toggle
+  4. Clicking a file shows detail in right panel (name, path, size, type, preview placeholder)
+  5. Edge Devices header is clickable — shows edge devices overview in detail panel
+  6. Directory open/close state persists to localStorage
+**Plans**: TBD
 
-Plans:
-- [x] 03-01-PLAN.md — nav-descriptions.ts constant + CustomizePage.tsx component (CZ-01, CZ-02, CZ-03, CZ-04, CZ-05)
-- [ ] 03-02-PLAN.md — Register /customize route in App.tsx + human verify (CZ-01, CZ-02, CZ-03)
-
-### Phase 4: Tests + Polish
-**Goal**: A Playwright E2E suite covers the full sidebar feature contract — every critical user flow has a passing test, TypeScript typecheck is clean, and a Docker build confirms all new Tailwind tokens are present in production CSS
-**Depends on**: Phase 3
-**Requirements**: TST-01, TST-02, TST-03, TST-04, TST-05, TST-06
-**Success Criteria** (what must be TRUE):
-  1. Playwright tests pass for: sidebar renders pinned items, pin/unpin from Customize page, Recents section shows conversations, mobile sidebar slide-in, Customize page grid and search
-  2. `pnpm run typecheck` exits with zero errors across all packages
-  3. Docker build completes and all new Tailwind utility classes appear in the production CSS output (grep verification)
-  4. StatsPanel, MiniChat, MiniTerminal, and DebugDrawer all function correctly after the Layout.tsx refactor (regression checklist passes)
+### Phase 10: E2E Tests + Polish
+**Goal**: Full Playwright E2E suite covering all new features. Mobile regression. Docker build verification. TypeScript clean
+**Depends on**: Phase 9
+**Requirements**: TST-07 through TST-12
+**Success Criteria**:
+  1. Playwright tests pass for: sidebar enhancements, 2-tab customize, detail panel, search overlay, local files, mobile
+  2. pnpm run typecheck exits clean
+  3. Docker build produces correct CSS
+  4. No regression in StatsPanel, MiniChat, MiniTerminal, DebugDrawer
 **Plans**: TBD
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
-
 | Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Foundation | 2/2 | Complete   | 2026-03-28 |
-| 2. Sidebar Rebuild | 1/2 | In Progress|  |
-| 3. Customize Page | 0/2 | Not started | - |
-| 4. Tests + Polish | 0/TBD | Not started | - |
+|-------|---------------|--------|-----------|
+| 5. Sidebar Enhancement | 0/TBD | Not started | - |
+| 6. Customize 2-Tab | 0/TBD | Not started | - |
+| 7. Detail Panel | 0/TBD | Not started | - |
+| 8. Global Search | 0/TBD | Not started | - |
+| 9. Local Files Tab | 0/TBD | Not started | - |
+| 10. E2E Tests + Polish | 0/TBD | Not started | - |
 
 ---
-*Roadmap created: 2026-03-27 — v1.0 Sidebar Overhaul*
-*Last updated: 2026-03-28 — Phase 3 planned (2 plans)*
+*Roadmap created: 2026-03-28 — v1.0 complete*
+*Updated: 2026-03-29 — v1.1 milestone started (6 phases)*

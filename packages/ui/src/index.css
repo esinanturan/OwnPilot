@@ -1,7 +1,8 @@
 @import 'tailwindcss';
 
 /* Configure dark mode to use class-based selector instead of media query */
-@variant dark (&:where(.dark, .dark *));
+/* Both .dark and .claude are dark themes — claude overrides the color palette */
+@variant dark (&:where(.dark, .dark *, .claude, .claude *));
 
 /* Custom CSS variables for theming */
 @theme {
@@ -73,6 +74,57 @@ html.dark body {
 .dark {
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/*
+ * Claude Desktop Theme — warm earth tones
+ *
+ * Sources:
+ *   - Anthropic brand: #C15F3C (Crail), #B1ADA1 (Cloudy), #F4F3EE (Pampas)
+ *   - jnahian/vscode-claude-theme dark palette (GitHub, 2025)
+ *   - shadcn.io/theme/claude: oklch(0.70 0.14 45) terracotta accent
+ *   - mobbin.com/colors/brand/claude: official brand colors
+ *
+ * Overrides dark-* CSS variables so all dark: utilities work automatically.
+ * Accent: warm terracotta (#C15F3C) instead of blue (#3b82f6).
+ */
+.claude {
+  /* Override dark-* palette with warm earth tones */
+  --color-dark-bg-primary: #1a1815;
+  --color-dark-bg-secondary: #201d18;
+  --color-dark-bg-tertiary: #2a251d;
+
+  --color-dark-text-primary: #e8e6e3;
+  --color-dark-text-secondary: #b5afa8;
+  --color-dark-text-muted: #6a6158;
+
+  --color-dark-border: #3a352b;
+
+  /* Claude terracotta accent — Anthropic brand Crail */
+  --color-primary: #C15F3C;
+  --color-primary-dark: #A14A2F;
+
+  /* Shadows with warm undertone */
+  --shadow-card: 0 1px 3px rgba(20, 15, 10, 0.35), 0 1px 2px rgba(20, 15, 10, 0.25);
+  --shadow-card-hover: 0 4px 12px rgba(20, 15, 10, 0.45), 0 2px 4px rgba(20, 15, 10, 0.25);
+}
+
+/* Claude mode body styles */
+.claude body,
+html.claude body {
+  background-color: var(--color-dark-bg-primary);
+  color: var(--color-dark-text-primary);
+}
+
+/* Claude mode scrollbar */
+.claude ::-webkit-scrollbar-track {
+  background-color: var(--color-dark-bg-secondary);
+}
+.claude ::-webkit-scrollbar-thumb {
+  background-color: var(--color-dark-text-muted);
+}
+.claude ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-dark-text-secondary);
 }
 
 /* Card elevation utilities */

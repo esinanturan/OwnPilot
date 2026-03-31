@@ -1,13 +1,14 @@
 /**
- * HeaderItem — single pinned nav item rendered as an icon-only button in the header bar.
+ * HeaderItem — single pinned nav item rendered in the header bar.
  *
+ * Display mode controls rendering: icon-only, icon+text, or text-only.
  * Navigates on click. Shows active state when on the matching route.
- * Uses native title attribute for tooltip (consistent with codebase).
  */
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { NavItem } from '../constants/nav-items';
+import type { HeaderItemDisplayMode } from '../types/layout-config';
 
-export function HeaderItem({ item }: { item: NavItem }) {
+export function HeaderItem({ item, displayMode = 'icon' }: { item: NavItem; displayMode?: HeaderItemDisplayMode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const Icon = item.icon;
@@ -17,13 +18,18 @@ export function HeaderItem({ item }: { item: NavItem }) {
     <button
       onClick={() => navigate(item.to)}
       title={item.label}
-      className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${
+      className={`h-8 flex items-center justify-center rounded-md transition-colors ${
+        displayMode === 'icon' ? 'w-8' : 'px-2 gap-1.5'
+      } ${
         isActive
           ? 'bg-primary/15 text-primary'
           : 'text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary'
       }`}
     >
-      <Icon className="w-4 h-4" />
+      {displayMode !== 'text' && <Icon className="w-4 h-4 shrink-0" />}
+      {displayMode !== 'icon' && (
+        <span className="text-xs font-medium truncate max-w-[80px]">{item.label}</span>
+      )}
     </button>
   );
 }

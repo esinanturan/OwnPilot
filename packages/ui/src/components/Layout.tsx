@@ -4,19 +4,19 @@ import { useGateway, type ConnectionStatus } from '../hooks/useWebSocket';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import {
   Menu,
+  Settings,
 } from './icons';
 import { StatsPanel } from './StatsPanel';
 import { RealtimeBridge, type BadgeCounts } from './RealtimeBridge';
 import { SecurityBanner } from './SecurityBanner';
-import { usePulseSlots, PulseSlotGrid } from './PulseSlots';
 import { DebugDrawer } from './DebugDrawer';
 import { MiniChat } from './MiniChat';
 import { MiniTerminal } from './MiniTerminal';
-import { MiniPomodoro } from './MiniPomodoro';
 import { Sidebar } from './Sidebar';
 import { GlobalSearchOverlay } from './GlobalSearchOverlay';
 import { PinnedItemsProvider } from '../hooks/usePinnedItems';
 import { HeaderItemsProvider } from '../hooks/useHeaderItems';
+import { LayoutConfigProvider } from '../hooks/useLayoutConfig';
 import { HeaderItemsBar } from './HeaderItemsBar';
 
 const CustomizePage = lazy(() =>
@@ -38,7 +38,7 @@ export function Layout() {
   const isMobile = useIsMobile();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isStatsPanelCollapsed, setIsStatsPanelCollapsed] = useState(true);
-  const { slots: pulseSlots } = usePulseSlots();
+  // PulseSlotGrid removed from header — available as widget in zone config
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCustomizePanelOpen, setIsCustomizePanelOpen] = useState(false);
   const [badgeCounts, setBadgeCounts] = useState<BadgeCounts>({ inbox: 0, tasks: 0 });
@@ -93,30 +93,52 @@ export function Layout() {
   return (
     <PinnedItemsProvider>
       <HeaderItemsProvider>
+        <LayoutConfigProvider>
         <div className="flex flex-col h-screen bg-bg-primary dark:bg-dark-bg-primary">
-      {/* Global Header Bar */}
-      <header className="relative h-12 flex items-center px-4 gap-3 border-b border-border dark:border-dark-border bg-bg-secondary dark:bg-dark-bg-secondary shrink-0 z-50">
-        {isMobile && (
-          <button
-            onClick={() => setIsMobileSidebarOpen(true)}
-            className="p-1 -ml-1 rounded-md text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary"
-            aria-label="Open menu"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        )}
-        <h1 className="font-semibold text-text-primary dark:text-dark-text-primary whitespace-nowrap text-sm">
-          OwnPilot
-        </h1>
-        {!isMobile && <HeaderItemsBar />}
-        <div className="flex-1 flex justify-center">
-          <PulseSlotGrid slots={pulseSlots} compact={isMobile} />
+      {/* Global Header Bar — 5 zones: Brand | Left | Center | Right | Settings */}
+      <header className="relative h-12 flex items-center px-4 border-b border-border dark:border-dark-border bg-bg-secondary dark:bg-dark-bg-secondary shrink-0 z-50">
+        {/* Zone 1: Brand (fixed) */}
+        <div className="flex items-center gap-2 shrink-0">
+          {isMobile && (
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="p-1 -ml-1 rounded-md text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary"
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+          <h1 className="font-semibold text-text-primary dark:text-dark-text-primary whitespace-nowrap text-sm">
+            OwnPilot
+          </h1>
         </div>
-        <MiniPomodoro />
-        <span
-          className={`w-2 h-2 rounded-full shrink-0 ${connectionStyle.color} ${connectionStyle.pulse ? 'animate-pulse' : ''}`}
-          title={connectionStyle.label}
-        />
+
+        {/* Zones 2-4: Configurable header zones (desktop only) */}
+        {!isMobile && (
+          <>
+            <div className="w-px h-5 bg-border dark:bg-dark-border mx-3 shrink-0" />
+            <HeaderItemsBar />
+          </>
+        )}
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Zone 5: Settings + status (fixed) */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 ${connectionStyle.color} ${connectionStyle.pulse ? 'animate-pulse' : ''}`}
+            title={connectionStyle.label}
+          />
+          <button
+            onClick={() => navigate('/settings/layout')}
+            className="w-8 h-8 flex items-center justify-center rounded-md text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary transition-colors"
+            title="Settings"
+            aria-label="Layout settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        </div>
       </header>
 
       {/* Body: sidebar + content + stats */}
@@ -181,6 +203,7 @@ export function Layout() {
       {/* Global Search Overlay */}
       {isSearchOpen && <GlobalSearchOverlay onClose={() => setIsSearchOpen(false)} />}
         </div>
+        </LayoutConfigProvider>
       </HeaderItemsProvider>
     </PinnedItemsProvider>
   );

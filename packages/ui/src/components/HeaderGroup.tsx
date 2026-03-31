@@ -10,10 +10,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronDown } from './icons';
 import { NAV_ITEM_MAP } from '../constants/nav-items';
 import type { HeaderItemConfig } from '../hooks/useHeaderItems';
+import type { HeaderItemDisplayMode } from '../types/layout-config';
 
 type GroupConfig = Extract<HeaderItemConfig, { type: 'group' }>;
 
-export function HeaderGroup({ config }: { config: GroupConfig }) {
+export function HeaderGroup({ config, displayMode = 'icon' }: { config: GroupConfig; displayMode?: HeaderItemDisplayMode }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -49,14 +50,20 @@ export function HeaderGroup({ config }: { config: GroupConfig }) {
     <div ref={containerRef} className="relative">
       <button
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`h-8 flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors max-w-[100px] ${
+        className={`h-8 flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors max-w-[120px] ${
           hasActiveChild || isOpen
             ? 'bg-primary/15 text-primary'
             : 'text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary'
         }`}
         title={config.label}
       >
-        <span className="truncate">{config.label}</span>
+        {displayMode !== 'text' && (() => {
+          const firstItem = NAV_ITEM_MAP.get(config.items[0] ?? '');
+          if (!firstItem) return null;
+          const GroupIcon = firstItem.icon;
+          return <GroupIcon className="w-3.5 h-3.5 shrink-0" />;
+        })()}
+        {displayMode !== 'icon' && <span className="truncate">{config.label}</span>}
         <ChevronDown
           className={`w-3 h-3 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
         />

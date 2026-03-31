@@ -1,33 +1,85 @@
 /**
- * HeaderItemsBar — container for pinned items/groups in the global header.
+ * HeaderItemsBar — renders 3 configurable header zones (left, center, right).
  *
- * Renders between the logo and PulseSlotGrid. Returns null when empty
- * (same conditional pattern as MiniPomodoro). Desktop only — Layout
- * guards with {!isMobile && <HeaderItemsBar />}.
+ * Each zone reads its entries from useLayoutConfig zone config.
+ * Falls back to legacy useHeaderItems if zones are empty (migration compat).
+ * Desktop only — Layout guards with {!isMobile && <HeaderItemsBar />}.
  */
 import { useHeaderItems } from '../hooks/useHeaderItems';
+import { useLayoutConfig } from '../hooks/useLayoutConfig';
 import { NAV_ITEM_MAP } from '../constants/nav-items';
 import { HeaderItem } from './HeaderItem';
 import { HeaderGroup } from './HeaderGroup';
+import type { HeaderZoneId, HeaderZoneEntry, HeaderItemDisplayMode } from '../types/layout-config';
+
+const ZONE_IDS: HeaderZoneId[] = ['left', 'center', 'right'];
+
+function ZoneEntries({ entries, displayMode }: { entries: HeaderZoneEntry[]; displayMode: HeaderItemDisplayMode }) {
+  if (entries.length === 0) return null;
+  return (
+    <>
+      {entries.map((entry, i) => {
+        if (entry.type === 'item') {
+          const navItem = NAV_ITEM_MAP.get(entry.path);
+          if (!navItem) return null;
+          return <HeaderItem key={entry.path} item={navItem} displayMode={displayMode} />;
+        }
+        if (entry.type === 'group') {
+          return <HeaderGroup key={entry.id} config={entry} displayMode={displayMode} />;
+        }
+        return null;
+      })}
+    </>
+  );
+}
 
 export function HeaderItemsBar() {
   const { headerItems } = useHeaderItems();
+  const { config, getZone } = useLayoutConfig();
 
-  if (headerItems.length === 0) return null;
+  // Check if any zone has entries
+  const hasZoneEntries = ZONE_IDS.some((id) => getZone(id).entries.length > 0);
 
+  // Fallback: if no zone entries configured, render legacy headerItems in center zone
+  if (!hasZoneEntries && headerItems.length === 0) return null;
+
+  if (!hasZoneEntries) {
+    // Legacy mode: render all headerItems as a single flat bar
+    const displayMode = config.header.itemDisplayMode;
+    return (
+      <div className="flex items-center gap-1 shrink-0">
+        {headerItems.map((cfg) => {
+          if (cfg.type === 'item') {
+            const navItem = NAV_ITEM_MAP.get(cfg.path);
+            if (!navItem) return null;
+            return <HeaderItem key={cfg.path} item={navItem} displayMode={displayMode} />;
+          }
+          if (cfg.type === 'group') {
+            return <HeaderGroup key={cfg.id} config={cfg} displayMode={displayMode} />;
+          }
+          return null;
+        })}
+      </div>
+    );
+  }
+
+  // Zone mode: render 3 zones with separators
   return (
-    <div className="flex items-center gap-1 shrink-0">
-      <div className="w-px h-5 bg-border dark:bg-dark-border mx-1" />
-      {headerItems.map((config) => {
-        if (config.type === 'item') {
-          const navItem = NAV_ITEM_MAP.get(config.path);
-          if (!navItem) return null;
-          return <HeaderItem key={config.path} item={navItem} />;
-        }
-        if (config.type === 'group') {
-          return <HeaderGroup key={config.id} config={config} />;
-        }
-        return null;
+    <div className="flex items-center gap-1 flex-1 min-w-0">
+      {ZONE_IDS.map((zoneId, zi) => {
+        const zone = getZone(zoneId);
+        const hasEntries = zone.entries.length > 0;
+        return (
+          <div
+            key={zoneId}
+            className={`flex items-center gap-1 ${hasEntries ? 'shrink-0' : 'flex-1 min-w-0'}`}
+          >
+            {zi > 0 && (ZONE_IDS.slice(0, zi).some((id) => getZone(id).entries.length > 0) || zi === 1) && (
+              <div className="w-px h-4 bg-border/30 dark:bg-dark-border/30 mx-1 shrink-0" />
+            )}
+            <ZoneEntries entries={zone.entries} displayMode={zone.displayMode} />
+          </div>
+        );
       })}
     </div>
   );

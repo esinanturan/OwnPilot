@@ -171,6 +171,7 @@ export const navGroups: NavGroup[] = [
       { to: '/settings/workflow-tools', icon: GitBranch, label: 'Workflow Tools' },
       // System
       { to: '/settings/config-center', icon: Globe, label: 'Config Center' },
+      { to: '/settings/layout', icon: LayoutDashboard, label: 'Layout' },
       { to: '/settings/system', icon: Container, label: 'System' },
     ],
   },

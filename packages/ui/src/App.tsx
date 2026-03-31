@@ -134,6 +134,9 @@ const WorkflowToolSettingsPage = lazy(() =>
 const SystemPage = lazy(() =>
   import('./pages/SystemPage').then((m) => ({ default: m.SystemPage }))
 );
+const LayoutConfigPage = lazy(() =>
+  import('./pages/LayoutConfigPage').then((m) => ({ default: m.LayoutConfigPage }))
+);
 const CodingAgentsPage = lazy(() =>
   import('./pages/CodingAgentsPage').then((m) => ({ default: m.CodingAgentsPage }))
 );
@@ -295,6 +298,7 @@ export function App() {
         <Route path="settings/security" element={page(<SecurityPage />)} />
         <Route path="settings/security-scanner" element={page(<SecurityDashboardPage />)} />
         <Route path="settings/system" element={page(<SystemPage />)} />
+        <Route path="settings/layout" element={page(<LayoutConfigPage />)} />
         <Route path="about" element={page(<AboutPage />)} />
         <Route path="profile" element={page(<ProfilePage />)} />
         {/* Catch-all route - redirect unknown paths to home */}

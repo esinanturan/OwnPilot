@@ -2,6 +2,7 @@
 export {
   Activity,
   AlertCircle,
+  AlignLeft,
   ArrowLeft,
   AlertTriangle,
   Archive,
@@ -104,6 +105,7 @@ export {
   Terminal,
   Trash,
   Trash2,
+  Type,
   TrendingUp,
   Twitter,
   Unlink,

@@ -1,85 +1,100 @@
 /**
- * LayoutConfigPage — visual layout configuration for header and sidebar.
+ * LayoutConfigPage — interactive layout configuration with visual wireframe.
  *
  * Route: /settings/layout
- * Live preview: changes apply instantly via useLayoutConfig Context.
+ *
+ * Top: clickable mini layout wireframe (header zones + body areas)
+ * Middle: zone-specific settings panel (display mode, entries, add/remove)
+ * Bottom: global settings (theme, reset)
+ *
+ * Pattern: Soybean Admin layout thumbnails + Shopify Preview Inspector
+ * Changes apply instantly via Context state → live preview.
  */
+import { useState } from 'react';
+import { LayoutWireframe, type WireframeZone } from '../components/LayoutWireframe';
+import { ZoneEditor } from '../components/ZoneEditor';
 import { useLayoutConfig } from '../hooks/useLayoutConfig';
-import type { HeaderItemDisplayMode } from '../types/layout-config';
-import { LayoutDashboard, Type, AlignLeft } from '../components/icons';
+import { useTheme } from '../hooks/useTheme';
+import { DEFAULT_LAYOUT_CONFIG } from '../types/layout-config';
+import { RotateCcw, Sun, Moon, Monitor, Palette } from '../components/icons';
 
-const DISPLAY_MODES: { mode: HeaderItemDisplayMode; label: string; icon: React.ComponentType<{ className?: string }>; description: string }[] = [
-  { mode: 'icon', label: 'Icon', icon: LayoutDashboard, description: 'Compact — icons only' },
-  { mode: 'icon-text', label: 'Icon + Text', icon: AlignLeft, description: 'Icons with labels' },
-  { mode: 'text', label: 'Text', icon: Type, description: 'Labels only, no icons' },
+type ThemeOption = 'system' | 'light' | 'dark' | 'claude';
+
+const THEME_OPTIONS: { value: ThemeOption; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: 'system', label: 'System', icon: Monitor },
+  { value: 'light', label: 'Light', icon: Sun },
+  { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'claude', label: 'Claude', icon: Palette },
 ];
 
 export function LayoutConfigPage() {
-  const { config, setHeaderDisplayMode } = useLayoutConfig();
-  const currentMode = config.header.itemDisplayMode;
+  const [selectedZone, setSelectedZone] = useState<WireframeZone | null>(null);
+  const { setConfig } = useLayoutConfig();
+  const { theme, setTheme } = useTheme();
+
+  const handleReset = () => {
+    setConfig(DEFAULT_LAYOUT_CONFIG);
+    setSelectedZone(null);
+  };
 
   return (
-    <div className="max-w-2xl mx-auto p-6 space-y-8">
+    <div className="max-w-2xl mx-auto p-6 space-y-6">
       {/* Page header */}
       <div>
         <h1 className="text-xl font-semibold text-text-primary dark:text-dark-text-primary">
           Layout Configuration
         </h1>
         <p className="mt-1 text-sm text-text-secondary dark:text-dark-text-secondary">
-          Customize how your header and sidebar look. Changes apply instantly.
+          Click a zone to configure it. Changes apply instantly.
         </p>
       </div>
 
-      {/* Header section */}
-      <section className="space-y-4">
-        <h2 className="text-base font-medium text-text-primary dark:text-dark-text-primary border-b border-border dark:border-dark-border pb-2">
-          Header
+      {/* Interactive wireframe */}
+      <LayoutWireframe selectedZone={selectedZone} onZoneSelect={setSelectedZone} />
+
+      {/* Zone editor (shown when a zone is selected) */}
+      {selectedZone && <ZoneEditor zone={selectedZone} />}
+
+      {/* Global settings */}
+      <section className="space-y-4 pt-2">
+        <h2 className="text-sm font-medium text-text-primary dark:text-dark-text-primary border-b border-border dark:border-dark-border pb-2">
+          Global Settings
         </h2>
 
-        {/* Display mode */}
-        <div className="space-y-3">
-          <div>
-            <h3 className="text-sm font-medium text-text-primary dark:text-dark-text-primary">
-              Item Display Mode
-            </h3>
-            <p className="text-xs text-text-muted dark:text-dark-text-muted mt-0.5">
-              How pinned items appear in the header bar
-            </p>
-          </div>
-
-          <div className="flex gap-2">
-            {DISPLAY_MODES.map(({ mode, label, icon: ModeIcon, description }) => (
+        {/* Theme selector */}
+        <div className="space-y-2">
+          <p className="text-xs text-text-muted dark:text-dark-text-muted">Theme</p>
+          <div className="flex gap-1">
+            {THEME_OPTIONS.map(({ value, label, icon: ThemeIcon }) => (
               <button
-                key={mode}
-                onClick={() => setHeaderDisplayMode(mode)}
-                className={`flex-1 flex flex-col items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                  currentMode === mode
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-border dark:border-dark-border text-text-secondary dark:text-dark-text-secondary hover:border-primary/50 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary'
+                key={value}
+                onClick={() => setTheme(value)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  theme === value
+                    ? 'bg-primary text-white'
+                    : 'bg-bg-tertiary dark:bg-dark-bg-tertiary text-text-secondary dark:text-dark-text-secondary hover:bg-primary/10 hover:text-primary'
                 }`}
               >
-                <ModeIcon className="w-5 h-5" />
-                <span className="text-sm font-medium">{label}</span>
-                <span className="text-[10px] opacity-60">{description}</span>
+                <ThemeIcon className="w-3 h-3" />
+                {label}
               </button>
             ))}
           </div>
         </div>
-      </section>
 
-      {/* Sidebar section (placeholder) */}
-      <section className="space-y-4">
-        <h2 className="text-base font-medium text-text-primary dark:text-dark-text-primary border-b border-border dark:border-dark-border pb-2">
-          Sidebar
-        </h2>
-        <p className="text-sm text-text-muted dark:text-dark-text-muted italic">
-          Sidebar customization options coming soon — width, density, and default collapse state.
-        </p>
+        {/* Reset */}
+        <button
+          onClick={handleReset}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-text-muted dark:text-dark-text-muted hover:text-error hover:bg-error/10 transition-colors"
+        >
+          <RotateCcw className="w-3 h-3" />
+          Reset Layout to Defaults
+        </button>
       </section>
 
       {/* Info note */}
       <div className="text-xs text-text-muted dark:text-dark-text-muted bg-bg-tertiary dark:bg-dark-bg-tertiary rounded-lg px-4 py-3">
-        Layout settings are saved to this device. Header items are only visible on desktop.
+        Layout settings are saved to this device. Header zones are only visible on desktop.
       </div>
     </div>
   );

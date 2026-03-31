@@ -5,21 +5,23 @@
  * Do NOT add position:fixed or overflow:hidden wrappers around <aside>.
  * Mobile slide: translate-x-0 (open) / -translate-x-full (closed).
  */
-import { useRef } from 'react';
-import { NavLink, useNavigate, useSearchParams } from 'react-router-dom';
+import { useRef, useState } from 'react';
+import { NavLink, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import type { ConnectionStatus } from '../hooks/useWebSocket';
-import { usePinnedItems } from '../hooks/usePinnedItems';
+import { usePinnedItems, type SidebarPinnedConfig } from '../hooks/usePinnedItems';
+import { useChatStore } from '../hooks/useChatStore';
 import { useSidebarRecents, getConvTitle } from '../hooks/useSidebarRecents';
 import type { SourceFilter } from '../hooks/useSidebarRecents';
 import { useSidebarProjects } from '../hooks/useSidebarProjects';
 import { useSidebarWorkflows } from '../hooks/useSidebarWorkflows';
-import { ALL_NAV_ITEMS } from '../constants/nav-items';
+import { ALL_NAV_ITEMS, NAV_ITEM_MAP } from '../constants/nav-items';
 import { SidebarFooter } from './sidebar/SidebarFooter';
 import { useToast } from './ToastProvider';
 import { useDialog } from './ConfirmDialog';
-import { X, ChevronRight, Search, Calendar, FolderOpen, GitBranch, Plus, Edit2, Trash2, Globe, MessageSquare, Telegram, WhatsApp } from './icons';
+import { X, ChevronRight, ChevronDown, Search, Calendar, FolderOpen, GitBranch, Plus, Edit2, Trash2, Globe, MessageSquare, Telegram, WhatsApp } from './icons';
 import type { NavItem } from '../constants/nav-items';
 import type { Conversation } from '../api/types';
+import { chatApi } from '../api/endpoints/chat';
 
 export interface SidebarProps {
   isMobile: boolean;
@@ -33,16 +35,31 @@ export interface SidebarProps {
   badgeCounts: { inbox: number; tasks: number };
 }
 
-// Build a lookup map: route path → NavItem (for icon + label resolution)
-const NAV_ITEM_MAP = new Map<string, NavItem>(ALL_NAV_ITEMS.map((item) => [item.to, item]));
+// NAV_ITEM_MAP imported from '../constants/nav-items' (shared with HeaderItemsBar)
 
 function PinnedNavLink({ item, badge, onCloseCustomize, isCustomizeOpen }: { item: NavItem; badge?: number; onCloseCustomize?: () => void; isCustomizeOpen?: boolean }) {
   const Icon = item.icon;
+  const location = useLocation();
+  const { clearMessages, provider, model } = useChatStore();
+  const navigate = useNavigate();
+
+  const handleClick = (e: React.MouseEvent) => {
+    onCloseCustomize?.();
+    // Chat item: if already on "/" start a new chat instead of no-op navigation
+    if (item.to === '/' && location.pathname === '/') {
+      e.preventDefault();
+      clearMessages();
+      navigate('/', { replace: true });
+      // Reset backend context (best-effort)
+      chatApi.resetContext(provider, model).catch(() => {});
+    }
+  };
+
   return (
     <NavLink
       to={item.to}
       end={item.to === '/'}
-      onClick={onCloseCustomize}
+      onClick={handleClick}
       className={({ isActive }) =>
         `flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base ${
           isActive && !isCustomizeOpen
@@ -62,8 +79,56 @@ function PinnedNavLink({ item, badge, onCloseCustomize, isCustomizeOpen }: { ite
   );
 }
 
+function PinnedNavGroup({ config, onCloseCustomize, isCustomizeOpen }: { config: Extract<SidebarPinnedConfig, { type: 'group' }>; onCloseCustomize?: () => void; isCustomizeOpen?: boolean }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const hasActiveChild = config.items.some((path) => location.pathname === path);
+
+  return (
+    <div>
+      <button
+        onClick={() => setIsOpen((prev) => !prev)}
+        className={`w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base ${
+          (hasActiveChild && !isCustomizeOpen) || isOpen
+            ? 'bg-primary/10 text-primary'
+            : 'text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5'
+        }`}
+      >
+        <ChevronRight className={`w-3.5 h-3.5 shrink-0 transition-transform duration-150 ${isOpen ? 'rotate-90' : ''}`} />
+        <span className="truncate flex-1 text-left">{config.label}</span>
+        <span className="text-[10px] opacity-50">{config.items.length}</span>
+      </button>
+      {isOpen && (
+        <div className="ml-3 pl-2 border-l border-border dark:border-dark-border space-y-0.5 mt-0.5">
+          {config.items.map((path) => {
+            const navItem = NAV_ITEM_MAP.get(path);
+            if (!navItem) return null;
+            const Icon = navItem.icon;
+            const isActive = location.pathname === path;
+            return (
+              <button
+                key={path}
+                onClick={() => { onCloseCustomize?.(); navigate(path); }}
+                className={`w-full flex items-center gap-2 px-2 py-1 rounded-md transition-colors text-sm ${
+                  isActive && !isCustomizeOpen
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{navItem.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Sidebar({ isMobile, isOpen, onClose, onSearchOpen, onCustomizeToggle, isCustomizeOpen, onCloseCustomize, wsStatus, badgeCounts }: SidebarProps) {
-  const { pinnedItems } = usePinnedItems();
+  const { pinnedConfigs, pinnedItems } = usePinnedItems();
   const recents = useSidebarRecents();
   const { projects, isLoading: projectsLoading } = useSidebarProjects();
   const { workflows, isLoading: workflowsLoading } = useSidebarWorkflows();
@@ -74,10 +139,8 @@ export function Sidebar({ isMobile, isOpen, onClose, onSearchOpen, onCustomizeTo
   const dialog = useDialog();
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  // Resolve NavItem objects from pinned route paths.
-  const pinnedNavItems = pinnedItems
-    .map((path) => NAV_ITEM_MAP.get(path))
-    .filter((item): item is NavItem => item !== undefined);
+  // pinnedItems (string[]) still used for badge resolution below
+  // pinnedConfigs used for rendering (items + groups)
 
   const handleRecentClick = (conversationId: string) => {
     onCloseCustomize();
@@ -141,23 +204,40 @@ export function Sidebar({ isMobile, isOpen, onClose, onSearchOpen, onCustomizeTo
       {/* Navigation */}
       <nav className="flex-1 p-2 overflow-y-auto" data-testid="sidebar-nav">
 
-        {/* Pinned items */}
+        {/* Pinned items + groups */}
         <div className="space-y-0.5 mb-2" data-testid="sidebar-pinned-items">
-          {pinnedNavItems.map((item) => (
-            <PinnedNavLink
-              key={item.to}
-              item={item}
-              onCloseCustomize={onCloseCustomize}
-              isCustomizeOpen={isCustomizeOpen}
-              badge={
-                item.to === '/inbox'
-                  ? badgeCounts.inbox
-                  : item.to === '/tasks'
-                    ? badgeCounts.tasks
-                    : undefined
-              }
-            />
-          ))}
+          {pinnedConfigs.map((config, i) => {
+            if (config.type === 'item') {
+              const item = NAV_ITEM_MAP.get(config.path);
+              if (!item) return null;
+              return (
+                <PinnedNavLink
+                  key={config.path}
+                  item={item}
+                  onCloseCustomize={onCloseCustomize}
+                  isCustomizeOpen={isCustomizeOpen}
+                  badge={
+                    config.path === '/inbox'
+                      ? badgeCounts.inbox
+                      : config.path === '/tasks'
+                        ? badgeCounts.tasks
+                        : undefined
+                  }
+                />
+              );
+            }
+            if (config.type === 'group') {
+              return (
+                <PinnedNavGroup
+                  key={config.id}
+                  config={config}
+                  onCloseCustomize={onCloseCustomize}
+                  isCustomizeOpen={isCustomizeOpen}
+                />
+              );
+            }
+            return null;
+          })}
         </div>
 
         {/* Search button */}

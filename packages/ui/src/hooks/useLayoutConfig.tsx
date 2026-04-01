@@ -15,6 +15,7 @@ import {
   type HeaderZoneId,
   type HeaderZoneEntry,
   type HeaderZoneConfig,
+  type CustomGroup,
   DEFAULT_LAYOUT_CONFIG,
   LAYOUT_CONFIG_VERSION,
 } from '../types/layout-config';
@@ -54,7 +55,9 @@ function isValidConfig(v: unknown): v is LayoutConfig {
   if (!VALID_DISPLAY_MODES.includes(h.itemDisplayMode as string)) return false;
   if (!h.zones || typeof h.zones !== 'object') return false;
   const zones = h.zones as Record<string, unknown>;
-  return VALID_ZONE_IDS.every((id) => isValidZoneConfig(zones[id]));
+  if (!VALID_ZONE_IDS.every((id) => isValidZoneConfig(zones[id]))) return false;
+  if (!Array.isArray(obj.customGroups)) return false;
+  return true;
 }
 
 function migrateConfig(raw: unknown): LayoutConfig {
@@ -79,6 +82,15 @@ function migrateConfig(raw: unknown): LayoutConfig {
           right: { entries: [], displayMode },
         },
       },
+    };
+  }
+
+  // V2 → V3: add customGroups array
+  if (typeof obj.version === 'number' && obj.version === 2) {
+    return {
+      ...(obj as LayoutConfig),
+      version: LAYOUT_CONFIG_VERSION,
+      customGroups: [],
     };
   }
 
@@ -123,6 +135,9 @@ interface LayoutConfigValue {
   addZoneEntry: (zoneId: HeaderZoneId, entry: HeaderZoneEntry) => void;
   removeZoneEntry: (zoneId: HeaderZoneId, index: number) => void;
   getZone: (zoneId: HeaderZoneId) => HeaderZoneConfig;
+  addCustomGroup: (label: string, items: string[]) => CustomGroup;
+  removeCustomGroup: (id: string) => void;
+  updateCustomGroup: (id: string, label: string, items: string[]) => void;
 }
 
 const LayoutConfigContext = createContext<LayoutConfigValue | null>(null);
@@ -220,9 +235,35 @@ export function LayoutConfigProvider({ children }: { children: ReactNode }) {
     [config],
   );
 
+  const addCustomGroup = useCallback(
+    (label: string, items: string[]): CustomGroup => {
+      const group: CustomGroup = { id: `custom-${Date.now()}`, label, items };
+      setConfig((prev) => ({ ...prev, customGroups: [...prev.customGroups, group] }));
+      return group;
+    },
+    [setConfig],
+  );
+
+  const removeCustomGroup = useCallback(
+    (id: string) => {
+      setConfig((prev) => ({ ...prev, customGroups: prev.customGroups.filter((g) => g.id !== id) }));
+    },
+    [setConfig],
+  );
+
+  const updateCustomGroup = useCallback(
+    (id: string, label: string, items: string[]) => {
+      setConfig((prev) => ({
+        ...prev,
+        customGroups: prev.customGroups.map((g) => (g.id === id ? { ...g, label, items } : g)),
+      }));
+    },
+    [setConfig],
+  );
+
   return (
     <LayoutConfigContext.Provider
-      value={{ config, setConfig, setHeaderDisplayMode, setZoneDisplayMode, setZoneEntries, addZoneEntry, removeZoneEntry, getZone }}
+      value={{ config, setConfig, setHeaderDisplayMode, setZoneDisplayMode, setZoneEntries, addZoneEntry, removeZoneEntry, getZone, addCustomGroup, removeCustomGroup, updateCustomGroup }}
     >
       {children}
     </LayoutConfigContext.Provider>

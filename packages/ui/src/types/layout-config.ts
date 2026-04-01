@@ -10,7 +10,7 @@
  * Brand and Settings are fixed. The 3 middle zones are user-configurable.
  */
 
-export const LAYOUT_CONFIG_VERSION = 2;
+export const LAYOUT_CONFIG_VERSION = 3;
 
 /** How pinned header items render */
 export type HeaderItemDisplayMode = 'icon' | 'icon-text' | 'text';
@@ -43,10 +43,19 @@ export interface LayoutConfigSidebar {
   // density: 'compact' | 'default' | 'comfortable';
 }
 
+/** User-defined custom group — global, reusable across zones and sidebar */
+export interface CustomGroup {
+  id: string;        // custom-{timestamp}
+  label: string;     // user-defined name
+  items: string[];   // route paths
+}
+
 export interface LayoutConfig {
   version: number;
   header: LayoutConfigHeader;
   sidebar: LayoutConfigSidebar;
+  /** Global custom groups — can be added to any header zone or sidebar */
+  customGroups: CustomGroup[];
 }
 
 const EMPTY_ZONE: HeaderZoneConfig = { entries: [], displayMode: 'icon' };
@@ -62,4 +71,5 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
     },
   },
   sidebar: {},
+  customGroups: [],
 };

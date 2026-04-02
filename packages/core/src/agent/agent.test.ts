@@ -365,12 +365,15 @@ describe('Agent', () => {
     it('rejects when already processing', async () => {
       const agent = new Agent(createTestConfig());
 
-      // Manually set processing state using internal state manipulation
-      // We'll test this by calling chat when provider is not ready
+      // Set isProcessing to true via internal state to simulate an in-flight request
+      (agent as any)['state'] = { ...(agent as any)['state'], isProcessing: true };
+
       const result = await agent.chat('Hello');
 
-      // Should return validation error since no actual API
       expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.message).toContain('already processing');
+      }
     });
 
     it('rejects when provider not ready', async () => {

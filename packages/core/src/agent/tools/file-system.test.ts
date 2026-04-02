@@ -34,6 +34,16 @@ vi.mock('../../security/self-protection.js', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Mock node:dns/promises to prevent real DNS lookups in SSRF protection
+// ---------------------------------------------------------------------------
+vi.mock('node:dns/promises', () => ({
+  lookup: vi.fn(async () => {
+    // Return a public IP for any hostname in tests
+    return [{ address: '93.184.216.34', family: 4 }];
+  }),
+}));
+
+// ---------------------------------------------------------------------------
 // Import SUT after mocks are registered
 // ---------------------------------------------------------------------------
 import {

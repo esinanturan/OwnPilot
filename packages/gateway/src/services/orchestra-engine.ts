@@ -498,8 +498,8 @@ export class OrchestraEngine {
     // Timeout — cancel and return what we have
     try {
       svc.cancel(subagentId, userId);
-    } catch {
-      // Best-effort
+    } catch (err) {
+      log.debug('Subagent cancel failed (best-effort)', { subagentId, error: String(err) });
     }
 
     return svc.getSession(subagentId, userId);

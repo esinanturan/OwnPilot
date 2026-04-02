@@ -158,11 +158,16 @@ export class AcpClient {
     }, stream);
 
     // Listen for connection close
-    this.connection.closed.then(() => {
-      if (this.state !== 'closed' && this.state !== 'error') {
-        this.setState('closed');
-      }
-    });
+    this.connection.closed
+      .then(() => {
+        if (this.state !== 'closed' && this.state !== 'error') {
+          this.setState('closed');
+        }
+      })
+      .catch((err) => {
+        this.setState('error');
+        log.warn('ACP connection closed with error', { error: String(err) });
+      });
 
     // Perform initialization handshake
     await this.initialize();

@@ -803,7 +803,10 @@ export class ClawManager {
     try {
       const { ConversationsRepository } = await import('../db/repositories/conversations.js');
       const repo = new ConversationsRepository();
-      const existing = await repo.getById(conversationId).catch(() => null);
+      const existing = await repo.getById(conversationId).catch((err) => {
+        log.debug('Conversation lookup failed (best-effort)', { conversationId, error: String(err) });
+        return null;
+      });
       if (!existing) {
         await repo.create({
           id: conversationId,
@@ -811,8 +814,8 @@ export class ClawManager {
           metadata: { clawId, clawName, type: 'claw' },
         });
       }
-    } catch {
-      // conversations table may not exist or repo may differ — best-effort
+    } catch (err) {
+      log.debug('Failed to persist claw conversation (best-effort)', { clawId, error: String(err) });
     }
   }
 

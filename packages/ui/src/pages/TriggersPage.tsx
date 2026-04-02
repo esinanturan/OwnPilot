@@ -124,8 +124,36 @@ export function TriggersPage() {
   const [showHistory, setShowHistory] = useState<string | null>(null);
   const [history, setHistory] = useState<TriggerHistoryEntry[]>([]);
 
+  // Skip home preference from localStorage
+  const SKIP_HOME_KEY = 'ownpilot:triggers:skipHome';
+  const [skipHome, setSkipHome] = useState(() => {
+    try {
+      return localStorage.getItem(SKIP_HOME_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Save skip home preference
+  const handleSkipHomeChange = useCallback((checked: boolean) => {
+    setSkipHome(checked);
+    try {
+      localStorage.setItem(SKIP_HOME_KEY, String(checked));
+    } catch {
+      // localStorage might be disabled
+    }
+  }, []);
+
   // New state for enhanced features
-  const [activeTab, setActiveTab] = useState<TabId>('home');
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    // Skip home if preference is set
+    try {
+      if (localStorage.getItem(SKIP_HOME_KEY) === 'true') {
+        return 'triggers';
+      }
+    } catch {}
+    return 'home';
+  });
   const [stats, setStats] = useState<TriggerStats | null>(null);
   const [engineRunning, setEngineRunning] = useState<boolean | null>(null);
   const [engineLoading, setEngineLoading] = useState(false);
@@ -457,6 +485,9 @@ export function TriggersPage() {
             title="Automate with Smart Triggers"
             subtitle="Triggers let your AI react to events automatically — schedules, webhooks, data changes, and custom conditions."
             cta={{ label: 'Create Trigger', icon: Plus, onClick: () => setShowCreateModal(true) }}
+            skipHomeChecked={skipHome}
+            onSkipHomeChange={handleSkipHomeChange}
+            skipHomeLabel="Skip this screen and go directly to Triggers"
             features={[
               {
                 icon: Clock,

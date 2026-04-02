@@ -58,10 +58,39 @@ export function WorkflowsPage() {
   const { confirm } = useDialog();
   const toast = useToast();
   const { subscribe } = useGateway();
+
+  // Skip home preference from localStorage
+  const SKIP_HOME_KEY = 'ownpilot:workflows:skipHome';
+  const [skipHome, setSkipHome] = useState(() => {
+    try {
+      return localStorage.getItem(SKIP_HOME_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Save skip home preference
+  const handleSkipHomeChange = useCallback((checked: boolean) => {
+    setSkipHome(checked);
+    try {
+      localStorage.setItem(SKIP_HOME_KEY, String(checked));
+    } catch {
+      // localStorage might be disabled
+    }
+  }, []);
+
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [recentLogs, setRecentLogs] = useState<WorkflowLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabId>('home');
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    // Skip home if preference is set
+    try {
+      if (localStorage.getItem(SKIP_HOME_KEY) === 'true') {
+        return 'workflows';
+      }
+    } catch {}
+    return 'home';
+  });
 
   const fetchWorkflows = useCallback(async () => {
     try {
@@ -261,6 +290,9 @@ export function WorkflowsPage() {
             title="Build Multi-Step Workflows"
             subtitle="Workflows chain multiple actions into automated pipelines — from simple sequences to complex branching logic."
             cta={{ label: 'Create Workflow', icon: Plus, onClick: handleCreate }}
+            skipHomeChecked={skipHome}
+            onSkipHomeChange={handleSkipHomeChange}
+            skipHomeLabel="Skip this screen and go directly to Workflows"
             features={[
               {
                 icon: GitBranch,

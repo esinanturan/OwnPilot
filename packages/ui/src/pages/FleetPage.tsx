@@ -1954,9 +1954,39 @@ export function FleetPage() {
   const toast = useToast();
   const { confirm } = useDialog();
 
+  // Skip home preference from localStorage
+  const SKIP_HOME_KEY = 'ownpilot:fleet:skipHome';
+  const [skipHome, setSkipHome] = useState(() => {
+    try {
+      return localStorage.getItem(SKIP_HOME_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Save skip home preference
+  const handleSkipHomeChange = useCallback((checked: boolean) => {
+    setSkipHome(checked);
+    try {
+      localStorage.setItem(SKIP_HOME_KEY, String(checked));
+    } catch {
+      // localStorage might be disabled
+    }
+  }, []);
+
   const tabParam = searchParams.get('tab') as TabId | null;
   const activeTab: TabId =
     tabParam && (['home', 'fleets'] as string[]).includes(tabParam) ? tabParam : 'home';
+
+  // Auto-redirect to fleets if skipHome is enabled and no explicit tab param
+  useEffect(() => {
+    if (skipHome && !tabParam) {
+      const params = new URLSearchParams(searchParams);
+      params.set('tab', 'fleets');
+      navigate({ search: params.toString() }, { replace: true });
+    }
+  }, [skipHome, tabParam, searchParams, navigate]);
+
   const setTab = (tab: TabId) => {
     const params = new URLSearchParams(searchParams);
     params.set('tab', tab);
@@ -2205,6 +2235,9 @@ export function FleetPage() {
               },
             },
           ]}
+          skipHomeChecked={skipHome}
+          onSkipHomeChange={handleSkipHomeChange}
+          skipHomeLabel="Skip this screen and go directly to Fleets"
           infoBox={{
             icon: Layers,
             title: 'Built on Top of Existing Services',

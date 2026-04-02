@@ -110,12 +110,21 @@ export class ChannelSessionsRepository extends BaseRepository {
 
   /**
    * Create a new session.
+   * Uses ON CONFLICT to reactivate an existing inactive session instead of
+   * violating the unique constraint (channel_user_id, channel_plugin_id, platform_chat_id).
    */
   async create(input: CreateChannelSessionInput): Promise<ChannelSessionEntity> {
     const id = randomUUID();
-    await this.execute(
+    const row = await this.queryOne<ChannelSessionRow>(
       `INSERT INTO channel_sessions (id, channel_user_id, channel_plugin_id, platform_chat_id, conversation_id, context)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (channel_user_id, channel_plugin_id, platform_chat_id)
+       DO UPDATE SET
+         is_active = TRUE,
+         conversation_id = COALESCE(EXCLUDED.conversation_id, channel_sessions.conversation_id),
+         context = EXCLUDED.context,
+         last_message_at = NOW()
+       RETURNING *`,
       [
         id,
         input.channelUserId,
@@ -125,14 +134,14 @@ export class ChannelSessionsRepository extends BaseRepository {
         JSON.stringify(input.context ?? {}),
       ]
     );
-    const result = await this.getById(id);
-    if (!result) throw new Error('Failed to create channel session');
-    return result;
+    if (!row) throw new Error('Failed to create channel session');
+    return rowToEntity(row);
   }
 
   /**
    * Find or create an active session.
-   * Uses find-then-create with retry to handle concurrent requests safely.
+   * The upsert in create() handles conflicts at the DB level, making this
+   * safe for concurrent requests and multi-instance deployments.
    */
   async findOrCreate(input: CreateChannelSessionInput): Promise<ChannelSessionEntity> {
     const existing = await this.findActive(
@@ -142,18 +151,7 @@ export class ChannelSessionsRepository extends BaseRepository {
     );
     if (existing) return existing;
 
-    try {
-      return await this.create(input);
-    } catch {
-      // Concurrent insert may have succeeded — retry lookup
-      const retried = await this.findActive(
-        input.channelUserId,
-        input.channelPluginId,
-        input.platformChatId
-      );
-      if (retried) return retried;
-      throw new Error('Failed to find or create channel session');
-    }
+    return this.create(input);
   }
 
   /**

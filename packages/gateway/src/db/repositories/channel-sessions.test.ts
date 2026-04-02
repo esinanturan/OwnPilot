@@ -161,8 +161,7 @@ describe('ChannelSessionsRepository', () => {
   // ---- create ----
 
   describe('create', () => {
-    it('inserts a session and returns the mapped entity', async () => {
-      mockAdapter.execute.mockResolvedValueOnce({ changes: 1 });
+    it('inserts a session with ON CONFLICT and returns the mapped entity', async () => {
       mockAdapter.queryOne.mockResolvedValueOnce(makeSessionRow({ id: 'generated-uuid' }));
 
       const result = await repo.create({
@@ -171,8 +170,12 @@ describe('ChannelSessionsRepository', () => {
         platformChatId: 'chat-1',
       });
 
-      expect(mockAdapter.execute).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT INTO channel_sessions'),
+      const sql = mockAdapter.queryOne.mock.calls[0][0] as string;
+      expect(sql).toContain('INSERT INTO channel_sessions');
+      expect(sql).toContain('ON CONFLICT');
+      expect(sql).toContain('RETURNING *');
+      expect(mockAdapter.queryOne).toHaveBeenCalledWith(
+        expect.any(String),
         ['generated-uuid', 'cu-1', 'cp-1', 'chat-1', null, '{}']
       );
       expect(result.id).toBe('generated-uuid');
@@ -180,7 +183,6 @@ describe('ChannelSessionsRepository', () => {
     });
 
     it('passes conversationId and context when provided', async () => {
-      mockAdapter.execute.mockResolvedValueOnce({ changes: 1 });
       mockAdapter.queryOne.mockResolvedValueOnce(
         makeSessionRow({
           id: 'generated-uuid',
@@ -197,7 +199,7 @@ describe('ChannelSessionsRepository', () => {
         context: { key: 'value' },
       });
 
-      expect(mockAdapter.execute).toHaveBeenCalledWith(
+      expect(mockAdapter.queryOne).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO channel_sessions'),
         ['generated-uuid', 'cu-1', 'cp-1', 'chat-1', 'conv-1', '{"key":"value"}']
       );
@@ -205,8 +207,25 @@ describe('ChannelSessionsRepository', () => {
       expect(result.context).toEqual({ key: 'value' });
     });
 
-    it('throws when getById returns null after insert', async () => {
-      mockAdapter.execute.mockResolvedValueOnce({ changes: 1 });
+    it('reactivates an existing inactive session on conflict', async () => {
+      // ON CONFLICT returns the updated (reactivated) row
+      mockAdapter.queryOne.mockResolvedValueOnce(
+        makeSessionRow({ id: 'existing-sess', is_active: true })
+      );
+
+      const result = await repo.create({
+        channelUserId: 'cu-1',
+        channelPluginId: 'cp-1',
+        platformChatId: 'chat-1',
+      });
+
+      const sql = mockAdapter.queryOne.mock.calls[0][0] as string;
+      expect(sql).toContain('DO UPDATE SET');
+      expect(sql).toContain('is_active = TRUE');
+      expect(result.id).toBe('existing-sess');
+    });
+
+    it('throws when RETURNING returns null', async () => {
       mockAdapter.queryOne.mockResolvedValueOnce(null);
 
       await expect(
@@ -222,7 +241,7 @@ describe('ChannelSessionsRepository', () => {
   // ---- findOrCreate ----
 
   describe('findOrCreate', () => {
-    it('returns existing session when found', async () => {
+    it('returns existing active session without inserting', async () => {
       // findActive returns a session
       mockAdapter.queryOne.mockResolvedValueOnce(makeSessionRow());
 
@@ -233,16 +252,15 @@ describe('ChannelSessionsRepository', () => {
       });
 
       expect(result.id).toBe('sess-1');
-      // execute should NOT be called (no insert)
-      expect(mockAdapter.execute).not.toHaveBeenCalled();
+      // Only one queryOne call (findActive), no insert attempted
+      expect(mockAdapter.queryOne).toHaveBeenCalledOnce();
     });
 
-    it('creates a new session when none exists', async () => {
-      // findActive returns null
-      mockAdapter.queryOne.mockResolvedValueOnce(null);
-      // create: execute + getById
-      mockAdapter.execute.mockResolvedValueOnce({ changes: 1 });
-      mockAdapter.queryOne.mockResolvedValueOnce(makeSessionRow({ id: 'generated-uuid' }));
+    it('creates a new session via upsert when none active', async () => {
+      // findActive returns null → create uses INSERT ... ON CONFLICT RETURNING *
+      mockAdapter.queryOne
+        .mockResolvedValueOnce(null) // findActive → null
+        .mockResolvedValueOnce(makeSessionRow({ id: 'generated-uuid' })); // create RETURNING
 
       const result = await repo.findOrCreate({
         channelUserId: 'cu-1',
@@ -251,17 +269,15 @@ describe('ChannelSessionsRepository', () => {
       });
 
       expect(result.id).toBe('generated-uuid');
-      expect(mockAdapter.execute).toHaveBeenCalledOnce();
+      expect(mockAdapter.queryOne).toHaveBeenCalledTimes(2);
     });
 
-    it('falls back to retry findActive when create throws and retry finds session', async () => {
-      // First findActive returns null → try create → throws → retry findActive returns session
+    it('handles conflict by reactivating inactive session via upsert', async () => {
+      // findActive → null (inactive session exists but not returned)
+      // create ON CONFLICT → reactivates and returns the existing row
       mockAdapter.queryOne
-        .mockResolvedValueOnce(null) // initial findActive → null
-        .mockResolvedValueOnce(makeSessionRow()); // retry findActive after catch → found
-
-      // Make create's execute throw
-      mockAdapter.execute.mockRejectedValueOnce(new Error('unique_violation'));
+        .mockResolvedValueOnce(null) // findActive → null
+        .mockResolvedValueOnce(makeSessionRow({ id: 'reactivated-sess', is_active: true }));
 
       const result = await repo.findOrCreate({
         channelUserId: 'cu-1',
@@ -269,24 +285,8 @@ describe('ChannelSessionsRepository', () => {
         platformChatId: 'chat-1',
       });
 
-      expect(result.id).toBe('sess-1');
-    });
-
-    it('throws when create fails and retry findActive also returns null', async () => {
-      // First findActive → null, create → throws, retry findActive → null → must throw
-      mockAdapter.queryOne
-        .mockResolvedValueOnce(null) // initial findActive
-        .mockResolvedValueOnce(null); // retry findActive
-
-      mockAdapter.execute.mockRejectedValueOnce(new Error('unique_violation'));
-
-      await expect(
-        repo.findOrCreate({
-          channelUserId: 'cu-1',
-          channelPluginId: 'cp-1',
-          platformChatId: 'chat-1',
-        })
-      ).rejects.toThrow('Failed to find or create channel session');
+      expect(result.id).toBe('reactivated-sess');
+      expect(result.isActive).toBe(true);
     });
   }); // end findOrCreate
 

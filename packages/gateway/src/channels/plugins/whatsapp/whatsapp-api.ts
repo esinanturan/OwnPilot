@@ -77,6 +77,20 @@ const RATE_LIMIT_PER_JID_MS = 3_000; // min 3s gap per recipient
 const MESSAGE_CACHE_SIZE = 500; // getMessage cache for retry/decryption
 const PROCESSED_MSG_IDS_CAP = 5000; // dedup cap for processedMsgIds (shared across upsert + history sync)
 
+// Connection state machine
+// disconnected → connecting → connected
+//                      ↓
+//                reconnecting ─┘ (temporary error)
+//                      ↓
+//                disconnected (permanent error or logout)
+type WhatsAppInternalState =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'disconnecting'
+  | 'reconnecting'
+  | 'error';
+
 // Baileys logger — silent in production to prevent leaking JIDs/message content
 const baileysLogger = pino({
   level: process.env.NODE_ENV === 'production' ? 'silent' : 'warn',
@@ -125,6 +139,7 @@ export interface WhatsAppGroupDetail extends WhatsAppGroupSummary {
 export class WhatsAppChannelAPI implements ChannelPluginAPI {
   private sock: WASocket | null = null;
   private status: ChannelConnectionStatus = 'disconnected';
+  private internalState: WhatsAppInternalState = 'disconnected';
   private readonly pluginId: string;
   private readonly config: WhatsAppBaileysConfig;
   private messageChatMap = new Map<string, string>();
@@ -132,8 +147,9 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
   private qrCode: string | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectAttempt = 0;
-  private isReconnecting = false;
   private consecutive440Count = 0;
+  private currentOperation: Promise<void> | null = null;
+  private preventAutoReconnect = false; // Set by logout() to stop auto-reconnect
 
   // Anti-ban: message cache for getMessage callback (retry/decryption)
   private messageCache = new Map<string, proto.IMessage>();
@@ -179,24 +195,45 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
   // ==========================================================================
 
   async connect(): Promise<void> {
-    if (this.status === 'connected' || this.status === 'connecting') {
-      // Reset reconnecting flag in case it was stuck
-      this.isReconnecting = false;
+    // State machine guard: prevent concurrent operations
+    if (this.currentOperation) {
+      log.debug('WhatsApp connect() waiting for current operation to complete...');
+      try {
+        await this.currentOperation;
+      } catch {
+        // Previous operation failed, continue with new connect attempt
+      }
+    }
+
+    // If already connected or connecting, nothing to do
+    if (this.internalState === 'connected' || this.internalState === 'connecting') {
+      log.debug(`WhatsApp connect() skipped — already ${this.internalState}`);
       return;
     }
 
-    // Prevent concurrent reconnection attempts
-    if (this.isReconnecting) {
-      log.debug('WhatsApp connect() skipped — already reconnecting');
+    // Create new operation promise
+    this.currentOperation = this.doConnect();
+    try {
+      await this.currentOperation;
+    } finally {
+      this.currentOperation = null;
+    }
+  }
+
+  private async doConnect(): Promise<void> {
+    // Final state check before proceeding
+    if (this.internalState === 'connected' || this.internalState === 'connecting') {
       return;
     }
-    this.isReconnecting = true;
 
-    // Clean up any existing socket — remove listeners first, then end
+    // Clean up any existing socket
     this.cleanupSocket();
+    this.clearReconnectTimer();
 
+    this.internalState = 'connecting';
     this.status = 'connecting';
     this.emitConnectionEvent('connecting');
+    log.info('WhatsApp connecting...');
 
     try {
       const sessionDir = getSessionDir(this.pluginId);
@@ -442,10 +479,9 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
         }
       );
 
-      this.isReconnecting = false;
       log.info('WhatsApp socket created, waiting for authentication...');
     } catch (error) {
-      this.isReconnecting = false;
+      this.internalState = 'error';
       this.status = 'error';
       this.emitConnectionEvent('error');
       throw new Error(`Failed to connect WhatsApp: ${getErrorMessage(error)}`);
@@ -453,12 +489,14 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
   }
 
   async disconnect(): Promise<void> {
+    // Prevent auto-reconnect after manual disconnect
+    this.preventAutoReconnect = false; // Manual disconnect allows future reconnects
     this.clearReconnectTimer();
     this.cleanupSocket();
 
     this.qrCode = null;
     this.reconnectAttempt = 0;
-    this.isReconnecting = false;
+    this.internalState = 'disconnected';
     this.status = 'disconnected';
     this.emitConnectionEvent('disconnected');
     log.info('WhatsApp disconnected (session preserved — reconnect without QR)');
@@ -467,28 +505,43 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
   /**
    * Logout: disconnect AND clear session files.
    * Next connect() will require a fresh QR code scan.
+   * NO auto-reconnect after logout.
    */
   async logout(): Promise<void> {
+    // CRITICAL: Set flag to prevent auto-reconnect
+    this.preventAutoReconnect = true;
     this.clearReconnectTimer();
 
+    // Properly logout from WhatsApp servers
     if (this.sock) {
-      this.sock.ev.removeAllListeners('connection.update');
-      this.sock.ev.removeAllListeners('messages.upsert');
-      this.sock.ev.removeAllListeners('creds.update');
       try {
+        // Use Baileys logout which properly terminates the session
         await this.sock.logout();
-      } catch {
-        // logout may fail if already disconnected
+        log.info('WhatsApp logout() called on socket');
+      } catch (err) {
+        // logout may fail if already disconnected — that's fine
+        log.debug('WhatsApp logout() failed or already disconnected:', err);
       }
     }
+
+    // Clean up socket and listeners
     this.cleanupSocket();
 
-    await clearSession(this.pluginId);
+    // Clear local session files
+    try {
+      await clearSession(this.pluginId);
+      log.info('WhatsApp session files cleared');
+    } catch (err) {
+      log.warn('Failed to clear WhatsApp session files:', err);
+    }
 
+    // Reset all state
     this.qrCode = null;
     this.reconnectAttempt = 0;
-    this.isReconnecting = false;
+    this.consecutive440Count = 0;
+    this.internalState = 'disconnected';
     this.status = 'disconnected';
+    this.preventAutoReconnect = false; // Reset for next time
     this.emitConnectionEvent('disconnected');
     log.info('WhatsApp logged out (session cleared — new QR scan required)');
   }
@@ -830,6 +883,7 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
     // QR code received — broadcast to UI
     if (qr) {
       this.qrCode = qr;
+      this.internalState = 'connecting';
       this.status = 'connecting';
       log.info('WhatsApp QR code generated, waiting for scan...');
 
@@ -843,10 +897,12 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
 
     // Connected
     if (connection === 'open') {
+      this.internalState = 'connected';
       this.status = 'connected';
       this.qrCode = null;
       this.reconnectAttempt = 0;
       this.consecutive440Count = 0;
+      this.preventAutoReconnect = false; // Reset on successful connection
       this.emitConnectionEvent('connected');
 
       // Anti-ban: immediately go offline — only appear online when typing/sending
@@ -892,8 +948,18 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
       const isPermanentDisconnect =
         isLoggedOut || statusCode === 403 || statusCode === 402 || statusCode === 406;
 
+      // CRITICAL: Check if auto-reconnect is prevented (e.g., after logout())
+      if (this.preventAutoReconnect) {
+        log.info('WhatsApp connection closed but auto-reconnect is prevented (logout was called)');
+        this.internalState = 'disconnected';
+        this.status = 'disconnected';
+        this.emitConnectionEvent('disconnected');
+        return;
+      }
+
       if (isPermanentDisconnect) {
         // Permanent disconnect — stop reconnect, need new QR or account action
+        this.internalState = 'disconnected';
         this.status = 'disconnected';
         this.qrCode = null;
         this.emitConnectionEvent('disconnected');
@@ -906,6 +972,7 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
         });
       } else {
         // Temporary disconnect — auto-reconnect with backoff
+        this.internalState = 'reconnecting';
         this.status = 'reconnecting';
         this.emitConnectionEvent('reconnecting');
         this.scheduleReconnect(statusCode);
@@ -919,6 +986,12 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
   private scheduleReconnect(statusCode?: number): void {
     this.clearReconnectTimer();
 
+    // CRITICAL: Don't reconnect if prevented (e.g., after logout)
+    if (this.preventAutoReconnect) {
+      log.info('Auto-reconnect skipped — preventAutoReconnect flag is set');
+      return;
+    }
+
     // Anti-ban: track consecutive 440 (connectionReplaced) errors
     if (statusCode === 440) {
       this.consecutive440Count++;
@@ -926,6 +999,7 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
         log.error(
           `WhatsApp: ${MAX_CONSECUTIVE_440} consecutive 440 errors — stopping reconnect to avoid ban`
         );
+        this.internalState = 'error';
         this.status = 'error';
         this.emitConnectionEvent('error');
         return;
@@ -937,6 +1011,7 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
     // Anti-ban: max reconnect attempts
     if (this.reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
       log.error(`WhatsApp: max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached — giving up`);
+      this.internalState = 'error';
       this.status = 'error';
       this.emitConnectionEvent('error');
       return;
@@ -951,13 +1026,19 @@ export class WhatsAppChannelAPI implements ChannelPluginAPI {
     this.reconnectAttempt++;
 
     this.reconnectTimer = setTimeout(() => {
+      // Double-check flag before reconnecting
+      if (this.preventAutoReconnect) {
+        log.info('Reconnect timer fired but auto-reconnect is prevented');
+        return;
+      }
       log.info(`WhatsApp reconnect attempt ${this.reconnectAttempt}/${MAX_RECONNECT_ATTEMPTS}...`);
       // Clean up socket properly before reconnecting
       this.cleanupSocket();
-      this.isReconnecting = false; // Reset flag so connect() can proceed
-      this.status = 'reconnecting'; // Ensure guard in connect() passes
+      this.internalState = 'reconnecting';
+      this.status = 'reconnecting';
       this.connect().catch((err) => {
         log.error('WhatsApp reconnect failed:', err);
+        this.internalState = 'error';
         this.status = 'error';
         this.emitConnectionEvent('error');
       });

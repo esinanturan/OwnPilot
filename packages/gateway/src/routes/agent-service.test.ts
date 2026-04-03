@@ -95,6 +95,13 @@ vi.mock('./settings.js', () => ({
   getEnabledToolGroupIds: (...args: unknown[]) => mockGetEnabledToolGroupIds(...args),
 }));
 
+vi.mock('../services/cli-chat-provider.js', () => ({
+  isCliChatProvider: vi.fn(() => false),
+  getCliBinaryFromProviderId: vi.fn(() => '/usr/bin/test'),
+  createCliChatProvider: vi.fn(() => ({})),
+  getCliChatProviderDefinition: vi.fn(() => null),
+}));
+
 vi.mock('../services/config-center-impl.js', () => ({
   gatewayConfigCenter: {},
 }));
@@ -109,7 +116,7 @@ vi.mock('./agent-prompt.js', () => ({
   BASE_SYSTEM_PROMPT: 'Test system prompt',
 }));
 
-vi.mock('./agent-tools.js', () => ({
+vi.mock('../tools/agent-tool-registry.js', () => ({
   registerGatewayTools: vi.fn(),
   registerDynamicTools: vi.fn(async () => []),
   registerPluginTools: vi.fn(() => []),
@@ -920,7 +927,7 @@ describe('isDemoMode', () => {
 // getAgent
 // =============================================================================
 
-describe.skip('getAgent', () => {
+describe('getAgent', () => {
   it('returns cached agent from lruGet', async () => {
     const { agent } = makeMockAgent();
     mockLruGet.mockReturnValueOnce(agent);
@@ -1021,7 +1028,7 @@ describe.skip('getAgent', () => {
 // getOrCreateDefaultAgent
 // =============================================================================
 
-describe.skip('getOrCreateDefaultAgent', () => {
+describe('getOrCreateDefaultAgent', () => {
   it('returns cached default agent', async () => {
     const { agent } = makeMockAgent();
     mockLruGet.mockReturnValueOnce(agent);
@@ -1176,7 +1183,7 @@ describe.skip('getOrCreateDefaultAgent', () => {
 // getOrCreateChatAgent
 // =============================================================================
 
-describe.skip('getOrCreateChatAgent', () => {
+describe('getOrCreateChatAgent', () => {
   it('returns cached chat agent', async () => {
     const { agent } = makeMockAgent();
     mockLruGet.mockImplementation((cache: Map<string, unknown>, key: string) => {
@@ -1303,7 +1310,7 @@ describe.skip('getOrCreateChatAgent', () => {
 // getOrCreateAgentInstance
 // =============================================================================
 
-describe.skip('getOrCreateAgentInstance', () => {
+describe('getOrCreateAgentInstance', () => {
   it('returns cached agent via lruGet', async () => {
     const { agent } = makeMockAgent();
     mockLruGet.mockReturnValueOnce(agent);
@@ -1861,7 +1868,7 @@ describe('ContextBreakdown type exports', () => {
 // Edge cases and integration-style tests
 // =============================================================================
 
-describe.skip('edge cases', () => {
+describe('edge cases', () => {
   it('getOrCreateAgentInstance deduplicates concurrent requests', async () => {
     const { agent } = makeMockAgent();
     const record = makeAgentRecord({ id: 'dedup-test' });
@@ -1979,11 +1986,11 @@ describe.skip('edge cases', () => {
 // Extended coverage — uncovered branches
 // =============================================================================
 
-describe.skip('extended branch coverage', () => {
+describe('extended branch coverage', () => {
   // ── Lines 149, 155: extension/MCP tool logging when non-empty ──
 
   it('logs extension tool registration when tools are non-empty', async () => {
-    const agentTools = await import('./agent-tools.js');
+    const agentTools = await import('../tools/agent-tool-registry.js');
     vi.mocked(agentTools.registerExtensionTools).mockReturnValueOnce([
       {
         name: 'ext-tool',
@@ -2003,7 +2010,7 @@ describe.skip('extended branch coverage', () => {
   });
 
   it('logs MCP tool registration when tools are non-empty', async () => {
-    const agentTools = await import('./agent-tools.js');
+    const agentTools = await import('../tools/agent-tool-registry.js');
     vi.mocked(agentTools.registerMcpTools).mockReturnValueOnce([
       {
         name: 'mcp-tool',
@@ -2025,7 +2032,7 @@ describe.skip('extended branch coverage', () => {
   // ── Lines 160, 203: filter callbacks when tool definitions non-empty ──
 
   it('runs tool filter callback for non-empty coreToolDefs in createAgentFromRecord', async () => {
-    const agentTools = await import('./agent-tools.js');
+    const agentTools = await import('../tools/agent-tool-registry.js');
     vi.mocked(agentTools.getToolDefinitions).mockReturnValueOnce([
       {
         name: 'calculate',
@@ -2109,7 +2116,7 @@ describe.skip('extended branch coverage', () => {
   // ── Lines 454, 482: filter callbacks in createChatAgentInstance ──
 
   it('runs tool filter callback for non-empty coreToolDefs in createChatAgentInstance', async () => {
-    const agentTools = await import('./agent-tools.js');
+    const agentTools = await import('../tools/agent-tool-registry.js');
     vi.mocked(agentTools.getToolDefinitions).mockReturnValueOnce([
       {
         name: 'generate_uuid',
@@ -2187,7 +2194,7 @@ describe.skip('extended branch coverage', () => {
 
   it('runs filter callback for non-empty standardToolDefs when hasAgentConfig=true (line 196)', async () => {
     // Make standardToolDefs non-empty
-    const agentTools = await import('./agent-tools.js');
+    const agentTools = await import('../tools/agent-tool-registry.js');
     vi.mocked(agentTools.getToolDefinitions).mockReturnValueOnce([
       {
         name: 'calculate',

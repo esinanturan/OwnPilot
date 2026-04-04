@@ -81,7 +81,6 @@ export function LayoutWireframe({ selectedZone, onZoneSelect }: LayoutWireframeP
 
   const sidebarSections = getSidebarSections();
   const sidebarVisibleCount = sidebarSections.filter((s) => s.visible).length;
-  const sidebarTotalCount = sidebarSections.length;
 
   return (
     <div className="w-full max-w-lg mx-auto">
@@ -140,7 +139,7 @@ export function LayoutWireframe({ selectedZone, onZoneSelect }: LayoutWireframeP
             isSelected={selectedZone === 'sidebar'}
             onClick={() => onZoneSelect('sidebar')}
             className="w-16 shrink-0 flex-col gap-1"
-            badge={sidebarVisibleCount < sidebarTotalCount ? sidebarVisibleCount : undefined}
+            badge={sidebarVisibleCount}
           />
           <ZoneBox
             zone="customize"

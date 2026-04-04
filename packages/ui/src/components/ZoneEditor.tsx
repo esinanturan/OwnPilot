@@ -14,7 +14,7 @@ import { LayoutDashboard, AlignLeft, Type, X, Plus, ChevronDown, FileCode, GripV
 import type { WireframeZone } from './LayoutWireframe';
 import type { HeaderZoneId, HeaderItemDisplayMode } from '../types/layout-config';
 import { SIDEBAR_SECTION_LABELS, SIDEBAR_WIDTH_VALUES, CORE_SECTION_IDS, type SidebarWidth } from '../types/layout-config';
-import { SECTION_GROUP_LABELS, getSectionIcon, getSectionLabel, getSectionGroup as getGroup, type SidebarSectionGroup } from '../constants/sidebar-sections';
+import { SECTION_GROUP_LABELS, getSectionIcon, getSectionLabel, getSectionGroup as getGroup, DATA_SECTION_ROUTES, type SidebarSectionGroup } from '../constants/sidebar-sections';
 
 const ZONE_LABELS: Record<WireframeZone, string> = {
   'header-brand': 'Header — Brand',
@@ -345,12 +345,12 @@ export function ZoneEditor({ zone }: { zone: WireframeZone }) {
 
 // ─── Sidebar Zone: Section Visibility, Ordering, Width ──────────────────
 
-/** All section IDs available for adding — data sections + nav items */
+/** All section IDs available for adding — data sections + nav items (deduplicated) */
 const ALL_ADDABLE_SECTION_IDS = [
   // Data sections from labels (exclude core — they're always present)
   ...Object.keys(SIDEBAR_SECTION_LABELS).filter((id) => !CORE_SECTION_IDS.has(id)),
-  // Nav items (route paths like '/', '/dashboard')
-  ...ALL_NAV_ITEMS.map((item) => item.to),
+  // Nav items — only those NOT already covered by a data section route
+  ...ALL_NAV_ITEMS.map((item) => item.to).filter((path) => !DATA_SECTION_ROUTES.has(path)),
 ];
 
 /** Group each addable section for the dropdown */

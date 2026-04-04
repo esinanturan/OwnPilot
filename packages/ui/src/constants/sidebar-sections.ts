@@ -275,6 +275,11 @@ export const STATIC_SECTION_ICONS: Record<string, IconComponent> = {
   recents: MessageSquare,
 };
 
+/** Routes already covered by data sections — prevents duplicate nav item entries */
+export const DATA_SECTION_ROUTES = new Set(
+  Object.values(SIDEBAR_DATA_SECTIONS).map((def) => def.route)
+);
+
 /** Check if a section ID is a route path (nav item) vs a named section */
 export function isNavItemSection(sectionId: string): boolean {
   return sectionId.startsWith('/');

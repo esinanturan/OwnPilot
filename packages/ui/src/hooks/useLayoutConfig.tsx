@@ -125,7 +125,17 @@ function migrateConfig(raw: unknown): LayoutConfig {
     };
   }
 
-  if (isValidConfig(obj)) return { ...obj, version: LAYOUT_CONFIG_VERSION };
+  if (isValidConfig(obj)) {
+    // Strip any leftover 'footer' section from pre-v4.1 configs
+    const config = { ...obj, version: LAYOUT_CONFIG_VERSION } as LayoutConfig;
+    if (config.sidebar?.sections) {
+      config.sidebar = {
+        ...config.sidebar,
+        sections: config.sidebar.sections.filter((s) => s.id !== 'footer'),
+      };
+    }
+    return config;
+  }
   return DEFAULT_LAYOUT_CONFIG;
 }
 

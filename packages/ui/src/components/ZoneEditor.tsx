@@ -10,9 +10,10 @@ import { useLayoutConfig } from '../hooks/useLayoutConfig';
 import { useHeaderItems } from '../hooks/useHeaderItems';
 import { ALL_NAV_ITEMS, NAV_ITEM_MAP, navGroups } from '../constants/nav-items';
 import { PAGE_LAYOUT_REGISTRY } from '../constants/page-layouts';
-import { LayoutDashboard, AlignLeft, Type, X, Plus, ChevronDown, FileCode, GripVertical } from './icons';
+import { LayoutDashboard, AlignLeft, Type, X, Plus, ChevronDown, FileCode, GripVertical, Eye, EyeOff } from './icons';
 import type { WireframeZone } from './LayoutWireframe';
 import type { HeaderZoneId, HeaderItemDisplayMode } from '../types/layout-config';
+import { SIDEBAR_SECTION_LABELS, SIDEBAR_WIDTH_VALUES, type SidebarWidth } from '../types/layout-config';
 
 const ZONE_LABELS: Record<WireframeZone, string> = {
   'header-brand': 'Header — Brand',
@@ -56,6 +57,11 @@ export function ZoneEditor({ zone }: { zone: WireframeZone }) {
     return <ContentZoneEditor />;
   }
 
+  // Sidebar zone — section visibility, ordering, width
+  if (zone === 'sidebar') {
+    return <SidebarZoneEditor />;
+  }
+
   // Non-editable zones
   if (!isEditableHeaderZone(zone)) {
     return (
@@ -76,7 +82,7 @@ export function ZoneEditor({ zone }: { zone: WireframeZone }) {
             The sidebar panel for pinning items and groups to Sidebar/Header. Managed via the Customize button in the sidebar.
           </p>
         )}
-        {(zone === 'sidebar' || zone === 'stats-panel') && (
+        {zone === 'stats-panel' && (
           <p className="text-xs text-text-muted dark:text-dark-text-muted italic">
             {label} customization options coming soon — width, density, visibility.
           </p>
@@ -332,6 +338,127 @@ export function ZoneEditor({ zone }: { zone: WireframeZone }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Sidebar Zone: Section Visibility, Ordering, Width ──────────────────
+
+function SidebarZoneEditor() {
+  const { config, getSidebarSections, toggleSidebarSection, reorderSidebarSections, setSidebarWidth } = useLayoutConfig();
+  const sections = getSidebarSections();
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dropTarget, setDropTarget] = useState<number | null>(null);
+
+  const handleDragOver = (e: React.DragEvent, i: number) => {
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    setDropTarget(e.clientY < midY ? i : i + 1);
+  };
+
+  const handleDragEnd = () => {
+    if (dragIdx !== null && dropTarget !== null) {
+      let insertAt = dropTarget;
+      if (insertAt > dragIdx) insertAt -= 1;
+      if (insertAt !== dragIdx) {
+        const reordered = [...sections];
+        const [moved] = reordered.splice(dragIdx, 1);
+        reordered.splice(insertAt, 0, moved!);
+        // Re-assign order values
+        const updated = reordered.map((s, idx) => ({ ...s, order: idx }));
+        reorderSidebarSections(updated);
+      }
+    }
+    setDragIdx(null);
+    setDropTarget(null);
+  };
+
+  const visibleCount = sections.filter((s) => s.visible).length;
+
+  return (
+    <div className="rounded-lg border border-primary/30 bg-primary/5 dark:bg-primary/5 p-4 space-y-4">
+      <h3 className="text-sm font-medium text-primary">Sidebar</h3>
+      <p className="text-xs text-text-muted dark:text-dark-text-muted">
+        Toggle section visibility and drag to reorder. Footer is always shown at the bottom.
+      </p>
+
+      {/* Width selector */}
+      <div className="space-y-2">
+        <p className="text-xs text-text-muted dark:text-dark-text-muted">Width (desktop only)</p>
+        <div className="flex gap-1">
+          {(Object.entries(SIDEBAR_WIDTH_VALUES) as [SidebarWidth, typeof SIDEBAR_WIDTH_VALUES[SidebarWidth]][]).map(([key, val]) => (
+            <button
+              key={key}
+              onClick={() => setSidebarWidth(key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                config.sidebar.width === key
+                  ? 'bg-primary text-white'
+                  : 'bg-bg-tertiary dark:bg-dark-bg-tertiary text-text-secondary dark:text-dark-text-secondary hover:bg-primary/10 hover:text-primary'
+              }`}
+            >
+              {val.label}
+              <span className="text-[9px] opacity-70">{val.px}px</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Sections list */}
+      <div className="space-y-2">
+        <p className="text-xs text-text-muted dark:text-dark-text-muted">
+          Sections ({visibleCount}/{sections.length} visible)
+        </p>
+
+        <div className="space-y-1">
+          {sections.map((section, i) => {
+            const sectionLabel = SIDEBAR_SECTION_LABELS[section.id] ?? section.id;
+            const showLineBefore = dragIdx !== null && dropTarget === i && dropTarget !== dragIdx && dropTarget !== dragIdx + 1;
+
+            return (
+              <div key={section.id}>
+                {showLineBefore && (
+                  <div className="h-0.5 bg-primary rounded-full mx-2 my-0.5" />
+                )}
+                <div
+                  draggable
+                  onDragStart={() => setDragIdx(i)}
+                  onDragOver={(e) => handleDragOver(e, i)}
+                  onDragEnd={handleDragEnd}
+                  className={`flex items-center gap-2 px-2 py-1.5 rounded bg-bg-secondary dark:bg-dark-bg-secondary text-xs cursor-grab active:cursor-grabbing transition-opacity ${
+                    dragIdx === i ? 'opacity-30' : ''
+                  }`}
+                >
+                  <GripVertical className="w-3 h-3 shrink-0 text-text-muted dark:text-dark-text-muted" />
+                  <span className={`flex-1 truncate ${section.visible ? 'text-text-primary dark:text-dark-text-primary' : 'text-text-muted dark:text-dark-text-muted line-through'}`}>
+                    {sectionLabel}
+                  </span>
+                  <button
+                    onClick={() => toggleSidebarSection(section.id)}
+                    className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
+                      section.visible
+                        ? 'text-primary hover:bg-primary/10'
+                        : 'text-text-muted dark:text-dark-text-muted hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary'
+                    }`}
+                    title={section.visible ? 'Hide section' : 'Show section'}
+                  >
+                    {section.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                {/* Drop indicator line AFTER last item */}
+                {i === sections.length - 1 && dragIdx !== null && dropTarget === sections.length && dropTarget !== dragIdx ? (
+                  <div className="h-0.5 bg-primary rounded-full mx-2 my-0.5" />
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Info note */}
+      <p className="text-[10px] text-text-muted dark:text-dark-text-muted">
+        Changes apply instantly. Width setting only affects desktop layout.
+      </p>
     </div>
   );
 }

@@ -49,8 +49,15 @@ export type SidebarSectionId =
   | 'workflows'
   | 'recents';
 
+/**
+ * ID for a sidebar section — built-in IDs are typed as SidebarSectionId,
+ * custom section IDs follow the `custom-{timestamp}` pattern.
+ * Kept as string (not branded) because JSON serialization loses brand info.
+ */
+export type SidebarSectionIdOrCustom = SidebarSectionId | (string & {});
+
 export interface SidebarSectionConfig {
-  id: SidebarSectionId | string;  // built-in or custom section id
+  id: SidebarSectionIdOrCustom;
   visible: boolean;
   order: number;
 }

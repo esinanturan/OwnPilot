@@ -39,7 +39,7 @@ export interface LayoutConfigHeader {
 /** Sidebar width preset — affects the aside element width class */
 export type SidebarWidth = 'narrow' | 'default' | 'wide';
 
-/** Built-in sidebar section identifiers */
+/** Built-in sidebar section identifiers (footer is structural, not configurable) */
 export type SidebarSectionId =
   | 'pinned'
   | 'search'
@@ -47,8 +47,7 @@ export type SidebarSectionId =
   | 'customize'
   | 'workspaces'
   | 'workflows'
-  | 'recents'
-  | 'footer';
+  | 'recents';
 
 export interface SidebarSectionConfig {
   id: SidebarSectionId | string;  // built-in or custom section id
@@ -56,7 +55,7 @@ export interface SidebarSectionConfig {
   order: number;
 }
 
-/** All 8 default sidebar sections in their default order */
+/** All 7 configurable sidebar sections in their default order (footer is structural, always rendered) */
 export const DEFAULT_SIDEBAR_SECTIONS: SidebarSectionConfig[] = [
   { id: 'pinned', visible: true, order: 0 },
   { id: 'search', visible: true, order: 1 },
@@ -65,8 +64,25 @@ export const DEFAULT_SIDEBAR_SECTIONS: SidebarSectionConfig[] = [
   { id: 'workspaces', visible: true, order: 4 },
   { id: 'workflows', visible: true, order: 5 },
   { id: 'recents', visible: true, order: 6 },
-  { id: 'footer', visible: true, order: 7 },
 ];
+
+/** Human-readable labels for sidebar sections */
+export const SIDEBAR_SECTION_LABELS: Record<string, string> = {
+  pinned: 'Pinned Items',
+  search: 'Search',
+  scheduled: 'Scheduled',
+  customize: 'Customize',
+  workspaces: 'Workspaces',
+  workflows: 'Workflows',
+  recents: 'Recent Chats',
+};
+
+/** Sidebar width presets — narrow is still text-visible, not icon-only */
+export const SIDEBAR_WIDTH_VALUES: Record<SidebarWidth, { class: string; label: string; px: number }> = {
+  narrow: { class: 'w-48', label: 'Compact', px: 192 },
+  default: { class: 'w-60', label: 'Default', px: 240 },
+  wide: { class: 'w-72', label: 'Wide', px: 288 },
+};
 
 export interface LayoutConfigSidebar {
   width: SidebarWidth;

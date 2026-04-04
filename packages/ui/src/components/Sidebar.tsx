@@ -12,21 +12,21 @@ import { usePinnedItems, type SidebarPinnedConfig } from '../hooks/usePinnedItem
 import { useChatStore } from '../hooks/useChatStore';
 import { useSidebarRecents, getConvTitle } from '../hooks/useSidebarRecents';
 import type { SourceFilter } from '../hooks/useSidebarRecents';
-import { useSidebarProjects } from '../hooks/useSidebarProjects';
-import { useSidebarWorkflows } from '../hooks/useSidebarWorkflows';
 import { useLayoutConfig } from '../hooks/useLayoutConfig';
 import { NAV_ITEM_MAP } from '../constants/nav-items';
 import { SIDEBAR_WIDTH_VALUES, DEFAULT_SIDEBAR_SECTIONS } from '../types/layout-config';
+import { SIDEBAR_DATA_SECTIONS, getSectionGroup } from '../constants/sidebar-sections';
 import { SidebarFooter } from './sidebar/SidebarFooter';
+import { SidebarDataSection } from './sidebar/SidebarDataSection';
 import { useToast } from './ToastProvider';
 import { useDialog } from './ConfirmDialog';
-import { X, ChevronRight, Search, Calendar, FolderOpen, GitBranch, Plus, Edit2, Trash2, Globe, MessageSquare, Telegram, WhatsApp } from './icons';
+import { X, ChevronRight, Search, Calendar, Edit2, Trash2, Globe, MessageSquare, Telegram, WhatsApp } from './icons';
 import type { NavItem } from '../constants/nav-items';
 import type { Conversation } from '../api/types';
 import { chatApi } from '../api/endpoints/chat';
 
-/** Section IDs that get a divider rendered before them */
-const DIVIDER_BEFORE = new Set(['workspaces', 'workflows', 'recents']);
+/** Data sections get a divider before them (if not first visible section) */
+const DATA_GROUPS = new Set(['data', 'ai', 'tools', 'personal', 'system']);
 
 export interface SidebarProps {
   isMobile: boolean;
@@ -135,8 +135,6 @@ function PinnedNavGroup({ config, onCloseCustomize, isCustomizeOpen }: { config:
 export function Sidebar({ isMobile, isOpen, onClose, onSearchOpen, onCustomizeToggle, isCustomizeOpen, onCloseCustomize, wsStatus, badgeCounts }: SidebarProps) {
   const { pinnedConfigs } = usePinnedItems();
   const recents = useSidebarRecents();
-  const { projects, isLoading: projectsLoading } = useSidebarProjects();
-  const { workflows, isLoading: workflowsLoading } = useSidebarWorkflows();
   const { config: layoutConfig } = useLayoutConfig();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -223,10 +221,29 @@ export function Sidebar({ isMobile, isOpen, onClose, onSearchOpen, onCustomizeTo
       {/* Navigation — config-driven section rendering */}
       <nav className="flex-1 p-2 overflow-y-auto" data-testid="sidebar-nav">
         {visibleSections.map((section, sectionIdx) => {
-          // Show divider before data sections, but not if it's the first visible section
-          const divider = DIVIDER_BEFORE.has(section.id) && sectionIdx > 0 ? (
+          // Show divider when entering a data group (not if first section)
+          const currentGroup = getSectionGroup(section.id);
+          const prevGroup = sectionIdx > 0 ? getSectionGroup(visibleSections[sectionIdx - 1]!.id) : currentGroup;
+          const divider = sectionIdx > 0 && currentGroup !== prevGroup && DATA_GROUPS.has(currentGroup) ? (
             <div key={`div-${section.id}`} className="border-t border-border dark:border-dark-border my-2" />
           ) : null;
+
+          // Registry-driven data sections (workspaces, workflows, and all future data sections)
+          const dataDef = SIDEBAR_DATA_SECTIONS[section.id];
+          if (dataDef) {
+            return (
+              <div key={section.id}>
+                {divider}
+                <SidebarDataSection
+                  def={dataDef}
+                  config={section}
+                  collapsed={!!collapsed[section.id]}
+                  onToggleCollapse={() => setCollapsed((prev) => ({ ...prev, [section.id]: !prev[section.id] }))}
+                  onCloseCustomize={onCloseCustomize}
+                />
+              </div>
+            );
+          }
 
           switch (section.id) {
             case 'pinned':
@@ -315,136 +332,6 @@ export function Sidebar({ isMobile, isOpen, onClose, onSearchOpen, onCustomizeTo
                     <ChevronRight className="w-4 h-4 shrink-0" />
                     <span className="truncate flex-1">Customize</span>
                   </button>
-                </div>
-              );
-
-            case 'workspaces':
-              if (section.style === 'flat') {
-                return (
-                  <div key="workspaces">
-                    {divider}
-                    <button
-                      onClick={() => { onCloseCustomize(); navigate('/workspaces'); }}
-                      data-testid="sidebar-projects"
-                      className="w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5 text-left"
-                    >
-                      <FolderOpen className="w-4 h-4 shrink-0" />
-                      <span className="truncate flex-1">Workspaces</span>
-                    </button>
-                  </div>
-                );
-              }
-              return (
-                <div key="workspaces">
-                  {divider}
-                  <div className="mb-2" data-testid="sidebar-projects">
-                    <div className="flex items-center px-3 py-1 gap-1.5">
-                      <button
-                        onClick={() => setCollapsed((prev) => ({ ...prev, workspaces: !prev.workspaces }))}
-                        className="p-0.5 rounded text-text-muted dark:text-dark-text-muted hover:text-text-secondary dark:hover:text-dark-text-secondary transition-colors"
-                        aria-label={collapsed.workspaces ? 'Expand workspaces' : 'Collapse workspaces'}
-                      >
-                        <ChevronRight className={`w-[17px] h-[17px] shrink-0 transition-transform duration-150 ${!collapsed.workspaces ? 'rotate-90' : ''}`} />
-                      </button>
-                      <button
-                        onClick={() => { onCloseCustomize(); navigate('/workspaces'); }}
-                        className="flex-1 text-left text-[15px] font-semibold text-text-muted dark:text-dark-text-muted uppercase tracking-wider hover:text-text-secondary dark:hover:text-dark-text-secondary transition-colors"
-                      >
-                        Workspaces
-                      </button>
-                      <button
-                        onClick={() => { onCloseCustomize(); navigate('/workspaces'); }}
-                        className="p-0.5 rounded text-text-muted dark:text-dark-text-muted hover:text-primary transition-colors"
-                        aria-label="New project"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                    {!collapsed.workspaces && (projectsLoading ? (
-                      <div className="px-3 py-2 text-xs text-text-muted dark:text-dark-text-muted">Loading...</div>
-                    ) : projects.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-text-muted dark:text-dark-text-muted">No projects</div>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {projects.map((project) => (
-                          <button
-                            key={project.id}
-                            onClick={() => { onCloseCustomize(); navigate(`/workspaces?id=${project.id}`); }}
-                            className="w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5 text-left"
-                            title={project.name}
-                          >
-                            <FolderOpen className="w-4 h-4 shrink-0 opacity-60" />
-                            <span className="truncate flex-1">{project.name.length > 25 ? project.name.slice(0, 25) + '\u2026' : project.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-
-            case 'workflows':
-              if (section.style === 'flat') {
-                return (
-                  <div key="workflows">
-                    {divider}
-                    <button
-                      onClick={() => { onCloseCustomize(); navigate('/workflows'); }}
-                      data-testid="sidebar-workflows"
-                      className="w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5 text-left"
-                    >
-                      <GitBranch className="w-4 h-4 shrink-0" />
-                      <span className="truncate flex-1">Workflows</span>
-                    </button>
-                  </div>
-                );
-              }
-              return (
-                <div key="workflows">
-                  {divider}
-                  <div className="mb-2" data-testid="sidebar-workflows">
-                    <div className="flex items-center px-3 py-1 gap-1.5">
-                      <button
-                        onClick={() => setCollapsed((prev) => ({ ...prev, workflows: !prev.workflows }))}
-                        className="p-0.5 rounded text-text-muted dark:text-dark-text-muted hover:text-text-secondary dark:hover:text-dark-text-secondary transition-colors"
-                        aria-label={collapsed.workflows ? 'Expand workflows' : 'Collapse workflows'}
-                      >
-                        <ChevronRight className={`w-[17px] h-[17px] shrink-0 transition-transform duration-150 ${!collapsed.workflows ? 'rotate-90' : ''}`} />
-                      </button>
-                      <button
-                        onClick={() => { onCloseCustomize(); navigate('/workflows'); }}
-                        className="flex-1 text-left text-[15px] font-semibold text-text-muted dark:text-dark-text-muted uppercase tracking-wider hover:text-text-secondary dark:hover:text-dark-text-secondary transition-colors"
-                      >
-                        Workflows
-                      </button>
-                      <button
-                        onClick={() => { onCloseCustomize(); navigate('/workflows'); }}
-                        className="p-0.5 rounded text-text-muted dark:text-dark-text-muted hover:text-primary transition-colors"
-                        aria-label="New workflow"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                    {!collapsed.workflows && (workflowsLoading ? (
-                      <div className="px-3 py-2 text-xs text-text-muted dark:text-dark-text-muted">Loading...</div>
-                    ) : workflows.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-text-muted dark:text-dark-text-muted">No workflows</div>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {workflows.map((wf) => (
-                          <button
-                            key={wf.id}
-                            onClick={() => { onCloseCustomize(); navigate(`/workflows/${wf.id}`); }}
-                            className="w-full flex items-center gap-2 px-3 py-2.5 md:py-1.5 rounded-md transition-all text-base text-text-secondary dark:text-dark-text-secondary hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary hover:translate-x-0.5 text-left"
-                            title={wf.name}
-                          >
-                            <GitBranch className="w-4 h-4 shrink-0 opacity-60" />
-                            <span className="truncate flex-1">{wf.name.length > 25 ? wf.name.slice(0, 25) + '\u2026' : wf.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
                 </div>
               );
 

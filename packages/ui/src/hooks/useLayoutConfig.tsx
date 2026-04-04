@@ -113,16 +113,16 @@ function migrateConfig(raw: unknown): LayoutConfig {
     });
   }
 
-  // V3 → V4: add sidebar sections + width
+  // V3 → V4: add sidebar sections + width (recursive to apply footer-strip)
   if (typeof obj.version === 'number' && obj.version === 3) {
-    return {
+    return migrateConfig({
       ...(obj as unknown as LayoutConfig),
       version: LAYOUT_CONFIG_VERSION,
       sidebar: {
         width: 'default' as const,
         sections: [...DEFAULT_SIDEBAR_SECTIONS],
       },
-    };
+    });
   }
 
   if (isValidConfig(obj)) {

@@ -14,6 +14,7 @@ import { LayoutDashboard, AlignLeft, Type, X, Plus, ChevronDown, FileCode, GripV
 import type { WireframeZone } from './LayoutWireframe';
 import type { HeaderZoneId, HeaderItemDisplayMode } from '../types/layout-config';
 import { SIDEBAR_SECTION_LABELS, SIDEBAR_WIDTH_VALUES, type SidebarWidth } from '../types/layout-config';
+import { SIDEBAR_DATA_SECTIONS as SIDEBAR_DATA_SECTIONS_MAP } from '../constants/sidebar-sections';
 
 const ZONE_LABELS: Record<WireframeZone, string> = {
   'header-brand': 'Header — Brand',
@@ -414,7 +415,7 @@ function SidebarZoneEditor() {
           {sections.map((section, i) => {
             const sectionLabel = SIDEBAR_SECTION_LABELS[section.id] ?? section.id;
             const showLineBefore = dragIdx !== null && dropTarget === i && dropTarget !== dragIdx && dropTarget !== dragIdx + 1;
-            const isDataSection = ['workspaces', 'workflows', 'recents'].includes(section.id);
+            const isDataSection = section.id in SIDEBAR_DATA_SECTIONS_MAP || section.id === 'recents';
             const isFlat = section.style === 'flat';
 
             return (

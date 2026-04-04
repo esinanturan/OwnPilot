@@ -145,6 +145,15 @@ function readConfig(): LayoutConfig {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (isValidConfig(parsed) && parsed.version === LAYOUT_CONFIG_VERSION) {
+        // Strip leftover 'footer' from pre-removal configs (footer is now structural)
+        if (parsed.sidebar?.sections?.some((s: { id: string }) => s.id === 'footer')) {
+          const cleaned = {
+            ...parsed,
+            sidebar: { ...parsed.sidebar, sections: parsed.sidebar.sections.filter((s: { id: string }) => s.id !== 'footer') },
+          };
+          persistConfig(cleaned);
+          return cleaned;
+        }
         return parsed;
       }
       const migrated = migrateConfig(parsed);

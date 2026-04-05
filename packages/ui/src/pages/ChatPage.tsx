@@ -395,6 +395,13 @@ export function ChatPage() {
         );
         // Also set the session so the sidebar highlights correctly
         loadConversation(id, []);
+        // v7.2: Restore provider/model from conversation metadata
+        if (conv.provider) {
+          setProvider(conv.provider);
+          if (conv.model) {
+            setModel(conv.model);
+          }
+        }
         setSearchParams({});
       } else {
         // Web mode: load into useChatStore as usual
@@ -417,6 +424,13 @@ export function ChatPage() {
             isError: m.isError,
           }));
         loadConversation(id, msgs);
+        // v7.2: Restore provider/model from conversation metadata
+        if (conv.provider) {
+          setProvider(conv.provider);
+          if (conv.model) {
+            setModel(conv.model);
+          }
+        }
         setSearchParams({});
       }
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'instant' }), 50);

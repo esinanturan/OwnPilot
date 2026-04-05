@@ -117,5 +117,129 @@ Transformed 63-item chaotic sidebar into Cowork-inspired structural sidebar with
 | 10. E2E Tests + Polish | 0/TBD | Not started | - |
 
 ---
+
+## Milestone v2.0: Contextual Sidebar Chat
+
+**Goal:** StatsPanel (sag panel) Stats | Chat tab'li yapiya donusur. Sidebar'dan bir ogeye tiklandiginda chat o ogenin baglaminda (dizin, ID, metadata) calisir. Bridge uzerinden CC/OpenCode/Codex/Gemini ile baglamsal konusma.
+
+**Branch:** feature/contextual-sidebar-chat
+**Handoff:** ~/Downloads/session-handoff-2026-04-05-s6.md
+**Key Insight:** StatsPanel zaten persistent aside (route degisikliginde yikilmaz), expand/collapse toggle var, WS updates aliyor — contextual chat icin yapisal olarak cok uygun.
+
+**Architecture Reference:**
+```
+Layout.tsx (4-panel shell)
+  [Sidebar]       ← Baglam kaynagi (workspace/workflow/agent tiklama)
+  [Main <Outlet>] ← Sayfa icerigi
+  [StatsPanel]    ← HEDEF: Stats | Chat tab'li yapi
+  [MiniChat]      ← Floating widget (StatsPanel Chat varsa redundant olabilir)
+```
+
+**Key Files:**
+- packages/ui/src/components/StatsPanel.tsx (374 LOC) — donusturulecek
+- packages/ui/src/components/MiniChat.tsx (537 LOC) — referans chat UI
+- packages/ui/src/hooks/useChatStore.tsx (656 LOC) — global chat state
+- packages/ui/src/components/Layout.tsx (257 LOC) — panel orkestrasyonu
+- packages/ui/src/constants/sidebar-sections.ts (317 LOC) — 23 data section registry
+
+**Dizin/Baglam Availability Tablosu:**
+| Sidebar Section | Dizin Context? | Kaynak |
+|----------------|----------------|--------|
+| workspaces | YES: FileWorkspaceInfo.path | GET /file-workspaces/{id} |
+| coding-agents | YES: session.cwd | GET /coding-agents/{id} |
+| claws | YES: .claw/ workspace | Claw config |
+| workflows | NO: DB-stored | metadata only |
+| agents | NO: config-based | N/A |
+| tasks/notes/etc | NO: personal data | N/A |
+
+## Phases
+
+- [ ] **Phase 11: StatsPanel Tab System** — Stats | Chat tab switcher, tab state persistence (localStorage), Chat tab placeholder
+- [ ] **Phase 12: Compact Chat UI** — MiniChat-benzeri compact message list + input in StatsPanel Chat tab, useChatStore() baglantisi, genislik ayari (w-64 → w-80)
+- [ ] **Phase 13: Context Detection** — Route degisikliginde aktif sayfa/oge baglam tespiti, context banner (aktif workspace/agent gosterimi), context change event
+- [ ] **Phase 14: Context Injection** — Chat request'e X-Project-Dir header inject (workspace path varsa), baglam degistiginde otomatik ilk mesaj veya prepopulate
+- [ ] **Phase 15: Multi-Session Research** — useChatStore tek global context → coklu context arastirmasi, MiniChat vs StatsPanel Chat session izolasyonu karari
+- [ ] **Phase 16: E2E Tests** — Playwright: tab switching, contextual chat, workspace baglam injection, message send/receive
+
+### Phase 11: StatsPanel Tab System
+**Goal**: StatsPanel ustune Stats | Chat tab switcher eklenir. Tab state localStorage'da persist eder. Chat tab bos placeholder gosterir.
+**Depends on**: v1.1 Phase 10 (veya bagimsiz — StatsPanel zaten stabil)
+**Requirements**: CTX-01, CTX-02
+**Success Criteria**:
+  1. StatsPanel'de iki tab gorulur: "Stats" ve "Chat"
+  2. Stats tab mevcut StatsPanel icerigini gosterir (regression yok)
+  3. Chat tab placeholder mesaj gosterir ("Chat coming soon" veya benzeri)
+  4. Tab secimi localStorage'da persist eder (sayfa refresh sonrasi korunur)
+  5. Collapse/expand davranisi her iki tab icin calisir
+**Plans**: TBD
+
+### Phase 12: Compact Chat UI
+**Goal**: Chat tab'inda MiniChat benzeri compact chat arayuzu render edilir. useChatStore() ile baglanir. Mesaj gonderme ve alma calisir.
+**Depends on**: Phase 11
+**Requirements**: CTX-03, CTX-04
+**Success Criteria**:
+  1. Chat tab'inda mesaj listesi gorunur (scrollable)
+  2. Alt kisimda mesaj input alani var
+  3. Mesaj gonderildiginde SSE stream ile yanit gelir
+  4. Provider/model secimi ChatPage ile paylasilan state'den gelir
+  5. StatsPanel genisligi chat icin yeterli (w-80 = 320px minimum)
+**Plans**: TBD
+
+### Phase 13: Context Detection
+**Goal**: Sidebar'dan bir ogeye tiklandiginda veya route degistiginde, aktif baglam (workspace, agent, claw) tespit edilir ve Chat tab'inda gosterilir.
+**Depends on**: Phase 12
+**Requirements**: CTX-05, CTX-06
+**Success Criteria**:
+  1. Workspace sayfasinda bir workspace tiklandiginda, Chat tab context banner'inda workspace adi gorunur
+  2. Coding-agents sayfasinda bir session tiklandiginda, cwd bilgisi context banner'da gorunur
+  3. Baglam olmayan sayfalarda (tasks, notes) context banner gizlenir
+  4. Route degisikligi context'i otomatik gunceller
+**Plans**: TBD
+
+### Phase 14: Context Injection
+**Goal**: Tespit edilen baglam chat request'e inject edilir — X-Project-Dir header'i veya otomatik ilk mesaj.
+**Depends on**: Phase 13
+**Requirements**: CTX-07, CTX-08
+**Success Criteria**:
+  1. Workspace baglami varken gonderilen mesajda X-Project-Dir header'i dogru dizini icerir
+  2. Bridge spawn'i o dizinde calisir (git log, dosya okuma o dizinden yapilir)
+  3. Baglam degistiginde yeni conversation baslatilir (eski context karistirilmaz)
+  4. Opsiyonel: Ilk mesaj otomatik olarak "Bu workspace/proje hakkinda bilgi ver" seklinde prepopulate edilir
+**Plans**: TBD
+
+### Phase 15: Multi-Session Research
+**Goal**: useChatStore tek global singleton — StatsPanel Chat ve MiniChat ve ChatPage AYNI conversation'i paylasir. Bu uygun mu? Alternatifler arastirilir ve mimari karar dokumanlastirilir.
+**Depends on**: Phase 12
+**Requirements**: CTX-09
+**Success Criteria**:
+  1. Mimari karar dokumani yazilir: tek store vs coklu store
+  2. Secilen yaklasim implement edilir (veya gelecek phase'e ertelenir)
+  3. Bridge X-Conversation-Id ile session izolasyonu test edilir
+**Plans**: TBD
+
+### Phase 16: E2E Tests
+**Goal**: Playwright ile tum contextual chat ozelliklerinin E2E testi.
+**Depends on**: Phase 14
+**Requirements**: CTX-10, CTX-11
+**Success Criteria**:
+  1. Tab switching testi: Stats → Chat → Stats gecisilir, state korunur
+  2. Mesaj gonderme testi: Chat tab'inda mesaj gonderilir, yanit alinir
+  3. Context injection testi: Workspace sayfasinda chat yapilir, bridge dogru dizinde calisir
+  4. Regression testi: MiniChat, ChatPage, StatsPanel Stats tab'i bozulmamis
+**Plans**: TBD
+
+## Progress (v2.0)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|---------------|--------|-----------|
+| 11. StatsPanel Tab System | 0/TBD | Not started | - |
+| 12. Compact Chat UI | 0/TBD | Not started | - |
+| 13. Context Detection | 0/TBD | Not started | - |
+| 14. Context Injection | 0/TBD | Not started | - |
+| 15. Multi-Session Research | 0/TBD | Not started | - |
+| 16. E2E Tests | 0/TBD | Not started | - |
+
+---
 *Roadmap created: 2026-03-28 — v1.0 complete*
 *Updated: 2026-03-29 — v1.1 milestone started (6 phases)*
+*Updated: 2026-04-05 — v2.0 Contextual Sidebar Chat milestone added (6 phases)*

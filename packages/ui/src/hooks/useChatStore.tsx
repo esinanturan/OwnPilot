@@ -118,9 +118,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [sessionId, setSessionIdState] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   // Wrapper: keep ref in sync with state so sendMessage always sees latest value
+  // Also update URL so sidebar highlights the active conversation
   const setSessionId = (id: string | null) => {
+    const prev = sessionIdRef.current;
     sessionIdRef.current = id;
     setSessionIdState(id);
+    // When a new conversation is created (null → id), update URL for sidebar highlight
+    if (id && !prev && window.location.pathname === '/') {
+      const newUrl = `/?conversationId=${id}`;
+      window.history.replaceState(null, '', newUrl);
+      // Trigger React Router to re-read searchParams via popstate
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }
   };
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [isThinking, setIsThinking] = useState(false);

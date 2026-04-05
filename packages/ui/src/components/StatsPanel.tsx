@@ -28,8 +28,10 @@ import {
   AlertCircle,
   TrendingUp,
   Cpu,
+  MessageSquare,
 } from './icons';
 import { summaryApi, costsApi, providersApi, modelsApi } from '../api';
+import { STORAGE_KEYS } from '../constants/storage-keys';
 import type { SummaryData, CostsData } from '../types';
 import { LoadingSpinner } from './LoadingSpinner';
 import { QuickAddGrid } from './QuickAddModal';
@@ -86,6 +88,8 @@ interface StatsPanelProps {
   onToggle: () => void;
 }
 
+type PanelTab = 'stats' | 'chat';
+
 export function StatsPanel({ isCollapsed, onToggle }: StatsPanelProps) {
   const { status: wsStatus, subscribe } = useGateway();
   const [summary, setSummary] = useState<SummaryData | null>(null);
@@ -93,6 +97,15 @@ export function StatsPanel({ isCollapsed, onToggle }: StatsPanelProps) {
   const [providerCount, setProviderCount] = useState(0);
   const [modelCount, setModelCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<PanelTab>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.STATS_PANEL_TAB);
+    return saved === 'chat' ? 'chat' : 'stats';
+  });
+
+  const handleTabChange = (tab: PanelTab) => {
+    setActiveTab(tab);
+    localStorage.setItem(STORAGE_KEYS.STATS_PANEL_TAB, tab);
+  };
 
   const debouncedRefresh = useDebouncedCallback(() => fetchStats(), 2000);
 
@@ -184,172 +197,207 @@ export function StatsPanel({ isCollapsed, onToggle }: StatsPanelProps) {
 
   return (
     <aside className="w-64 border-l border-border dark:border-dark-border bg-bg-secondary dark:bg-dark-bg-secondary flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="p-4 border-b border-border dark:border-dark-border flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text-primary dark:text-dark-text-primary flex items-center gap-2">
-          <Activity className="w-4 h-4 text-primary" />
-          Stats
-        </h3>
-        <button
-          onClick={onToggle}
-          className="p-1 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded transition-colors"
-          title="Collapse panel"
-          aria-label="Collapse panel"
-        >
-          <ChevronRight className="w-4 h-4 text-text-muted dark:text-dark-text-muted" />
-        </button>
+      {/* Header with Tabs */}
+      <div className="border-b border-border dark:border-dark-border">
+        <div className="flex items-center justify-between px-4 pt-3 pb-0">
+          <div className="flex gap-1">
+            <button
+              data-testid="stats-tab"
+              onClick={() => handleTabChange('stats')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-t transition-colors ${
+                activeTab === 'stats'
+                  ? 'text-primary border-b-2 border-primary bg-bg-tertiary/50 dark:bg-dark-bg-tertiary/50'
+                  : 'text-text-muted dark:text-dark-text-muted hover:text-text-secondary dark:hover:text-dark-text-secondary'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5" />
+              Stats
+            </button>
+            <button
+              data-testid="chat-tab"
+              onClick={() => handleTabChange('chat')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-t transition-colors ${
+                activeTab === 'chat'
+                  ? 'text-primary border-b-2 border-primary bg-bg-tertiary/50 dark:bg-dark-bg-tertiary/50'
+                  : 'text-text-muted dark:text-dark-text-muted hover:text-text-secondary dark:hover:text-dark-text-secondary'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Chat
+            </button>
+          </div>
+          <button
+            onClick={onToggle}
+            className="p-1 hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary rounded transition-colors"
+            title="Collapse panel"
+            aria-label="Collapse panel"
+          >
+            <ChevronRight className="w-4 h-4 text-text-muted dark:text-dark-text-muted" />
+          </button>
+        </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {isLoading ? (
-          <LoadingSpinner size="sm" message="Loading..." />
-        ) : (
+      {/* Tab Content */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-6" data-testid="tab-content">
+        {activeTab === 'stats' ? (
           <>
-            {/* Quick Add */}
-            <QuickAddGrid onCreated={fetchStats} />
+            {isLoading ? (
+              <LoadingSpinner size="sm" message="Loading..." />
+            ) : (
+              <>
+                {/* Quick Add */}
+                <QuickAddGrid onCreated={fetchStats} />
 
-            {/* Personal Data */}
-            {summary && (
-              <div className="space-y-2">
-                <h4 className="text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
-                  Personal Data
-                </h4>
-                <StatCard
-                  icon={CheckCircle2}
-                  label="Tasks"
-                  value={summary.tasks.total}
-                  subValue={
-                    summary.tasks.pending > 0 ? `${summary.tasks.pending} pending` : undefined
-                  }
-                  color="text-primary"
-                  alert={summary.tasks.overdue > 0}
-                />
-                {summary.tasks.overdue > 0 && (
-                  <div className="px-3 py-2 bg-error/10 rounded-lg text-xs text-error flex items-center gap-2">
-                    <AlertCircle className="w-3 h-3" />
-                    {summary.tasks.overdue} overdue task{summary.tasks.overdue > 1 ? 's' : ''}
+                {/* Personal Data */}
+                {summary && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
+                      Personal Data
+                    </h4>
+                    <StatCard
+                      icon={CheckCircle2}
+                      label="Tasks"
+                      value={summary.tasks.total}
+                      subValue={
+                        summary.tasks.pending > 0 ? `${summary.tasks.pending} pending` : undefined
+                      }
+                      color="text-primary"
+                      alert={summary.tasks.overdue > 0}
+                    />
+                    {summary.tasks.overdue > 0 && (
+                      <div className="px-3 py-2 bg-error/10 rounded-lg text-xs text-error flex items-center gap-2">
+                        <AlertCircle className="w-3 h-3" />
+                        {summary.tasks.overdue} overdue task{summary.tasks.overdue > 1 ? 's' : ''}
+                      </div>
+                    )}
+                    {summary.tasks.dueToday > 0 && (
+                      <div className="px-3 py-2 bg-warning/10 rounded-lg text-xs text-warning flex items-center gap-2">
+                        <Calendar className="w-3 h-3" />
+                        {summary.tasks.dueToday} due today
+                      </div>
+                    )}
+                    <StatCard
+                      icon={FileText}
+                      label="Notes"
+                      value={summary.notes.total}
+                      subValue={summary.notes.pinned > 0 ? `${summary.notes.pinned} pinned` : undefined}
+                      color="text-warning"
+                    />
+                    <StatCard
+                      icon={Calendar}
+                      label="Events"
+                      value={summary.calendar.total}
+                      subValue={
+                        summary.calendar.upcoming > 0
+                          ? `${summary.calendar.upcoming} upcoming`
+                          : undefined
+                      }
+                      color="text-success"
+                    />
+                    <StatCard
+                      icon={Users}
+                      label="Contacts"
+                      value={summary.contacts.total}
+                      color="text-purple-500"
+                    />
+                    <StatCard
+                      icon={Bookmark}
+                      label="Bookmarks"
+                      value={summary.bookmarks.total}
+                      subValue={
+                        summary.bookmarks.favorites > 0
+                          ? `${summary.bookmarks.favorites} favorites`
+                          : undefined
+                      }
+                      color="text-blue-500"
+                    />
+                    {summary.habits && (
+                      <StatCard
+                        icon={Repeat}
+                        label="Habits"
+                        value={summary.habits.total}
+                        subValue={
+                          summary.habits.totalToday > 0
+                            ? `${summary.habits.completedToday}/${summary.habits.totalToday} today`
+                            : undefined
+                        }
+                        color="text-emerald-500"
+                      />
+                    )}
+                    {summary.expenses && (
+                      <StatCard
+                        icon={Receipt}
+                        label="Expenses"
+                        value={summary.expenses.total}
+                        subValue={
+                          summary.expenses.thisMonth > 0
+                            ? `${summary.expenses.thisMonth.toFixed(0)} this month`
+                            : undefined
+                        }
+                        color="text-orange-500"
+                      />
+                    )}
                   </div>
                 )}
-                {summary.tasks.dueToday > 0 && (
-                  <div className="px-3 py-2 bg-warning/10 rounded-lg text-xs text-warning flex items-center gap-2">
-                    <Calendar className="w-3 h-3" />
-                    {summary.tasks.dueToday} due today
+
+                {/* Usage Stats */}
+                {costs && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
+                      API Usage
+                    </h4>
+                    <StatCard
+                      icon={Hash}
+                      label="Tokens Today"
+                      value={formatNumber(costs.daily.totalTokens)}
+                      color="text-primary"
+                    />
+                    <StatCard
+                      icon={DollarSign}
+                      label="Cost Today"
+                      value={formatCurrency(costs.daily.totalCost)}
+                      color="text-success"
+                    />
+                    <StatCard
+                      icon={TrendingUp}
+                      label="This Month"
+                      value={formatCurrency(costs.monthly.totalCost)}
+                      subValue={`${formatNumber(costs.monthly.totalTokens)} tokens`}
+                      color="text-text-secondary"
+                    />
                   </div>
                 )}
-                <StatCard
-                  icon={FileText}
-                  label="Notes"
-                  value={summary.notes.total}
-                  subValue={summary.notes.pinned > 0 ? `${summary.notes.pinned} pinned` : undefined}
-                  color="text-warning"
-                />
-                <StatCard
-                  icon={Calendar}
-                  label="Events"
-                  value={summary.calendar.total}
-                  subValue={
-                    summary.calendar.upcoming > 0
-                      ? `${summary.calendar.upcoming} upcoming`
-                      : undefined
-                  }
-                  color="text-success"
-                />
-                <StatCard
-                  icon={Users}
-                  label="Contacts"
-                  value={summary.contacts.total}
-                  color="text-purple-500"
-                />
-                <StatCard
-                  icon={Bookmark}
-                  label="Bookmarks"
-                  value={summary.bookmarks.total}
-                  subValue={
-                    summary.bookmarks.favorites > 0
-                      ? `${summary.bookmarks.favorites} favorites`
-                      : undefined
-                  }
-                  color="text-blue-500"
-                />
-                {summary.habits && (
-                  <StatCard
-                    icon={Repeat}
-                    label="Habits"
-                    value={summary.habits.total}
-                    subValue={
-                      summary.habits.totalToday > 0
-                        ? `${summary.habits.completedToday}/${summary.habits.totalToday} today`
-                        : undefined
-                    }
-                    color="text-emerald-500"
-                  />
-                )}
-                {summary.expenses && (
-                  <StatCard
-                    icon={Receipt}
-                    label="Expenses"
-                    value={summary.expenses.total}
-                    subValue={
-                      summary.expenses.thisMonth > 0
-                        ? `${summary.expenses.thisMonth.toFixed(0)} this month`
-                        : undefined
-                    }
-                    color="text-orange-500"
-                  />
-                )}
-              </div>
-            )}
 
-            {/* Usage Stats */}
-            {costs && (
-              <div className="space-y-2">
-                <h4 className="text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
-                  API Usage
-                </h4>
-                <StatCard
-                  icon={Hash}
-                  label="Tokens Today"
-                  value={formatNumber(costs.daily.totalTokens)}
-                  color="text-primary"
-                />
-                <StatCard
-                  icon={DollarSign}
-                  label="Cost Today"
-                  value={formatCurrency(costs.daily.totalCost)}
-                  color="text-success"
-                />
-                <StatCard
-                  icon={TrendingUp}
-                  label="This Month"
-                  value={formatCurrency(costs.monthly.totalCost)}
-                  subValue={`${formatNumber(costs.monthly.totalTokens)} tokens`}
-                  color="text-text-secondary"
-                />
-              </div>
+                {/* System Info */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
+                    System
+                  </h4>
+                  <StatCard
+                    icon={Brain}
+                    label="Providers"
+                    value={providerCount}
+                    subValue="configured"
+                    color="text-primary"
+                  />
+                  <StatCard
+                    icon={Cpu}
+                    label="Models"
+                    value={modelCount}
+                    subValue="available"
+                    color="text-text-secondary"
+                  />
+                </div>
+              </>
             )}
-
-            {/* System Info */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-medium text-text-muted dark:text-dark-text-muted uppercase tracking-wider">
-                System
-              </h4>
-              <StatCard
-                icon={Brain}
-                label="Providers"
-                value={providerCount}
-                subValue="configured"
-                color="text-primary"
-              />
-              <StatCard
-                icon={Cpu}
-                label="Models"
-                value={modelCount}
-                subValue="available"
-                color="text-text-secondary"
-              />
-            </div>
           </>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-center py-12">
+            <MessageSquare className="w-10 h-10 text-text-muted dark:text-dark-text-muted mb-3" />
+            <p className="text-sm text-text-muted dark:text-dark-text-muted">
+              Chat coming soon...
+            </p>
+          </div>
         )}
       </div>
 

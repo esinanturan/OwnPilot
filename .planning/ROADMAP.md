@@ -154,14 +154,28 @@ Layout.tsx (4-panel shell)
 
 ## Phases
 
-- [ ] **Phase 11: StatsPanel Tab System** — Stats | Chat tab switcher, tab state persistence (localStorage), Chat tab placeholder
-- [ ] **Phase 12: Compact Chat UI** — MiniChat-benzeri compact message list + input in StatsPanel Chat tab, useChatStore() baglantisi, genislik ayari (w-64 → w-80)
-- [ ] **Phase 13: Context Detection** — Route degisikliginde aktif sayfa/oge baglam tespiti, context banner (aktif workspace/agent gosterimi), context change event
-- [ ] **Phase 14: Context Injection** — Chat request'e X-Project-Dir header inject (workspace path varsa), baglam degistiginde otomatik ilk mesaj veya prepopulate
-- [ ] **Phase 15: Multi-Session Research** — useChatStore tek global context → coklu context arastirmasi, MiniChat vs StatsPanel Chat session izolasyonu karari
-- [ ] **Phase 16: E2E Tests** — Playwright: tab switching, contextual chat, workspace baglam injection, message send/receive
+- [ ] **Phase 11: Workspace Protocol Research** — Workspace'lerin calisma protokolunu arastir: FileWorkspace path nasil resolve ediliyor, chat request'e nasil aktariliyor, bridge X-Project-Dir ile nasil eslesiyor, workspace create/select/switch lifecycle, WorkspaceSelector component akisi, sandbox vs host-fs workspace farki. Karar dokumani uret
+- [ ] **Phase 12: StatsPanel Tab System** — Stats | Chat tab switcher, tab state persistence (localStorage), Chat tab placeholder
+- [ ] **Phase 13: Compact Chat UI** — MiniChat-benzeri compact message list + input in StatsPanel Chat tab, useChatStore() baglantisi, genislik ayari (w-64 → w-80)
+- [ ] **Phase 14: Context Detection** — Route degisikliginde aktif sayfa/oge baglam tespiti, context banner (aktif workspace/agent gosterimi), context change event
+- [ ] **Phase 15: Context Injection** — Chat request'e X-Project-Dir header inject (workspace path varsa), baglam degistiginde otomatik ilk mesaj veya prepopulate
+- [ ] **Phase 16: Multi-Session Research** — useChatStore tek global context → coklu context arastirmasi, MiniChat vs StatsPanel Chat session izolasyonu karari
+- [ ] **Phase 17: E2E Tests** — Playwright: tab switching, contextual chat, workspace baglam injection, message send/receive
 
-### Phase 11: StatsPanel Tab System
+### Phase 11: Workspace Protocol Research
+**Goal**: Workspace'lerin calisma protokolunu derinlemesine arastir. FileWorkspace path nasil resolve ediliyor, chat request'e nasil aktariliyor, bridge X-Project-Dir ile nasil eslesiyor, workspace lifecycle (create/select/switch), WorkspaceSelector component akisi, sandbox workspace vs host-fs workspace farki.
+**Depends on**: Nothing (pure research — bagimsiz, ilk phase olabilir)
+**Requirements**: CTX-00
+**Success Criteria**:
+  1. FileWorkspace API akisi dokumanlastirilir: create → path resolve → file listing → chat context
+  2. WorkspaceSelector component akisi haritalanir: UI select → useChatStore.workspaceId → request body
+  3. Bridge tarafinda X-Project-Dir nasil islenir dokumanlastirilir: header → spawn cwd
+  4. Sandbox workspace (Docker volume) vs host-fs workspace (OWNPILOT_HOST_FS bind mount) farki aciklanir
+  5. Chat request'e workspace path inject etmenin en uygun yontemi belirlenir (header vs body vs gateway resolve)
+  6. Karar dokumani yazilir: RESEARCH.md veya WORKSPACE-PROTOCOL.md
+**Plans**: TBD
+
+### Phase 12: StatsPanel Tab System
 **Goal**: StatsPanel ustune Stats | Chat tab switcher eklenir. Tab state localStorage'da persist eder. Chat tab bos placeholder gosterir.
 **Depends on**: v1.1 Phase 10 (veya bagimsiz — StatsPanel zaten stabil)
 **Requirements**: CTX-01, CTX-02
@@ -173,9 +187,9 @@ Layout.tsx (4-panel shell)
   5. Collapse/expand davranisi her iki tab icin calisir
 **Plans**: TBD
 
-### Phase 12: Compact Chat UI
+### Phase 13: Compact Chat UI
 **Goal**: Chat tab'inda MiniChat benzeri compact chat arayuzu render edilir. useChatStore() ile baglanir. Mesaj gonderme ve alma calisir.
-**Depends on**: Phase 11
+**Depends on**: Phase 12
 **Requirements**: CTX-03, CTX-04
 **Success Criteria**:
   1. Chat tab'inda mesaj listesi gorunur (scrollable)
@@ -185,9 +199,9 @@ Layout.tsx (4-panel shell)
   5. StatsPanel genisligi chat icin yeterli (w-80 = 320px minimum)
 **Plans**: TBD
 
-### Phase 13: Context Detection
+### Phase 14: Context Detection
 **Goal**: Sidebar'dan bir ogeye tiklandiginda veya route degistiginde, aktif baglam (workspace, agent, claw) tespit edilir ve Chat tab'inda gosterilir.
-**Depends on**: Phase 12
+**Depends on**: Phase 13
 **Requirements**: CTX-05, CTX-06
 **Success Criteria**:
   1. Workspace sayfasinda bir workspace tiklandiginda, Chat tab context banner'inda workspace adi gorunur
@@ -196,9 +210,9 @@ Layout.tsx (4-panel shell)
   4. Route degisikligi context'i otomatik gunceller
 **Plans**: TBD
 
-### Phase 14: Context Injection
+### Phase 15: Context Injection
 **Goal**: Tespit edilen baglam chat request'e inject edilir — X-Project-Dir header'i veya otomatik ilk mesaj.
-**Depends on**: Phase 13
+**Depends on**: Phase 14
 **Requirements**: CTX-07, CTX-08
 **Success Criteria**:
   1. Workspace baglami varken gonderilen mesajda X-Project-Dir header'i dogru dizini icerir
@@ -207,9 +221,9 @@ Layout.tsx (4-panel shell)
   4. Opsiyonel: Ilk mesaj otomatik olarak "Bu workspace/proje hakkinda bilgi ver" seklinde prepopulate edilir
 **Plans**: TBD
 
-### Phase 15: Multi-Session Research
+### Phase 16: Multi-Session Research
 **Goal**: useChatStore tek global singleton — StatsPanel Chat ve MiniChat ve ChatPage AYNI conversation'i paylasir. Bu uygun mu? Alternatifler arastirilir ve mimari karar dokumanlastirilir.
-**Depends on**: Phase 12
+**Depends on**: Phase 13
 **Requirements**: CTX-09
 **Success Criteria**:
   1. Mimari karar dokumani yazilir: tek store vs coklu store
@@ -217,9 +231,9 @@ Layout.tsx (4-panel shell)
   3. Bridge X-Conversation-Id ile session izolasyonu test edilir
 **Plans**: TBD
 
-### Phase 16: E2E Tests
+### Phase 17: E2E Tests
 **Goal**: Playwright ile tum contextual chat ozelliklerinin E2E testi.
-**Depends on**: Phase 14
+**Depends on**: Phase 15
 **Requirements**: CTX-10, CTX-11
 **Success Criteria**:
   1. Tab switching testi: Stats → Chat → Stats gecisilir, state korunur
@@ -232,14 +246,15 @@ Layout.tsx (4-panel shell)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|---------------|--------|-----------|
-| 11. StatsPanel Tab System | 0/TBD | Not started | - |
-| 12. Compact Chat UI | 0/TBD | Not started | - |
-| 13. Context Detection | 0/TBD | Not started | - |
-| 14. Context Injection | 0/TBD | Not started | - |
-| 15. Multi-Session Research | 0/TBD | Not started | - |
-| 16. E2E Tests | 0/TBD | Not started | - |
+| 11. Workspace Protocol Research | 0/TBD | Not started | - |
+| 12. StatsPanel Tab System | 0/TBD | Not started | - |
+| 13. Compact Chat UI | 0/TBD | Not started | - |
+| 14. Context Detection | 0/TBD | Not started | - |
+| 15. Context Injection | 0/TBD | Not started | - |
+| 16. Multi-Session Research | 0/TBD | Not started | - |
+| 17. E2E Tests | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-03-28 — v1.0 complete*
 *Updated: 2026-03-29 — v1.1 milestone started (6 phases)*
-*Updated: 2026-04-05 — v2.0 Contextual Sidebar Chat milestone added (6 phases)*
+*Updated: 2026-04-05 — v2.0 Contextual Sidebar Chat milestone added (7 phases, Phase 11: Workspace Protocol Research)*

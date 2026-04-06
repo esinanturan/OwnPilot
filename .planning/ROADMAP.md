@@ -255,7 +255,233 @@ Layout.tsx (4-panel shell)
 | 17. E2E Tests | 1/1 | Complete | 2026-04-05 |
 
 ---
+
+## Milestone v2.1: Contextual Chat — Full Implementation
+
+**Goal:** v2.0 research + scaffold'i production-ready hale getir. Her sayfada sidebar chat o sayfanin baglaminda calisir: path olan sayfalarda (workspace, coding-agent, claw) bridge CLI spawn ile dosya erisimi, path olmayan sayfalarda (workflow, agent, tools) direkt LLM API ile context data injection. Docker bind mount + path mapping ile host dosya sistemi erisimi.
+
+**Branch:** feature/v2.1-contextual-impl
+**Depends on:** v2.0 (Phase 11-17 complete)
+**Research docs:**
+- `.planning/phases/11-workspace-protocol/RESEARCH.md` (workspace protocol)
+- `.planning/phases/11-workspace-protocol/BRIDGE-DIRECTORY-ROUTING-RESEARCH.md` (CLI tools, spawn CWD, security)
+- `.planning/phases/11-workspace-protocol/CONTEXTUAL-CHAT-ARCHITECTURE.md` (full architecture)
+- `.planning/phases/16-multi-session/RESEARCH.md` (multi-session, Dedicated SidebarChatStore)
+
+**Architecture Decision Records:**
+- Path var → Bridge CLI spawn (o dizinde) → dosya erisimi, git, terminal
+- Path yok → Direkt LLM API → context data system prompt'a inject
+- Docker: bind mount `/home/ayaz:/host-home:rw` + path mapping
+- Chat state: Dedicated SidebarChatStore (ChatPage/MiniChat'ten bagimsiz)
+- Context: Session-based (ilk mesajda gonder, sonrakilerde conversationId ile resolve)
+- Hibrit provider: Otomatik secim (path → bridge, no-path → LLM API)
+
+**Key Insight:** Gateway `context-injection.ts` pipeline %80 hazir — sadece `## Page Context` section builder + path mapping eklenmesi gerekiyor.
+
+### Wave Map (Dependency Order)
+
+```
+Wave 1 (Foundation — parallel, bagimsiz):
+  Phase 18: SidebarChatStore        ← UI, bagimsiz
+  Phase 19: Page Copilot Registry   ← UI, bagimsiz
+  Phase 20: Docker Host-FS Setup    ← DevOps, bagimsiz
+
+Wave 2 (Gateway Pipeline — Wave 1 sonrasi):
+  Phase 21: Path Mapping Utility    ← Gateway, depends: Phase 20
+  Phase 22: pageContext Injection   ← Gateway, depends: Phase 21
+  Phase 23: X-Project-Dir Forward   ← Gateway, depends: Phase 22
+
+Wave 3 (Integration — Wave 2 sonrasi):
+  Phase 24: Hybrid Provider Route   ← Gateway+UI, depends: Phase 22-23
+  Phase 25: Per-Page Prompts        ← Gateway, depends: Phase 24
+  Phase 26: UI Polish               ← UI, depends: Phase 18-19, 24
+
+Wave 4 (Quality — Wave 3 sonrasi):
+  Phase 27: Bridge Security         ← Bridge, depends: nothing (parallel)
+  Phase 28: E2E Integration Tests   ← Test, depends: Phase 26
+  Phase 29: Docker Build + Deploy   ← DevOps, depends: Phase 28
+```
+
+## Phases
+
+- [ ] **Phase 18: Dedicated SidebarChatStore** — ChatPage/MiniChat'ten bagimsiz chat store. Kendi messages, sessionId, provider, model, isLoading state'i. contextPath ile otomatik conversation reset. useChatStore'a dokunmadan bagimsiz calisir
+- [ ] **Phase 19: Page Copilot Registry** — Route → context config mapping. Per-page: resolveContext(), suggestions[], actions[], systemPromptHint. usePageCopilotContext() hook. 23 sidebar section icin config
+- [ ] **Phase 20: Docker Host-FS Setup** — `/home/ayaz:/host-home:rw` bind mount. OWNPILOT_HOST_FS + OWNPILOT_HOST_FS_HOST_PREFIX env vars. Docker compose guncelleme. Container restart + verify
+- [ ] **Phase 21: Gateway Path Mapping** — `toHostPath()` / `toContainerPath()` utility. OWNPILOT_HOST_FS env var'dan prefix cozumleme. Container path ↔ host path donusumu
+- [ ] **Phase 22: Gateway pageContext Injection** — `buildPageContextSection()` fonksiyonu. context-injection.ts'e entegrasyon. pageContext field'i chat request body'de. Validation schema guncelleme
+- [ ] **Phase 23: Gateway X-Project-Dir Forwarding** — pageContext.path varsa → toHostPath() → X-Project-Dir header. agent-cache.ts'de bridge request'e ekleme. Sadece bridge provider'lar icin
+- [ ] **Phase 24: Hybrid Provider Routing** — Path var → bridge provider (auto). Path yok → direkt LLM API (copilot pattern). Provider secimi: otomatik + manual override. Gateway chat route'da routing logic
+- [ ] **Phase 25: Per-Page Copilot Prompts** — Workflow copilot prompt (24 node type). Agent config copilot prompt. Tool/extension copilot prompt. MCP server copilot prompt. Her sayfa icin domain-specific system prompt section
+- [ ] **Phase 26: UI Polish** — Registry-based suggestions. Per-context action buttons (Apply, Create, Run). Context banner gelistirme. Streaming cancel (AbortController). Provider selector (bridge vs LLM API)
+- [ ] **Phase 27: Bridge Security Fixes** — validateProjectDir'a realpathSync() ekleme (symlink). additionalDirs path validation. Default CWD daraltma (/home/ayaz/ → /home/ayaz/ownpilot/)
+- [ ] **Phase 28: E2E Integration Tests** — Workspace context: chat → bridge spawn → dosya erisimi. Workflow context: chat → LLM API → JSON cikti. Sayfa gecisi: context reset → yeni conversation. Docker path mapping: container → host → CLI
+- [ ] **Phase 29: Docker Build + Deploy** — Bind mount ile yeni image. Container restart. Smoke test: workspace chat + workflow chat. ROADMAP progress guncelleme
+
+### Phase 18: Dedicated SidebarChatStore
+**Goal:** StatsPanel CompactChat icin ChatPage/MiniChat'ten tamamen bagimsiz chat store. Kendi messages, sessionId, provider, model state'i. Context degistiginde otomatik sifirlama.
+**Depends on:** Phase 16 research (Alternative D: Dedicated SidebarChatStore)
+**Requirements:** CTX-12
+**Success Criteria:**
+  1. useSidebarChat() hook calisiyor, useChatStore()'dan bagimsiz
+  2. StatsPanel CompactChat useSidebarChat() kullaniyor
+  3. ChatPage'de mesaj gonderince sidebar chat ETKILENMIYOR
+  4. Sidebar'da mesaj gonderince ChatPage ETKILENMIYOR
+  5. contextPath degisince sidebar messages temizleniyor + yeni session
+**Plans:** TBD
+
+### Phase 19: Page Copilot Registry
+**Goal:** Her sayfa icin context config, suggestions ve actions tanimlayan registry. usePageCopilotContext() hook ile route'dan otomatik resolution.
+**Depends on:** Phase 14 (usePageContext hook)
+**Requirements:** CTX-13
+**Success Criteria:**
+  1. page-copilot-registry.ts 23 section icin config iceriyor
+  2. usePageCopilotContext() route'a gore dogru config donduruyor
+  3. Her section icin en az 3 context-aware suggestion var
+  4. Path olan sections icin resolveContext() async cagri yapiliyor
+  5. Path olmayan sections icin contextData (definition, config) donduruluyor
+**Plans:** TBD
+
+### Phase 20: Docker Host-FS Setup
+**Goal:** Container icinden host dosya sistemine erisim icin bind mount. OWNPILOT_HOST_FS env var ile gateway'e host-fs konumunu bildirme.
+**Depends on:** Nothing (DevOps, bagimsiz)
+**Requirements:** CTX-14
+**Success Criteria:**
+  1. Docker compose'da `/home/ayaz:/host-home:rw` volume mount eklendi
+  2. OWNPILOT_HOST_FS=/host-home env var set edildi
+  3. OWNPILOT_HOST_FS_HOST_PREFIX=/home/ayaz env var set edildi
+  4. Container restart sonrasi `/host-home/` icinden host dosyalari gorunuyor
+  5. `docker exec ownpilot ls /host-home/projects/` calisiyor
+**Plans:** TBD
+
+### Phase 21: Gateway Path Mapping
+**Goal:** Container path ↔ host path donusumu. toHostPath('/host-home/projects/x') → '/home/ayaz/projects/x'.
+**Depends on:** Phase 20
+**Requirements:** CTX-15
+**Success Criteria:**
+  1. host-path.ts utility dosyasi olusturuldu
+  2. toHostPath() container → host donusumu calisiyor
+  3. toContainerPath() host → container donusumu calisiyor
+  4. OWNPILOT_HOST_FS env var yoksa null donuyor (graceful degradation)
+  5. Unit testler: 5+ senaryo PASS
+**Plans:** TBD
+
+### Phase 22: Gateway pageContext Injection
+**Goal:** context-injection.ts pipeline'ina ## Page Context section builder eklemek. Chat request body'de pageContext field'i kabul etmek.
+**Depends on:** Phase 21
+**Requirements:** CTX-16
+**Success Criteria:**
+  1. buildPageContextSection() fonksiyonu olusturuldu
+  2. context-injection.ts'de DYNAMIC block'a eklendi
+  3. Chat request body'de pageContext field'i kabul ediliyor
+  4. Validation schema (workflowCopilotSchema benzeri) guncellendi
+  5. System prompt'ta ## Page Context gorunuyor (debug endpoint ile dogrulama)
+**Plans:** TBD
+
+### Phase 23: Gateway X-Project-Dir Forwarding
+**Goal:** pageContext.path varsa → toHostPath() → X-Project-Dir header olarak bridge request'e ekleme.
+**Depends on:** Phase 21, 22
+**Requirements:** CTX-17
+**Success Criteria:**
+  1. Bridge provider request'inde X-Project-Dir header'i mevcut
+  2. Path mapping dogru calisiyor (container path → host path)
+  3. Non-bridge provider'larda X-Project-Dir EKLENMEZ
+  4. Path yoksa header EKLENMEZ (null safety)
+  5. Bridge tarafinda CLI dogru CWD'de spawn oluyor
+**Plans:** TBD
+
+### Phase 24: Hybrid Provider Routing
+**Goal:** Path olan sayfalarda otomatik bridge provider secimi, path olmayan sayfalarda direkt LLM API.
+**Depends on:** Phase 22, 23
+**Requirements:** CTX-18
+**Success Criteria:**
+  1. Workspace sayfasinda sidebar chat bridge provider'i otomatik seciyor
+  2. Workflow sayfasinda sidebar chat LLM API'yi otomatik seciyor
+  3. Kullanici manual override yapabiliyor (bridge → LLM veya LLM → bridge)
+  4. LLM API path'inda copilot-benzeri SSE streaming calisiyor
+  5. Bridge path'inda mevcut chat pipeline calisiyor
+**Plans:** TBD
+
+### Phase 25: Per-Page Copilot Prompts
+**Goal:** Her sayfa turu icin domain-specific system prompt section'lari. Workflow: 24 node type. Agent: config best practices. Tool: schema + usage.
+**Depends on:** Phase 24
+**Requirements:** CTX-19
+**Success Criteria:**
+  1. Workflow copilot prompt (mevcut workflow-copilot-prompt.ts reuse)
+  2. Agent configuration prompt (system prompt optimization, tool selection)
+  3. Tool/extension prompt (code generation, schema, test patterns)
+  4. MCP server prompt (connection diagnostics, tool discovery)
+  5. Her prompt en az 1 pratik test ile dogrulanmis (AI mantikli yanit veriyor)
+**Plans:** TBD
+
+### Phase 26: UI Polish
+**Goal:** Sidebar chat UX iyilestirmeleri — suggestions, action buttons, context banner, streaming cancel.
+**Depends on:** Phase 18, 19, 24
+**Requirements:** CTX-20
+**Success Criteria:**
+  1. Per-page suggestions registry'den gorunuyor
+  2. "Apply" / "Create" / "Run" action buttons (Copilot pattern)
+  3. Context banner: ikon + isim + path (truncated)
+  4. Streaming cancel butonu (AbortController)
+  5. Provider selector dropdown (bridge vs LLM API)
+  6. MarkdownContent rendering (Copilot'tan) ← plain text yerine
+**Plans:** TBD
+
+### Phase 27: Bridge Security Fixes
+**Goal:** Directory routing guvenlik aciklari kapatma (symlink bypass, additionalDirs validation).
+**Depends on:** Nothing (paralel calisabilir)
+**Requirements:** CTX-21
+**Success Criteria:**
+  1. validateProjectDir'a realpathSync() eklendi
+  2. Symlink bypass testi: FAIL (symlink path reddedilir)
+  3. additionalDirs her entry icin validateProjectDir() calisiyor
+  4. Default CWD daraltildi (config.ts)
+  5. Mevcut bridge testler PASS (regression yok)
+**Plans:** TBD
+
+### Phase 28: E2E Integration Tests
+**Goal:** Uctan uca contextual chat akisi testleri.
+**Depends on:** Phase 26
+**Requirements:** CTX-22
+**Success Criteria:**
+  1. Workspace chat: sayfa ac → sidebar chat → mesaj gonder → yanit al
+  2. Workflow chat: sayfa ac → sidebar chat → workflow JSON yaniti
+  3. Sayfa gecisi: context reset → eski mesajlar temizlenir
+  4. Provider routing: workspace=bridge, workflow=LLM otomatik secim
+  5. Context banner: dogru ikon, isim, path gorunuyor
+**Plans:** TBD
+
+### Phase 29: Docker Build + Deploy
+**Goal:** Bind mount ile production Docker image. Smoke test.
+**Depends on:** Phase 28
+**Requirements:** CTX-23
+**Success Criteria:**
+  1. Docker build basarili (bind mount volume config)
+  2. Container restart + healthy
+  3. Workspace sidebar chat → bridge spawn → dosya listesi
+  4. Workflow sidebar chat → LLM API → JSON cikti
+  5. ROADMAP progress tablosu tamamen guncel
+**Plans:** TBD
+
+## Progress (v2.1)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|---------------|--------|-----------|
+| 18. SidebarChatStore | 0/TBD | Not started | - |
+| 19. Page Copilot Registry | 0/TBD | Not started | - |
+| 20. Docker Host-FS Setup | 0/TBD | Not started | - |
+| 21. Gateway Path Mapping | 0/TBD | Not started | - |
+| 22. pageContext Injection | 0/TBD | Not started | - |
+| 23. X-Project-Dir Forward | 0/TBD | Not started | - |
+| 24. Hybrid Provider Route | 0/TBD | Not started | - |
+| 25. Per-Page Prompts | 0/TBD | Not started | - |
+| 26. UI Polish | 0/TBD | Not started | - |
+| 27. Bridge Security | 0/TBD | Not started | - |
+| 28. E2E Integration Tests | 0/TBD | Not started | - |
+| 29. Docker Build + Deploy | 0/TBD | Not started | - |
+
+---
 *Roadmap created: 2026-03-28 — v1.0 complete*
 *Updated: 2026-03-29 — v1.1 milestone started (6 phases)*
 *Updated: 2026-04-05 — v2.0 Contextual Sidebar Chat milestone added (7 phases, Phase 11: Workspace Protocol Research)*
 *Updated: 2026-04-05 — v2.0 all 7 phases complete (Phase 11-17, branch: feature/v2-contextual-chat)*
+*Updated: 2026-04-06 — v2.1 Contextual Chat Full Implementation milestone added (12 phases, 4 waves)*

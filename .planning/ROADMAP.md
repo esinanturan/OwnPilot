@@ -466,18 +466,18 @@ Wave 4 (Quality — Wave 3 sonrasi):
 
 | Phase | Plans Complete | Status | Completed |
 |-------|---------------|--------|-----------|
-| 18. SidebarChatStore | 0/TBD | Not started | - |
-| 19. Page Copilot Registry | 0/TBD | Not started | - |
-| 20. Docker Host-FS Setup | 0/TBD | Not started | - |
-| 21. Gateway Path Mapping | 0/TBD | Not started | - |
-| 22. pageContext Injection | 0/TBD | Not started | - |
-| 23. X-Project-Dir Forward | 0/TBD | Not started | - |
-| 24. Hybrid Provider Route | 0/TBD | Not started | - |
-| 25. Per-Page Prompts | 0/TBD | Not started | - |
-| 26. UI Polish | 0/TBD | Not started | - |
-| 27. Bridge Security | 0/TBD | Not started | - |
-| 28. E2E Integration Tests | 0/TBD | Not started | - |
-| 29. Docker Build + Deploy | 0/TBD | Not started | - |
+| 18. SidebarChatStore | 1/1 | Complete | 2026-04-06 |
+| 19. Page Copilot Registry | 1/1 | Complete | 2026-04-06 |
+| 20. Docker Host-FS Setup | 1/1 | Complete | 2026-04-06 |
+| 21. Gateway Path Mapping | 1/1 | Complete | 2026-04-06 |
+| 22. pageContext Injection | 1/1 | Complete | 2026-04-06 |
+| 23. X-Project-Dir Forward | 1/1 | Complete | 2026-04-06 |
+| 24. Hybrid Provider Route | 1/1 | Complete | 2026-04-06 |
+| 25. Per-Page Prompts | 1/1 | Complete | 2026-04-06 |
+| 26. UI Polish | 1/1 | Complete | 2026-04-06 |
+| 27. Bridge Security | 1/1 | Complete | 2026-04-06 |
+| 28. E2E Integration Tests | 1/1 | Complete | 2026-04-06 |
+| 29. Docker Build + Deploy | 1/1 | Complete | 2026-04-06 |
 
 ---
 *Roadmap created: 2026-03-28 — v1.0 complete*

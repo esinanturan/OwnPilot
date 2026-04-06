@@ -27,44 +27,81 @@ export function getPageCopilotPrompt(pageType: string, contextData?: Record<stri
 }
 
 /**
- * Condensed workflow copilot section for page context injection.
- * References node types only — not the full 657-line prompt (which is used
- * by the dedicated workflow copilot chat endpoint).
+ * Enriched workflow copilot section for sidebar chat page context injection.
+ * Contains node types, template syntax, edge rules, data flow, and common mistakes
+ * from the full workflow-copilot-prompt.ts — condensed for sidebar use.
  */
 function buildWorkflowCopilotSection(): string {
   return `\n### Workflow Assistant
 
 You are helping the user build or edit an OwnPilot visual workflow.
+When suggesting changes, output the COMPLETE workflow JSON inside a \`\`\`json code block.
 
-**Available Node Types (24 total)**
-- **trigger** — workflow entry point (manual / schedule / event / condition / webhook)
-- **llm** — call an AI model with a prompt
-- **tool** — execute a registered tool (identified by \`tool\` field, no \`type\` field)
-- **condition** — if/else branching (edges use \`sourceHandle: "true"\` / \`"false"\`)
-- **switch** — multi-branch routing by expression value
-- **forEach** — iterate over an array (edges: \`"each"\` / \`"done"\`)
-- **parallel** — run branches concurrently (edges: \`"branch-0"\`, \`"branch-1"\`, …)
-- **merge** — collect results from parallel branches
-- **httpRequest** — make an HTTP call (requires \`method\` + \`url\`)
-- **notification** — send a message or alert
-- **delay** — pause execution (requires \`duration\` + \`unit\`)
-- **transformer** — reshape data with a JS expression
-- **code** — run arbitrary JavaScript
-- **filter** — remove items from an array
-- **map** — transform each item in an array
-- **aggregate** — reduce/collect array items
-- **dataStore** — read/write persistent key-value data
-- **subWorkflow** — call another workflow by ID
-- **approval** — pause and wait for human approval
-- **webhookResponse** — respond to an incoming webhook
-- **errorHandler** — catch errors from upstream nodes
-- **claw** — run an autonomous Claw agent
-- **setVariable** — store a value for later nodes
-- **note** — visual annotation only (no execution)
+**Node Types (24)**
+- **trigger** — entry point: \`triggerType\`: manual | schedule | event | condition | webhook. Schedule: add \`cron\`. Webhook: add \`webhookPath\`. Max ONE per workflow.
+- **llm** — AI model call: \`provider\`: "default", \`model\`: "default", \`systemPrompt\`, \`userMessage\` (required). Use \`responseFormat: "json"\` for structured output.
+- **tool** — registered tool: \`tool\`: "exact.name" (no \`type\` field!), \`args\`: {params}
+- **condition** — if/else: \`expression\` (JS against \`data\`). Edges MUST use \`sourceHandle: "true"\` / \`"false"\`
+- **switch** — multi-branch: \`expression\`, \`cases\`: [{label, value}]. Edges use \`sourceHandle\` = case label or "default"
+- **forEach** — loop: \`arrayExpression\`, \`itemVariable\`, \`maxIterations\`. Edges: "each" / "done"
+- **parallel** — concurrent: \`branchCount\` (2-10). Edges: "branch-0", "branch-1", ...
+- **merge** — collect parallel results: \`mode\`: "waitAll" | "firstCompleted"
+- **httpRequest** — API call: \`method\` + \`url\` (required). Optional: \`headers\`, \`body\`, \`auth\`
+- **code** — run code: \`language\`: js/python/shell, \`code\` (use \`data\` var, \`return\` for output)
+- **transformer** — reshape: \`expression\` (JS against \`data\`)
+- **filter** — filter array: \`arrayExpression\`, \`condition\` (access \`item\`, \`index\`)
+- **map** — transform array: \`arrayExpression\`, \`expression\` (access \`item\`, \`index\`)
+- **aggregate** — reduce: \`arrayExpression\`, \`operation\`: sum/count/avg/min/max/groupBy/flatten/unique
+- **delay** — pause: \`duration\` + \`unit\` (seconds/minutes/hours). Max 1 hour.
+- **dataStore** — persist: \`operation\`: get/set/delete/list/has, \`key\`, \`value\`, \`namespace\`
+- **notification** — alert: \`message\` (required), \`severity\`: info/warning/error/success
+- **subWorkflow** — nested: \`subWorkflowId\` (required), \`inputMapping\`, \`maxDepth\`
+- **approval** — human gate: \`approvalMessage\`, \`timeoutMinutes\`
+- **webhookResponse** — HTTP response: \`statusCode\`, \`body\`, \`contentType\`
+- **errorHandler** — catch: max ONE per workflow. Place off main flow. \`continueOnSuccess\`
+- **claw** — autonomous agent: \`name\`, \`mission\`, \`mode\`: single-shot/continuous/interval/event
+- **stickyNote** — annotation only: \`text\`, \`color\`. No connections, not executed.
 
-**Key Rules**
-- Exactly ONE trigger node per workflow (always node_1)
-- Node IDs must be sequential: node_1, node_2, …
-- Tool nodes use \`"tool": "exact.tool.name"\` — no \`type\` field
-- Always return the COMPLETE workflow JSON, never a partial patch`;
+**Template Syntax** (used in tool args, LLM messages, HTTP urls/body, notifications)
+- \`{{nodeId.output}}\` — full output of upstream node
+- \`{{nodeId.output.field}}\` — nested field access
+- \`{{variables.key}}\` — workflow-level variable
+- \`{{inputs.paramName}}\` — workflow input parameter
+- \`{{alias}}\` — node output alias (set via \`outputAlias\` field)
+- Type preservation: \`"{{node_2.output}}"\` keeps original type; \`"Result: {{node_2.output}}"\` becomes string
+
+**Expression Nodes** (condition, switch, transformer, code) use \`data\` variable — NOT templates:
+- CORRECT: \`"expression": "data.items.length > 0"\`
+- WRONG: \`"expression": "{{node_2.output}}.items.length > 0"\`
+
+**Edge Rules**
+- Basic: \`{ "source": "node_1", "target": "node_2" }\`
+- Condition: MUST use \`sourceHandle\`: "true" or "false"
+- ForEach: MUST use \`sourceHandle\`: "each" or "done"
+- Switch: MUST use \`sourceHandle\`: case label or "default"
+- Parallel: MUST use \`sourceHandle\`: "branch-0", "branch-1", ...
+
+**Data Flow Patterns**
+- Tool → LLM: \`"userMessage": "Summarize: {{node_2.output}}"\`
+- LLM → Tool: \`"args": { "content": "{{node_3.output}}" }\`
+- HTTP → Transformer: \`"expression": "data.body.results"\` (HTTP output: {status, body, headers})
+- ForEach body: \`"args": { "id": "{{item.id}}" }\` (when itemVariable="item")
+
+**Layout**
+- Trigger at y=50, each level +150px. Center at x=300. Branches offset x±200.
+
+**Common Mistakes to Avoid**
+1. NEVER add multiple trigger nodes — max ONE (node_1)
+2. LLM nodes MUST include \`userMessage\`
+3. Use \`"provider": "default"\` and \`"model": "default"\` unless user specifies
+4. Condition/ForEach/Switch edges MUST have \`sourceHandle\`
+5. HTTP nodes MUST include \`method\` and \`url\`
+6. Always include \`"edges": []\` even if empty
+
+**Database Access** — for advanced inspection:
+\`\`\`
+psql -h localhost -p 25432 -U ownpilot -d ownpilot
+SELECT nodes, edges, variables FROM workflows WHERE id = '<workflow_id>';
+SELECT * FROM workflow_logs WHERE workflow_id = '<workflow_id>' ORDER BY started_at DESC LIMIT 5;
+\`\`\``;
 }

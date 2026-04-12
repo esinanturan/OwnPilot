@@ -674,7 +674,8 @@ async function createChatAgentInstance(
 }
 
 /**
- * Reset chat agent context - clears conversation memory
+ * Reset chat agent context - creates new conversation, preserves old one.
+ * Old conversations stay in memory until the agent cache entry is evicted.
  */
 export function resetChatAgentContext(
   provider: string,
@@ -686,7 +687,7 @@ export function resetChatAgentContext(
   if (agent) {
     const memory = agent.getMemory();
     const currentConversation = agent.getConversation();
-    memory.delete(currentConversation.id);
+    // Preserve old conversation — don't delete it so users can return to it
     const newConversation = memory.create(currentConversation.systemPrompt);
     agent.loadConversation(newConversation.id);
 

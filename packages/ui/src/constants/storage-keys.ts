@@ -20,4 +20,5 @@ export const STORAGE_KEYS = {
   STATS_PANEL_TAB: 'ownpilot-stats-panel-tab',         // 'stats' | 'chat' — active tab in StatsPanel
   CHAT_PROVIDER: 'ownpilot-chat-provider',             // last-selected provider ID (persists across page reloads)
   CHAT_MODEL: 'ownpilot-chat-model',                   // last-selected model ID (persists across page reloads)
+  CHAT_SESSION_ID: 'ownpilot-chat-session-id',         // active conversation ID (persists across page reloads)
 } as const;

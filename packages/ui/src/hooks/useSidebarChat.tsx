@@ -215,9 +215,20 @@ export function SidebarChatProvider({ children }: { children: ReactNode }) {
         /* localStorage unavailable in test environments */
       }
 
+      // Bridge providers: signal which runtime to use.
+      // Provider may be a UUID (local provider) or a name ('bridge-opencode').
+      // Check both the raw ID and the display name from localStorage cache —
+      // same pattern as useChatStore.tsx:270-279.
       const currentProvider = providerRef.current;
-      if (currentProvider.startsWith('bridge-')) {
-        headers['X-Runtime'] = currentProvider.replace('bridge-', '');
+      const providerDisplayName = (() => {
+        try {
+          const names = JSON.parse(localStorage.getItem('ownpilot-provider-names') ?? '{}');
+          return (names[currentProvider] ?? currentProvider) as string;
+        } catch { return currentProvider; }
+      })();
+      const bridgeName = [currentProvider, providerDisplayName].find(n => n.startsWith('bridge-'));
+      if (bridgeName) {
+        headers['X-Runtime'] = bridgeName.replace('bridge-', '');
       }
 
       const currentContextPath = contextPathRef.current;

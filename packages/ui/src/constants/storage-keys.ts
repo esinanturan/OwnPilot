@@ -18,4 +18,6 @@ export const STORAGE_KEYS = {
   HEADER_ITEMS: 'ownpilot-header-items',               // HeaderItemConfig[] — pinned items/groups in header bar
   LAYOUT_CONFIG: 'ownpilot-layout-config',             // LayoutConfig — header/sidebar display preferences
   STATS_PANEL_TAB: 'ownpilot-stats-panel-tab',         // 'stats' | 'chat' — active tab in StatsPanel
+  CHAT_PROVIDER: 'ownpilot-chat-provider',             // last-selected provider ID (persists across page reloads)
+  CHAT_MODEL: 'ownpilot-chat-model',                   // last-selected model ID (persists across page reloads)
 } as const;

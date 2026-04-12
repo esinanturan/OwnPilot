@@ -102,8 +102,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null);
-  const [provider, setProvider] = useState('');
-  const [model, setModel] = useState('');
+  const [provider, setProviderState] = useState(() => {
+    try { return localStorage.getItem(STORAGE_KEYS.CHAT_PROVIDER) ?? ''; } catch { return ''; }
+  });
+  const [model, setModelState] = useState(() => {
+    try { return localStorage.getItem(STORAGE_KEYS.CHAT_MODEL) ?? ''; } catch { return ''; }
+  });
+  // Persist provider/model to localStorage so they survive page reloads
+  const setProvider = useCallback((v: string) => {
+    setProviderState(v);
+    try { if (v) localStorage.setItem(STORAGE_KEYS.CHAT_PROVIDER, v); else localStorage.removeItem(STORAGE_KEYS.CHAT_PROVIDER); } catch { /* */ }
+  }, []);
+  const setModel = useCallback((v: string) => {
+    setModelState(v);
+    try { if (v) localStorage.setItem(STORAGE_KEYS.CHAT_MODEL, v); else localStorage.removeItem(STORAGE_KEYS.CHAT_MODEL); } catch { /* */ }
+  }, []);
   const [agentId, setAgentId] = useState<string | null>(null);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [streamingContent, setStreamingContent] = useState('');

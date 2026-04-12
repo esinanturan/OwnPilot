@@ -1,9 +1,35 @@
 # HANDOFF: Multi-Session Chat — Instant Sidebar Entry Fix
 
-**Date:** 2026-04-12
+**Date:** 2026-04-12 (updated session 2)
 **Branch:** main
-**Last commit:** `e5794da4` (fix: always start fresh session on page load)
-**Deploy:** v8.4-fresh-session (Dokploy, localhost:5000 registry)
+**Last commit:** `e85edb23` (fix: per-conversation agent cache for parallel multi-session chat)
+**Deploy:** v8.9-parallel-chat (Dokploy, localhost:5000 registry)
+
+---
+
+## SESSION 2 FIXES (6 commits: 4bc33329..e85edb23)
+
+| # | Commit | Problem | Root Cause | Fix |
+|---|--------|---------|------------|-----|
+| 1 | `4bc33329` | Sidebar entry not instant on Send | optimisticEntries useMemo pruned by DB reload race | Custom event `chat:optimistic-entry` → useSidebarRecents prepends directly |
+| 2 | `7b4f4bee` | Dev fetch 404 + WS crash + CORS | Raw `fetch('/api/...')` bypasses VITE_API_BASE; dev-proxy no WS handler; X-Runtime not in CORS | VITE_API_BASE prefix + WS upgrade handler + CORS headers + TARGET_HOST=127.0.0.1 |
+| 3 | `2860b73f` | User message lost when AI fails | Early persist only creates conv row, no message | `chatRepo.addMessage()` in early persist + dedup in saveStreamingChat + ChatPage memory fallback |
+| 4 | `9b843e2c` | MessageBus path saves log only | `processStreamingViaBus` calls `saveStreamingLog` not `saveStreamingChat` | Changed to `saveStreamingChat` with closure-captured conversationId |
+| 5 | `e85edb23` | "Agent already processing" on parallel chat | chatAgentCache keyed by `provider\|model` = singleton per provider | Added `conversationId` to cache key → per-conversation agent instances |
+| 6 | `f5ac...` | launch.json autoPort golden path | autoPort:true breaks Vite (PORT env ignored) | Restored autoPort:false |
+
+### Key Architecture Insights
+
+1. **Agent Cache**: `chatAgentCache` key was `chat|provider|model` → ALL conversations shared ONE agent. `isProcessing` lock rejected concurrent requests. Fix: `chat|provider|model|conv_ID` → 20 concurrent agents (LRU eviction).
+
+2. **MessageBus vs Legacy Streaming**: Two paths exist in `chat.ts`. MessageBus path (line 447) delegated persistence to middleware that broke on `resetContext`. Legacy path (line 500) called `saveStreamingChat` directly. Fix: both paths now use `saveStreamingChat`.
+
+3. **Dev Proxy Architecture**: `dev-proxy.mjs` → `127.0.0.1:8080`. Needs WS upgrade handler + error resilience. CORS must include `X-Runtime`, `X-Conversation-Id`.
+
+### Remaining Issues
+- Duplicate user messages in some conversations (dedup check `getMessages(id, {limit:1})` may not catch all cases)
+- Bridge CC spawn for openclaw-bridge project fails with code=143 (needs investigation)
+- openclaw-bridge has 35 pre-existing test failures (validateProjectDir ENOENT)
 
 ---
 

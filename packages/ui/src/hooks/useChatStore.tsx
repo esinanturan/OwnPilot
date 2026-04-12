@@ -126,12 +126,20 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     Array<{ type: string; content: string; importance?: number }>
   >([]);
   const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null);
-  const [sessionId, setSessionIdState] = useState<string | null>(null);
+  const [sessionId, setSessionIdState] = useState<string | null>(() => {
+    try { return localStorage.getItem(STORAGE_KEYS.CHAT_SESSION_ID); } catch { return null; }
+  });
   const sessionIdRef = useRef<string | null>(null);
-  // Wrapper: keep ref in sync with state so sendMessage always sees latest value
+  // Initialize ref from restored state
+  sessionIdRef.current = sessionId;
+  // Wrapper: keep ref + localStorage in sync with state
   const setSessionId = (id: string | null) => {
     sessionIdRef.current = id;
     setSessionIdState(id);
+    try {
+      if (id) localStorage.setItem(STORAGE_KEYS.CHAT_SESSION_ID, id);
+      else localStorage.removeItem(STORAGE_KEYS.CHAT_SESSION_ID);
+    } catch { /* */ }
   };
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [isThinking, setIsThinking] = useState(false);
@@ -140,6 +148,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // AbortController persists across navigation
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Stream generation counter — orphaned streams (from New Chat) keep reading
+  // so the backend can finish + persist, but their UI updates are suppressed.
+  const streamGenRef = useRef(0);
 
   // Cancel any ongoing request (also rejects pending approval if any)
   const cancelRequest = useCallback(() => {
@@ -222,6 +234,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       // Create new AbortController for this request
       const controller = new AbortController();
       abortControllerRef.current = controller;
+
+      // Capture stream generation — if clearMessages/loadConversation increments this,
+      // the stream is "orphaned": it keeps reading (so backend persists to DB) but
+      // all UI state updates are suppressed.
+      const gen = streamGenRef.current;
+      const isCurrentStream = () => streamGenRef.current === gen;
 
       // Auto-accept any remaining memories from previous response
       for (const mem of extractedMemoriesRef.current) {
@@ -380,6 +398,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
               const { done, value } = await reader.read();
               if (done) break;
               if (controller.signal.aborted) break;
+              // Orphaned stream — keep draining body so backend completes + persists to DB
+              if (!isCurrentStream()) continue;
 
               buffer += decoder.decode(value, { stream: true });
               const lines = buffer.split('\n');
@@ -456,6 +476,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           }
 
           if (controller.signal.aborted) return;
+          // Orphaned stream completed — backend persisted, skip UI updates
+          if (!isCurrentStream()) return;
 
           // Stream complete - add final message
           setLastFailedMessage(null);
@@ -509,7 +531,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           // Non-streaming fallback
           const data: ApiResponse<ChatResponse> = await response.json();
 
-          if (controller.signal.aborted) {
+          if (controller.signal.aborted || !isCurrentStream()) {
             return;
           }
 
@@ -548,10 +570,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (err) {
-        // Ignore abort errors
+        // Ignore abort errors and orphaned stream errors
         if (err instanceof Error && err.name === 'AbortError') {
           return;
         }
+        if (!isCurrentStream()) return;
 
         const errorText = err instanceof Error ? err.message : 'An error occurred';
         setError(errorText);
@@ -592,34 +615,53 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [lastFailedMessage, sendMessage]);
 
   const clearMessages = useCallback(() => {
-    cancelRequest();
+    // Orphan any running stream — it keeps reading in background so the backend
+    // can finish processing and persist the response to DB. UI updates are
+    // suppressed via the generation check in sendMessage.
+    streamGenRef.current++;
+    abortControllerRef.current = null;
+    // Reject pending approval so backend doesn't hang waiting for user response
+    if (pendingApproval) {
+      executionPermissionsApi.resolveApproval(pendingApproval.approvalId, false).catch(() => {});
+    }
     setMessages([]);
+    setIsLoading(false);
     setError(null);
     setLastFailedMessage(null);
     setStreamingContent('');
+    setThinkingContent('');
     setProgressEvents([]);
+    setIsThinking(false);
     setSuggestions([]);
     setExtractedMemories([]);
     setPendingApproval(null);
     setSessionId(null);
     setSessionInfo(null);
-  }, [cancelRequest]);
+  }, [pendingApproval]);
 
   const loadConversation = useCallback(
-    (id: string, messages: Message[]) => {
-      cancelRequest();
-      setMessages(messages);
+    (id: string, msgs: Message[]) => {
+      // Orphan any running stream (same pattern as clearMessages)
+      streamGenRef.current++;
+      abortControllerRef.current = null;
+      if (pendingApproval) {
+        executionPermissionsApi.resolveApproval(pendingApproval.approvalId, false).catch(() => {});
+      }
+      setMessages(msgs);
+      setIsLoading(false);
       setError(null);
       setLastFailedMessage(null);
       setStreamingContent('');
+      setThinkingContent('');
       setProgressEvents([]);
+      setIsThinking(false);
       setSuggestions([]);
       setExtractedMemories([]);
       setPendingApproval(null);
       setSessionId(id);
       setSessionInfo(null);
     },
-    [cancelRequest]
+    [pendingApproval]
   );
 
   const value: ChatStore = {

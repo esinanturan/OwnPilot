@@ -393,17 +393,25 @@ export function Sidebar({ isMobile, isOpen, onClose, onSearchOpen, onCustomizeTo
                       </div>
                     ) : (
                       <>
-                      {/* Optimistic entry: shows immediately when user sends a message */}
-                      {optimisticEntry && (
-                        <div>
-                          <div
-                            className="group relative flex items-center gap-1.5 px-2 py-1.5 mx-1 my-0.5 rounded-md cursor-pointer transition-colors bg-primary/10 text-primary"
-                          >
-                            <MessageSquare className="w-3 h-3 shrink-0 opacity-50" />
-                            <span className="truncate text-xs flex-1">{optimisticEntry.title}</span>
+                      {/* Optimistic entry: shows immediately when user sends a message.
+                          Clickable + highlight-aware — de-highlights after New Chat,
+                          clicking navigates back to this conversation. */}
+                      {optimisticEntry && (() => {
+                        const isActive = activeConversationId === optimisticEntry.id;
+                        return (
+                          <div>
+                            <div
+                              onClick={() => handleRecentClick(optimisticEntry.id)}
+                              className={`group relative flex items-center gap-1.5 px-2 py-1.5 mx-1 my-0.5 rounded-md cursor-pointer transition-colors ${
+                                isActive ? 'bg-primary/10 text-primary' : 'hover:bg-bg-tertiary dark:hover:bg-dark-bg-tertiary text-text-secondary dark:text-dark-text-secondary'
+                              }`}
+                            >
+                              <MessageSquare className="w-3 h-3 shrink-0 opacity-50" />
+                              <span className="truncate text-xs flex-1">{optimisticEntry.title}</span>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                       {recents.groups.map((group) => (
                         <div key={group.label}>
                           <p className="px-3 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted dark:text-dark-text-muted">{group.label}</p>

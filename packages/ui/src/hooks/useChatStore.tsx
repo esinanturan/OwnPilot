@@ -298,6 +298,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           .catch(() => {});
       }
 
+      // Pre-set sessionId BEFORE adding user message so sidebar sees both
+      // chatMessages and chatStoreSessionId in the same render batch.
+      // This ensures the optimistic sidebar entry appears the INSTANT the user hits Send.
+      if (!sessionIdRef.current) {
+        const newId = crypto.randomUUID();
+        setSessionId(newId);
+      }
+
       setError(null);
       setIsLoading(true);
       setStreamingContent('');

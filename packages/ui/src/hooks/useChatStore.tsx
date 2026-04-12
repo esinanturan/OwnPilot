@@ -158,9 +158,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     Array<{ type: string; content: string; importance?: number }>
   >([]);
   const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null);
-  const [sessionId, setSessionIdState] = useState<string | null>(() => {
-    try { return localStorage.getItem(STORAGE_KEYS.CHAT_SESSION_ID); } catch { return null; }
-  });
+  // Always start with a fresh session on page load.
+  // Old conversations are accessible via sidebar Recents.
+  // Restoring old sessionId caused new messages to silently append to old conversations.
+  const [sessionId, setSessionIdState] = useState<string | null>(() => crypto.randomUUID());
   const sessionIdRef = useRef<string | null>(null);
   // Initialize ref from restored state
   sessionIdRef.current = sessionId;

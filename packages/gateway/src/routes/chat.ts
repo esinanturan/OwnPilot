@@ -274,6 +274,13 @@ chatRoutes.post('/', async (c) => {
   // Load conversation if specified
   console.log(`[SESSION-FIX] body.conversationId=${body.conversationId ?? 'NONE'}, agent.conv=${agent.getConversation().id.slice(0,8)}`);
   if (body.conversationId) {
+    // FIX: Capture agent's initial systemPrompt BEFORE any loadConversation switching.
+    // The agent was initialized with a rich 8796-char prompt (OwnPilot identity + tools
+    // + capabilities). When loadConversation switches to a new conversation without a
+    // systemPrompt, that prompt is lost and the middleware falls back to a generic
+    // "You are a helpful AI assistant." — causing identity drift (MiniMax → "I'm Claude").
+    const agentInitialPrompt = agent.getConversation().systemPrompt;
+
     let loaded = agent.loadConversation(body.conversationId);
     console.log(`[SESSION-FIX] loadConversation(${body.conversationId.slice(0,8)}) = ${loaded}`);
 
@@ -284,10 +291,12 @@ chatRoutes.post('/', async (c) => {
       const chatRepo = new ChatRepository(getUserId(c));
       const dbData = await chatRepo.getConversationWithMessages(body.conversationId);
       if (dbData) {
-        // Create conversation in agent memory with the ORIGINAL DB ID
+        // Create conversation in agent memory with the ORIGINAL DB ID.
+        // FIX: fall back to agent's rich init prompt if DB stored NULL — otherwise
+        // ContextInjection middleware hits its generic "helpful AI assistant" fallback.
         agent.getMemory().createWithId(
           dbData.conversation.id,
-          dbData.conversation.systemPrompt ?? undefined,
+          dbData.conversation.systemPrompt || agentInitialPrompt,
           { restoredFromDb: true, restoredAt: new Date().toISOString() }
         );
         // Replay messages from DB into agent memory
@@ -309,9 +318,11 @@ chatRoutes.post('/', async (c) => {
         const source = body.conversationId.startsWith('sidebar-')
           ? 'sidebar-chat'
           : 'client-generated';
+        // FIX: use agent's rich init prompt instead of undefined so the new
+        // conversation inherits the configured OwnPilot identity + tool docs.
         agent.getMemory().createWithId(
           body.conversationId,
-          undefined,
+          agentInitialPrompt,
           { source, createdAt: new Date().toISOString() }
         );
         loaded = agent.loadConversation(body.conversationId);

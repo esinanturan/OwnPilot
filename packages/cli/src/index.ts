@@ -48,13 +48,6 @@ import {
   channelDisconnect,
 } from './commands/channel.js';
 import {
-  workspaceList,
-  workspaceCreate,
-  workspaceDelete,
-  workspaceSwitch,
-  workspaceInfo,
-} from './commands/workspace.js';
-import {
   tunnelStartNgrok,
   tunnelStartCloudflare,
   tunnelStop,
@@ -198,30 +191,6 @@ channelCmd
   .command('disconnect [id]')
   .description('Disconnect a channel from the gateway')
   .action((id) => channelDisconnect({ id }));
-
-// Workspace commands for isolated agent sessions
-const workspaceCmd = program
-  .command('workspace')
-  .description('Manage workspaces (isolated agent sessions)');
-
-workspaceCmd.command('list').description('List all workspaces').action(workspaceList);
-
-workspaceCmd.command('create').description('Create a new workspace').action(workspaceCreate);
-
-workspaceCmd
-  .command('delete [id]')
-  .description('Delete a workspace')
-  .action((id) => workspaceDelete({ id }));
-
-workspaceCmd
-  .command('switch [id]')
-  .description('Switch to a workspace')
-  .action((id) => workspaceSwitch({ id }));
-
-workspaceCmd
-  .command('info [id]')
-  .description('Show workspace details')
-  .action((id) => workspaceInfo({ id }));
 
 // Tunnel commands for external access (webhook mode)
 const tunnelCmd = program

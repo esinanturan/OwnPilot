@@ -152,79 +152,6 @@ export interface CodingAgentResultRecord {
 }
 
 // =============================================================================
-// CLI Provider types (custom provider registry)
-// =============================================================================
-
-export type CliAuthMethod = 'none' | 'config_center' | 'env_var';
-export type CliOutputFormat = 'text' | 'json' | 'stream-json';
-
-export interface CliProviderRecord {
-  id: string;
-  userId: string;
-  name: string;
-  displayName: string;
-  description?: string;
-  binary: string;
-  category: string;
-  icon?: string;
-  color?: string;
-  authMethod: CliAuthMethod;
-  configServiceName?: string;
-  apiKeyEnvVar?: string;
-  defaultArgs: string[];
-  promptTemplate?: string;
-  outputFormat: CliOutputFormat;
-  defaultTimeoutMs: number;
-  maxTimeoutMs: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateCliProviderInput {
-  name: string;
-  display_name: string;
-  description?: string;
-  binary: string;
-  category?: string;
-  icon?: string;
-  color?: string;
-  auth_method?: CliAuthMethod;
-  config_service_name?: string;
-  api_key_env_var?: string;
-  default_args?: string[];
-  prompt_template?: string;
-  output_format?: CliOutputFormat;
-  default_timeout_ms?: number;
-  max_timeout_ms?: number;
-}
-
-export interface UpdateCliProviderInput {
-  name?: string;
-  display_name?: string;
-  description?: string;
-  binary?: string;
-  category?: string;
-  icon?: string;
-  color?: string;
-  auth_method?: CliAuthMethod;
-  config_service_name?: string;
-  api_key_env_var?: string;
-  default_args?: string[];
-  prompt_template?: string;
-  output_format?: CliOutputFormat;
-  default_timeout_ms?: number;
-  max_timeout_ms?: number;
-  is_active?: boolean;
-}
-
-export interface CliProviderTestResult {
-  installed: boolean;
-  version?: string;
-  binary: string;
-}
-
-// =============================================================================
 // API
 // =============================================================================
 
@@ -392,29 +319,6 @@ export interface CodingAgentSubscription {
   createdAt: string;
   updatedAt: string;
 }
-
-// =============================================================================
-// CLI Providers API (custom provider registry)
-// =============================================================================
-
-export const cliProvidersApi = {
-  /** List all CLI providers */
-  list: () => apiClient.get<CliProviderRecord[]>('/cli-providers'),
-
-  /** Create a new CLI provider */
-  create: (input: CreateCliProviderInput) =>
-    apiClient.post<CliProviderRecord>('/cli-providers', input),
-
-  /** Update a CLI provider */
-  update: (id: string, input: UpdateCliProviderInput) =>
-    apiClient.put<CliProviderRecord>(`/cli-providers/${id}`, input),
-
-  /** Delete a CLI provider */
-  delete: (id: string) => apiClient.delete<{ deleted: boolean }>(`/cli-providers/${id}`),
-
-  /** Test if a CLI provider binary is installed */
-  test: (id: string) => apiClient.post<CliProviderTestResult>(`/cli-providers/${id}/test`),
-};
 
 // =============================================================================
 // Orchestration types

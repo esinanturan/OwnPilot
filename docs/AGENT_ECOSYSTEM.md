@@ -1247,8 +1247,7 @@ The `openai-compatible` type in OwnPilot appends `/chat/completions`, which is o
 ```
 packages/core/src/agent/
 ├── agent.ts                    # Agent class (production runtime)
-├── orchestrator.ts             # AgentOrchestrator + MultiAgentOrchestrator
-├── agent-builder/              # LLM-guided agent creation
+├── orchestrator.ts             # AgentOrchestrator + AgentBuilder (fluent) + MultiAgentOrchestrator
 ├── prompt-composer.ts          # Dynamic system prompt builder
 ├── memory-injector.ts          # Memory injection into prompts
 ├── providers/                  # Multi-provider support

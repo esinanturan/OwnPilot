@@ -94,12 +94,12 @@
       "releaseDate": "2025-08-21"
     },
     {
-      "id": "openai/gpt-oss-120b",
-      "name": "gpt-oss-120b",
+      "id": "openai/gpt-oss-20b",
+      "name": "gpt-oss-20b",
       "contextWindow": 131072,
       "maxOutput": 131072,
-      "inputPrice": 0.15,
-      "outputPrice": 0.6,
+      "inputPrice": 0.05,
+      "outputPrice": 0.2,
       "capabilities": [
         "chat",
         "function_calling",
@@ -110,12 +110,12 @@
       "releaseDate": "2025-08-05"
     },
     {
-      "id": "openai/gpt-oss-20b",
-      "name": "gpt-oss-20b",
+      "id": "openai/gpt-oss-120b",
+      "name": "gpt-oss-120b",
       "contextWindow": 131072,
       "maxOutput": 131072,
-      "inputPrice": 0.05,
-      "outputPrice": 0.2,
+      "inputPrice": 0.15,
+      "outputPrice": 0.6,
       "capabilities": [
         "chat",
         "function_calling",

@@ -12,6 +12,23 @@
   },
   "models": [
     {
+      "id": "zai-org/GLM-5.1",
+      "name": "GLM-5.1",
+      "contextWindow": 202752,
+      "maxOutput": 16384,
+      "inputPrice": 1.4,
+      "outputPrice": 4.4,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "json_mode",
+        "reasoning",
+        "streaming"
+      ],
+      "default": true,
+      "releaseDate": "2026-04-07"
+    },
+    {
       "id": "zai-org/GLM-5",
       "name": "GLM-5",
       "contextWindow": 202752,
@@ -24,7 +41,7 @@
         "reasoning",
         "streaming"
       ],
-      "default": true,
+      "default": false,
       "releaseDate": "2026-02-12"
     },
     {
@@ -206,12 +223,12 @@
       "releaseDate": "2025-09-05"
     },
     {
-      "id": "openai/gpt-oss-120b",
-      "name": "GPT OSS 120B",
+      "id": "openai/gpt-oss-20b",
+      "name": "GPT OSS 20B",
       "contextWindow": 131072,
       "maxOutput": 16384,
-      "inputPrice": 0.05,
-      "outputPrice": 0.24,
+      "inputPrice": 0.03,
+      "outputPrice": 0.14,
       "capabilities": [
         "chat",
         "function_calling",
@@ -222,12 +239,12 @@
       "releaseDate": "2025-08-05"
     },
     {
-      "id": "openai/gpt-oss-20b",
-      "name": "GPT OSS 20B",
+      "id": "openai/gpt-oss-120b",
+      "name": "GPT OSS 120B",
       "contextWindow": 131072,
       "maxOutput": 16384,
-      "inputPrice": 0.03,
-      "outputPrice": 0.14,
+      "inputPrice": 0.05,
+      "outputPrice": 0.24,
       "capabilities": [
         "chat",
         "function_calling",
@@ -409,6 +426,21 @@
       "releaseDate": "2024-07-23"
     },
     {
+      "id": "meta-llama/Llama-3.1-70B-Instruct",
+      "name": "Llama 3.1 70B",
+      "contextWindow": 131072,
+      "maxOutput": 16384,
+      "inputPrice": 0.4,
+      "outputPrice": 0.4,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2024-07-23"
+    },
+    {
       "id": "meta-llama/Llama-3.1-8B-Instruct-Turbo",
       "name": "Llama 3.1 8B Turbo",
       "contextWindow": 131072,
@@ -426,21 +458,6 @@
     {
       "id": "meta-llama/Llama-3.1-70B-Instruct-Turbo",
       "name": "Llama 3.1 70B Turbo",
-      "contextWindow": 131072,
-      "maxOutput": 16384,
-      "inputPrice": 0.4,
-      "outputPrice": 0.4,
-      "capabilities": [
-        "chat",
-        "function_calling",
-        "streaming"
-      ],
-      "default": false,
-      "releaseDate": "2024-07-23"
-    },
-    {
-      "id": "meta-llama/Llama-3.1-70B-Instruct",
-      "name": "Llama 3.1 70B",
       "contextWindow": 131072,
       "maxOutput": 16384,
       "inputPrice": 0.4,

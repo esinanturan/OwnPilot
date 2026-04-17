@@ -1,27 +1,25 @@
 {
-  "id": "xiaomi",
-  "name": "Xiaomi",
+  "id": "xiaomi-token-plan-ams",
+  "name": "Xiaomi Token Plan (Europe)",
   "type": "openai-compatible",
   "apiKeyEnv": "XIAOMI_API_KEY",
   "features": {
     "streaming": true,
     "toolUse": true,
-    "vision": false,
+    "vision": true,
     "jsonMode": false,
     "systemMessage": true
   },
   "models": [
     {
-      "id": "mimo-v2-omni",
-      "name": "MiMo-V2-Omni",
-      "contextWindow": 256000,
+      "id": "mimo-v2-pro",
+      "name": "MiMo-V2-Pro",
+      "contextWindow": 1000000,
       "maxOutput": 128000,
-      "inputPrice": 0.4,
-      "outputPrice": 2,
+      "inputPrice": 0,
+      "outputPrice": 0,
       "capabilities": [
         "chat",
-        "vision",
-        "audio",
         "function_calling",
         "reasoning",
         "streaming"
@@ -30,38 +28,38 @@
       "releaseDate": "2026-03-18"
     },
     {
-      "id": "mimo-v2-pro",
-      "name": "MiMo-V2-Pro",
-      "contextWindow": 1000000,
-      "maxOutput": 128000,
-      "inputPrice": 1,
-      "outputPrice": 3,
+      "id": "mimo-v2-tts",
+      "name": "MiMo-V2-TTS",
+      "contextWindow": 8000,
+      "maxOutput": 16000,
+      "inputPrice": 0,
+      "outputPrice": 0,
       "capabilities": [
         "chat",
-        "function_calling",
-        "reasoning",
         "streaming"
       ],
       "default": false,
       "releaseDate": "2026-03-18"
     },
     {
-      "id": "mimo-v2-flash",
-      "name": "MiMo-V2-Flash",
+      "id": "mimo-v2-omni",
+      "name": "MiMo-V2-Omni",
       "contextWindow": 256000,
-      "maxOutput": 64000,
-      "inputPrice": 0.1,
-      "outputPrice": 0.3,
+      "maxOutput": 128000,
+      "inputPrice": 0,
+      "outputPrice": 0,
       "capabilities": [
         "chat",
+        "vision",
+        "audio",
         "function_calling",
         "reasoning",
         "streaming"
       ],
       "default": false,
-      "releaseDate": "2025-12-16"
+      "releaseDate": "2026-03-18"
     }
   ],
-  "baseUrl": "https://api.xiaomimimo.com/v1",
+  "baseUrl": "https://token-plan-ams.xiaomimimo.com/v1",
   "docsUrl": "https://platform.xiaomimimo.com/#/docs"
 }

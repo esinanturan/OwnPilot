@@ -14,7 +14,7 @@
     {
       "id": "deepseek-chat",
       "name": "DeepSeek Chat",
-      "contextWindow": 128000,
+      "contextWindow": 131072,
       "maxOutput": 8192,
       "inputPrice": 0.28,
       "outputPrice": 0.42,

@@ -12,6 +12,22 @@
   },
   "models": [
     {
+      "id": "step-3.5-flash-2603",
+      "name": "Step 3.5 Flash 2603",
+      "contextWindow": 256000,
+      "maxOutput": 256000,
+      "inputPrice": 0.1,
+      "outputPrice": 0.3,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "reasoning",
+        "streaming"
+      ],
+      "default": true,
+      "releaseDate": "2026-04-02"
+    },
+    {
       "id": "step-3.5-flash",
       "name": "Step 3.5 Flash",
       "contextWindow": 256000,
@@ -24,7 +40,7 @@
         "reasoning",
         "streaming"
       ],
-      "default": true,
+      "default": false,
       "releaseDate": "2026-01-29"
     },
     {

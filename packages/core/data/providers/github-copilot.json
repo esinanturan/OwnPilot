@@ -12,8 +12,25 @@
   },
   "models": [
     {
+      "id": "claude-opus-4.7",
+      "name": "Claude Opus 4.7",
+      "contextWindow": 144000,
+      "maxOutput": 64000,
+      "inputPrice": 0,
+      "outputPrice": 0,
+      "capabilities": [
+        "chat",
+        "vision",
+        "function_calling",
+        "reasoning",
+        "streaming"
+      ],
+      "default": true,
+      "releaseDate": "2026-04-16"
+    },
+    {
       "id": "gpt-5.4-mini",
-      "name": "GPT-5.4 mini",
+      "name": "GPT-5.4 Mini",
       "contextWindow": 400000,
       "maxOutput": 128000,
       "inputPrice": 0,
@@ -26,7 +43,7 @@
         "reasoning",
         "streaming"
       ],
-      "default": true,
+      "default": false,
       "releaseDate": "2026-03-17"
     },
     {
@@ -135,10 +152,10 @@
       "releaseDate": "2025-12-17"
     },
     {
-      "id": "gpt-5.2-codex",
-      "name": "GPT-5.2-Codex",
-      "contextWindow": 400000,
-      "maxOutput": 128000,
+      "id": "gpt-5.2",
+      "name": "GPT-5.2",
+      "contextWindow": 264000,
+      "maxOutput": 64000,
       "inputPrice": 0,
       "outputPrice": 0,
       "capabilities": [
@@ -152,10 +169,10 @@
       "releaseDate": "2025-12-11"
     },
     {
-      "id": "gpt-5.2",
-      "name": "GPT-5.2",
-      "contextWindow": 264000,
-      "maxOutput": 64000,
+      "id": "gpt-5.2-codex",
+      "name": "GPT-5.2-Codex",
+      "contextWindow": 400000,
+      "maxOutput": 128000,
       "inputPrice": 0,
       "outputPrice": 0,
       "capabilities": [

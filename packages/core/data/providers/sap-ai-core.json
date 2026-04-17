@@ -97,24 +97,6 @@
       "releaseDate": "2025-09-29"
     },
     {
-      "id": "gpt-5",
-      "name": "gpt-5",
-      "contextWindow": 400000,
-      "maxOutput": 128000,
-      "inputPrice": 1.25,
-      "outputPrice": 10,
-      "capabilities": [
-        "chat",
-        "vision",
-        "function_calling",
-        "json_mode",
-        "reasoning",
-        "streaming"
-      ],
-      "default": false,
-      "releaseDate": "2025-08-07"
-    },
-    {
       "id": "gpt-5-mini",
       "name": "gpt-5-mini",
       "contextWindow": 400000,
@@ -139,6 +121,24 @@
       "maxOutput": 128000,
       "inputPrice": 0.05,
       "outputPrice": 0.4,
+      "capabilities": [
+        "chat",
+        "vision",
+        "function_calling",
+        "json_mode",
+        "reasoning",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2025-08-07"
+    },
+    {
+      "id": "gpt-5",
+      "name": "gpt-5",
+      "contextWindow": 400000,
+      "maxOutput": 128000,
+      "inputPrice": 1.25,
+      "outputPrice": 10,
       "capabilities": [
         "chat",
         "vision",
@@ -372,20 +372,6 @@
       "releaseDate": "2024-02-29"
     },
     {
-      "id": "sonar",
-      "name": "sonar",
-      "contextWindow": 128000,
-      "maxOutput": 4096,
-      "inputPrice": 1,
-      "outputPrice": 1,
-      "capabilities": [
-        "chat",
-        "streaming"
-      ],
-      "default": false,
-      "releaseDate": "2024-01-01"
-    },
-    {
       "id": "sonar-pro",
       "name": "sonar-pro",
       "contextWindow": 200000,
@@ -395,6 +381,20 @@
       "capabilities": [
         "chat",
         "vision",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2024-01-01"
+    },
+    {
+      "id": "sonar",
+      "name": "sonar",
+      "contextWindow": 128000,
+      "maxOutput": 4096,
+      "inputPrice": 1,
+      "outputPrice": 1,
+      "capabilities": [
+        "chat",
         "streaming"
       ],
       "default": false,

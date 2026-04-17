@@ -12,6 +12,40 @@
   },
   "models": [
     {
+      "id": "glm-5.1",
+      "name": "GLM-5.1",
+      "contextWindow": 204800,
+      "maxOutput": 131072,
+      "inputPrice": 1.31,
+      "outputPrice": 4.1,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "json_mode",
+        "reasoning",
+        "streaming"
+      ],
+      "default": true,
+      "releaseDate": "2026-04-14"
+    },
+    {
+      "id": "minimax-M2.7",
+      "name": "MiniMax-M2.7",
+      "contextWindow": 202752,
+      "maxOutput": 131072,
+      "inputPrice": 0.47,
+      "outputPrice": 1.4,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "json_mode",
+        "reasoning",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2026-03-18"
+    },
+    {
       "id": "claude-4-6-sonnet",
       "name": "Claude Sonnet 4.6",
       "contextWindow": 1000000,
@@ -25,7 +59,7 @@
         "reasoning",
         "streaming"
       ],
-      "default": true,
+      "default": false,
       "releaseDate": "2026-02-17"
     },
     {
@@ -45,6 +79,22 @@
       "releaseDate": "2026-02-12"
     },
     {
+      "id": "glm-5",
+      "name": "GLM 5",
+      "contextWindow": 202752,
+      "maxOutput": 202752,
+      "inputPrice": 1.08,
+      "outputPrice": 3.44,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "reasoning",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2026-02-11"
+    },
+    {
       "id": "claude-opus4-6",
       "name": "Claude Opus 4.6",
       "contextWindow": 1000000,
@@ -60,6 +110,22 @@
       ],
       "default": false,
       "releaseDate": "2026-02-05"
+    },
+    {
+      "id": "qwen3-coder-next",
+      "name": "Qwen3 Coder Next 80B",
+      "contextWindow": 256000,
+      "maxOutput": 65536,
+      "inputPrice": 0.158,
+      "outputPrice": 0.84,
+      "capabilities": [
+        "chat",
+        "function_calling",
+        "reasoning",
+        "streaming"
+      ],
+      "default": false,
+      "releaseDate": "2026-02-04"
     },
     {
       "id": "kimi-k2.5",

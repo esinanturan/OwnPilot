@@ -12,8 +12,8 @@
   },
   "models": [
     {
-      "id": "cerebras-llama-4-scout-17b-16e-instruct",
-      "name": "Cerebras-Llama-4-Scout-17B-16E-Instruct",
+      "id": "cerebras-llama-4-maverick-17b-128e-instruct",
+      "name": "Cerebras-Llama-4-Maverick-17B-128E-Instruct",
       "contextWindow": 128000,
       "maxOutput": 4096,
       "inputPrice": 0,
@@ -27,8 +27,8 @@
       "releaseDate": "2025-04-05"
     },
     {
-      "id": "cerebras-llama-4-maverick-17b-128e-instruct",
-      "name": "Cerebras-Llama-4-Maverick-17B-128E-Instruct",
+      "id": "cerebras-llama-4-scout-17b-16e-instruct",
+      "name": "Cerebras-Llama-4-Scout-17B-16E-Instruct",
       "contextWindow": 128000,
       "maxOutput": 4096,
       "inputPrice": 0,

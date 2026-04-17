@@ -4,9 +4,6 @@
  * Shared by ClawCycleResult, FleetWorkerResult, and SubagentSession.
  * Each subtype extends this with domain-specific fields while maintaining a
  * consistent shape for cross-agent observability and reporting.
- *
- * Note: Named AutonomousAgentResult (not AgentExecutionResult) to avoid
- * collision with the existing AgentExecutionResult in agent-executor/.
  */
 
 /** Base result type for all autonomous agent executions */

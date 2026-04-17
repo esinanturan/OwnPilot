@@ -18,13 +18,6 @@ export {
   channelConnect,
   channelDisconnect,
 } from './channel.js';
-export {
-  workspaceList,
-  workspaceCreate,
-  workspaceDelete,
-  workspaceSwitch,
-  workspaceInfo,
-} from './workspace.js';
 export { tunnelStartNgrok, tunnelStartCloudflare, tunnelStop, tunnelStatus } from './tunnel.js';
 export {
   soulList,

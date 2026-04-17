@@ -62,7 +62,7 @@ export type {
   ComposioStatus,
   ComposioActionInfo,
 } from './composio';
-export { codingAgentsApi, cliProvidersApi, orchestrationApi } from './coding-agents';
+export { codingAgentsApi, orchestrationApi } from './coding-agents';
 export type {
   CodingAgentStatus,
   CodingAgentTestResult,
@@ -70,12 +70,6 @@ export type {
   CodingAgentSessionState,
   CreateCodingSessionInput,
   CodingAgentResultRecord,
-  CliProviderRecord,
-  CliAuthMethod,
-  CliOutputFormat,
-  CreateCliProviderInput,
-  UpdateCliProviderInput,
-  CliProviderTestResult,
 } from './coding-agents';
 export { cliToolsApi } from './cli-tools';
 export { securityApi } from './security';

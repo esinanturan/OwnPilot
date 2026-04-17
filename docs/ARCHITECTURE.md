@@ -161,9 +161,6 @@ ownpilot/
 |   |-- core/                     # @ownpilot/core - Zero-dependency foundation
 |   |   |-- src/
 |   |   |   |-- agent/            # Agent system (orchestrator, provider, tools)
-|   |   |   |-- agent-builder/    # LLM-guided agent creation
-|   |   |   |-- agent-executor/   # Agent execution engine
-|   |   |   |-- agent-router/     # Multi-agent routing
 |   |   |   |-- assistant/        # High-level assistant API
 |   |   |   |-- audit/            # Audit logging and verification
 |   |   |   |-- costs/            # Cost tracking tools
@@ -320,13 +317,13 @@ The agent system orchestrates all AI interactions, from single-turn completions 
  +-----------------------------------------------------------------------+
  |                                                                       |
  |  AgentBuilder                       AgentOrchestrator                 |
- |  (LLM-guided creation)            (Multi-step execution)             |
+ |  (Fluent config API)              (Multi-step execution)              |
  |  +-----------------------+         +--------------------------+       |
- |  | BuilderSession        |         | AgentConfig              |       |
- |  | - phase: gathering/   |         | - name, systemPrompt     |       |
- |  |   refining/generating |         | - provider (LLMProvider) |       |
- |  | - Q&A flow            |  uses   | - model, tools           |       |
- |  | - GeneratedAgentConfig|-------->| - maxIterations          |       |
+ |  | Partial<AgentConfig>  |         | AgentConfig              |       |
+ |  | - name, systemPrompt  |         | - name, systemPrompt     |       |
+ |  | - tools, provider     |         | - provider (LLMProvider) |       |
+ |  | - chain .name()/      |  build  | - model, tools           |       |
+ |  |   .tool()/.build()    |-------->| - maxIterations          |       |
  |  +-----------------------+         | - temperature            |       |
  |                                    +-----------+--------------+       |
  |                                                |                      |
@@ -374,12 +371,6 @@ The agent system orchestrates all AI interactions, from single-turn completions 
 - Integrates personal memory and conversation context into agent prompts.
 - Retrieves user profile, preferences, and custom instructions from the personal memory store.
 - Options: `includeProfile`, `includeInstructions`, `includeTimeContext`, `includeToolDescriptions`, `maxPromptLength`.
-
-**`AgentBuilder`** (`packages/core/src/agent-builder/index.ts`)
-
-- LLM-guided agent creation through interactive question-and-answer sessions.
-- Manages a `BuilderSession` with phases: `gathering` -> `refining` -> `generating` -> `complete`.
-- Produces a `GeneratedAgentConfig` with name, emoji, category, system prompt, tools, triggers, and model parameters.
 
 **`MultiAgentOrchestrator`** (`packages/core/src/agent/orchestrator.ts`)
 
@@ -1496,18 +1487,7 @@ abstract class BaseRepository {
 }
 ```
 
-### 11.3 Builder Pattern
-
-The `AgentBuilder` uses a multi-phase builder pattern for interactive agent creation:
-
-```
-BuilderSession
-  phase: gathering --> refining --> generating --> complete
-  answers: BuilderAnswer[]
-  generatedConfig?: GeneratedAgentConfig
-```
-
-### 11.4 Factory Pattern
+### 11.3 Factory Pattern
 
 Channel adapters use factories for registration:
 
@@ -1518,7 +1498,7 @@ channelManager.registerFactory('telegram', (config) => new TelegramAdapter(confi
 const adapter = await channelManager.connect({ type: 'telegram', id: '...', ... });
 ```
 
-### 11.5 Adapter Pattern
+### 11.4 Adapter Pattern
 
 The `DatabaseAdapter` interface abstracts PostgreSQL specifics, making it possible to swap database engines:
 
@@ -1534,7 +1514,7 @@ interface DatabaseAdapter {
 }
 ```
 
-### 11.6 Result Pattern for Error Handling
+### 11.5 Result Pattern for Error Handling
 
 Functions that can fail return `Result<T, E>` instead of throwing:
 
@@ -1557,7 +1537,7 @@ if (result.ok) {
 }
 ```
 
-### 11.7 Plugin Isolation
+### 11.6 Plugin Isolation
 
 Plugins run in worker threads with capability-based security:
 
@@ -1578,7 +1558,7 @@ IsolationEnforcer              Sandboxed Context
 - audit logging                - timeout enforcement
 ```
 
-### 11.8 Service Layer Pattern
+### 11.7 Service Layer Pattern
 
 Services encapsulate business logic between route handlers and repositories:
 
@@ -1599,7 +1579,7 @@ class GoalService {
 
 See [Section 6.8](#68-service-layer) for the full service listing.
 
-### 11.9 Tool Provider Pattern
+### 11.8 Tool Provider Pattern
 
 Tool providers enable modular tool registration by domain:
 

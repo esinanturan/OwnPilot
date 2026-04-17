@@ -55,15 +55,6 @@ export * from './data-gateway/index.js';
 // User Workspace Isolation
 export * from './workspace/index.js';
 
-// Agent Router
-export * from './agent-router/index.js';
-
-// Agent Executor
-export * from './agent-executor/index.js';
-
-// Agent Builder
-export * from './agent-builder/index.js';
-
 // Security (critical pattern blocking, code risk analysis)
 export * from './security/index.js';
 export * from './security/code-analyzer.js';

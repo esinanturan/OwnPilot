@@ -57,9 +57,9 @@ const wsLoginThrottle = createLoginThrottle({
  * Reads API_KEYS from env (same keys used for HTTP auth).
  * Returns true if auth is disabled (no keys) or token is valid.
  */
-function validateWsToken(token: string | null): boolean {
+async function validateWsToken(token: string | null): Promise<boolean> {
   // Check UI session token first
-  if (token && validateUiSession(token)) return true;
+  if (token && (await validateUiSession(token))) return true;
 
   const apiKeys = process.env.API_KEYS?.split(',').filter(Boolean);
 
@@ -156,6 +156,7 @@ export class WSGateway {
   private config: Required<WSGatewayConfig>;
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private cleanupTimer: NodeJS.Timeout | null = null;
+  private authCleanupTimer: NodeJS.Timeout | null = null;
   private clientHandler = new ClientEventHandler();
   private httpServer: (HttpServer | HttpsServer | Http2Server | Http2SecureServer) | null = null;
   private upgradeHandler: ((...args: unknown[]) => void) | null = null;
@@ -410,7 +411,7 @@ export class WSGateway {
 
     // Handle HTTP upgrade requests (store handler for cleanup on stop)
     this.httpServer = server;
-    this.upgradeHandler = (...args: unknown[]) => {
+    this.upgradeHandler = async (...args: unknown[]) => {
       const request = args[0] as IncomingMessage;
       const socket = args[1] as import('stream').Duplex;
       const head = args[2] as Buffer;
@@ -428,7 +429,7 @@ export class WSGateway {
 
         // Authenticate before upgrading: token via query param or Authorization header
         const token = url.searchParams.get('token') ?? null;
-        if (!validateWsToken(token)) {
+        if (!(await validateWsToken(token))) {
           log.warn('WebSocket connection rejected: invalid or missing token');
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
@@ -453,8 +454,13 @@ export class WSGateway {
   private setupServer(): void {
     if (!this.wss) return;
 
-    this.wss.on('connection', (socket: WebSocket, request: IncomingMessage) => {
-      this.handleConnection(socket, request);
+    this.wss.on('connection', async (socket: WebSocket, request: IncomingMessage) => {
+      try {
+        await this.handleConnection(socket, request);
+      } catch (err) {
+        log.error('Connection handler error', { error: err });
+        socket.close(1011, 'Internal error');
+      }
     });
 
     this.wss.on('error', (error) => {
@@ -478,12 +484,18 @@ export class WSGateway {
       Math.min(this.config.sessionTimeout / 3, 60_000)
     );
     this.cleanupTimer.unref();
+
+    // Start auth-throttle cleanup timer (unref so timer doesn't block process exit)
+    this.authCleanupTimer = setInterval(() => {
+      wsLoginThrottle.cleanup();
+    }, 2 * 60_000);
+    this.authCleanupTimer.unref();
   }
 
   /**
    * Handle new WebSocket connection
    */
-  private handleConnection(socket: WebSocket, request: IncomingMessage): void {
+  private async handleConnection(socket: WebSocket, request: IncomingMessage): Promise<void> {
     // Enforce max connections
     if (sessionManager.count >= this.config.maxConnections) {
       log.warn('Connection rejected: max connections reached', {
@@ -513,7 +525,7 @@ export class WSGateway {
     // Authenticate (standalone mode — upgrade handler already checks for attachToServer mode)
     const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
     const token = url.searchParams.get('token') ?? null;
-    if (!validateWsToken(token)) {
+    if (!(await validateWsToken(token))) {
       log.warn('Connection rejected: invalid or missing token');
       socket.close(1008, 'Authentication required');
       return;
@@ -1174,6 +1186,11 @@ export class WSGateway {
       if (this.cleanupTimer) {
         clearInterval(this.cleanupTimer);
         this.cleanupTimer = null;
+      }
+
+      if (this.authCleanupTimer) {
+        clearInterval(this.authCleanupTimer);
+        this.authCleanupTimer = null;
       }
 
       // Stop legacy event forwarding

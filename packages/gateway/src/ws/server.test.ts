@@ -183,10 +183,10 @@ function createMockRequest(
  * After gateway.start() or gateway.attachToServer(), extract the 'connection'
  * handler registered on mockWss.
  */
-function getConnectionHandler(): (socket: WebSocket, request: unknown) => void {
+function getConnectionHandler(): (socket: WebSocket, request: unknown) => Promise<void> {
   const call = mockWss.on.mock.calls.find((c: unknown[]) => c[0] === 'connection');
   if (!call) throw new Error('connection handler not registered');
-  return call[1] as (socket: WebSocket, request: unknown) => void;
+  return call[1] as (socket: WebSocket, request: unknown) => Promise<void>;
 }
 
 /**
@@ -257,7 +257,7 @@ describe('WSGateway', () => {
       expect(gw.connectionCount).toBe(0);
     });
 
-    it('merges custom config with defaults', () => {
+    it('merges custom config with defaults', async () => {
       const gw = new WSGateway({ port: 9999, maxConnections: 5 });
       expect(gw).toBeDefined();
       // Custom maxConnections = 5, so when count >= 5, connections rejected
@@ -266,7 +266,7 @@ describe('WSGateway', () => {
 
       const handler = getConnectionHandler();
       const socket = createMockSocket();
-      handler(socket, createMockRequest('/'));
+      await handler(socket, createMockRequest('/'));
 
       expect(socket.close).toHaveBeenCalledWith(1013, 'Maximum connections reached');
     });
@@ -276,7 +276,7 @@ describe('WSGateway', () => {
   // validateWsToken (tested through handleConnection)
   // =========================================================================
   describe('validateWsToken (via handleConnection)', () => {
-    it('allows connection when no API_KEYS configured', () => {
+    it('allows connection when no API_KEYS configured', async () => {
       delete process.env.API_KEYS;
       const gw = new WSGateway();
       gw.start();
@@ -285,13 +285,13 @@ describe('WSGateway', () => {
       const socket = createMockSocket();
       const request = createMockRequest('/?token=anything');
 
-      handler(socket, request);
+      await handler(socket, request);
 
       expect(mockSessionManager.create).toHaveBeenCalledWith(socket);
       expect(socket.close).not.toHaveBeenCalled();
     });
 
-    it('rejects connection when API_KEYS set but no token', () => {
+    it('rejects connection when API_KEYS set but no token', async () => {
       process.env.API_KEYS = 'secret-key-1,secret-key-2';
       const gw = new WSGateway();
       gw.start();
@@ -300,13 +300,13 @@ describe('WSGateway', () => {
       const socket = createMockSocket();
       const request = createMockRequest('/');
 
-      handler(socket, request);
+      await handler(socket, request);
 
       expect(socket.close).toHaveBeenCalledWith(1008, 'Authentication required');
       expect(mockSessionManager.create).not.toHaveBeenCalled();
     });
 
-    it('accepts connection with valid token', () => {
+    it('accepts connection with valid token', async () => {
       process.env.API_KEYS = 'key-alpha,key-beta';
       const gw = new WSGateway();
       gw.start();
@@ -315,13 +315,13 @@ describe('WSGateway', () => {
       const socket = createMockSocket();
       const request = createMockRequest('/?token=key-beta');
 
-      handler(socket, request);
+      await handler(socket, request);
 
       expect(mockSessionManager.create).toHaveBeenCalledWith(socket);
       expect(socket.close).not.toHaveBeenCalled();
     });
 
-    it('rejects connection with invalid token', () => {
+    it('rejects connection with invalid token', async () => {
       process.env.API_KEYS = 'key-alpha,key-beta';
       const gw = new WSGateway();
       gw.start();
@@ -330,7 +330,7 @@ describe('WSGateway', () => {
       const socket = createMockSocket();
       const request = createMockRequest('/?token=wrong-key');
 
-      handler(socket, request);
+      await handler(socket, request);
 
       expect(socket.close).toHaveBeenCalledWith(1008, 'Authentication required');
       expect(mockSessionManager.create).not.toHaveBeenCalled();
@@ -341,7 +341,7 @@ describe('WSGateway', () => {
   // isOriginAllowed (tested through handleConnection)
   // =========================================================================
   describe('isOriginAllowed (via handleConnection)', () => {
-    it('allows any origin when no restrictions configured', () => {
+    it('allows any origin when no restrictions configured', async () => {
       const gw = new WSGateway({ allowedOrigins: [] });
       gw.start();
 
@@ -351,13 +351,13 @@ describe('WSGateway', () => {
         origin: 'http://evil.example.com',
       });
 
-      handler(socket, request);
+      await handler(socket, request);
 
       expect(mockSessionManager.create).toHaveBeenCalled();
       expect(socket.close).not.toHaveBeenCalled();
     });
 
-    it('rejects connection when origin not in allowedOrigins', () => {
+    it('rejects connection when origin not in allowedOrigins', async () => {
       const gw = new WSGateway({
         allowedOrigins: ['http://localhost:5173'],
       });
@@ -369,13 +369,13 @@ describe('WSGateway', () => {
         origin: 'http://evil.example.com',
       });
 
-      handler(socket, request);
+      await handler(socket, request);
 
       expect(socket.close).toHaveBeenCalledWith(1008, 'Origin not allowed');
       expect(mockSessionManager.create).not.toHaveBeenCalled();
     });
 
-    it('accepts connection when origin matches allowedOrigins', () => {
+    it('accepts connection when origin matches allowedOrigins', async () => {
       const gw = new WSGateway({
         allowedOrigins: ['http://localhost:5173', 'http://localhost:3000'],
       });
@@ -387,13 +387,13 @@ describe('WSGateway', () => {
         origin: 'http://localhost:3000',
       });
 
-      handler(socket, request);
+      await handler(socket, request);
 
       expect(mockSessionManager.create).toHaveBeenCalled();
       expect(socket.close).not.toHaveBeenCalled();
     });
 
-    it('rejects when restrictions configured but no origin header', () => {
+    it('rejects when restrictions configured but no origin header', async () => {
       const gw = new WSGateway({
         allowedOrigins: ['http://localhost:5173'],
       });
@@ -404,7 +404,7 @@ describe('WSGateway', () => {
       // No origin header
       const request = createMockRequest('/');
 
-      handler(socket, request);
+      await handler(socket, request);
 
       expect(socket.close).toHaveBeenCalledWith(1008, 'Origin not allowed');
     });
@@ -414,7 +414,7 @@ describe('WSGateway', () => {
   // handleConnection
   // =========================================================================
   describe('handleConnection', () => {
-    it('rejects when max connections reached (closes with 1013)', () => {
+    it('rejects when max connections reached (closes with 1013)', async () => {
       mockSessionManager.count = 100;
       const gw = new WSGateway({ maxConnections: 100 });
       gw.start();
@@ -423,13 +423,13 @@ describe('WSGateway', () => {
       const socket = createMockSocket();
       const request = createMockRequest('/');
 
-      handler(socket, request);
+      await handler(socket, request);
 
       expect(socket.close).toHaveBeenCalledWith(1013, 'Maximum connections reached');
       expect(mockSessionManager.create).not.toHaveBeenCalled();
     });
 
-    it('creates session and sends connection:ready on success', () => {
+    it('creates session and sends connection:ready on success', async () => {
       const gw = new WSGateway();
       gw.start();
 
@@ -437,7 +437,7 @@ describe('WSGateway', () => {
       const socket = createMockSocket();
       const request = createMockRequest('/');
 
-      handler(socket, request);
+      await handler(socket, request);
 
       expect(mockSessionManager.create).toHaveBeenCalledWith(socket);
       expect(mockSessionManager.send).toHaveBeenCalledWith('session-1', 'connection:ready', {
@@ -445,7 +445,7 @@ describe('WSGateway', () => {
       });
     });
 
-    it('sets up message, close, error, pong handlers on socket', () => {
+    it('sets up message, close, error, pong handlers on socket', async () => {
       const gw = new WSGateway();
       gw.start();
 
@@ -453,7 +453,7 @@ describe('WSGateway', () => {
       const socket = createMockSocket();
       const request = createMockRequest('/');
 
-      handler(socket, request);
+      await handler(socket, request);
 
       const onCalls = (socket.on as ReturnType<typeof vi.fn>).mock.calls;
       const events = onCalls.map((c: unknown[]) => c[0]);
@@ -464,14 +464,14 @@ describe('WSGateway', () => {
       expect(events).toContain('pong');
     });
 
-    it('close handler removes session by socket', () => {
+    it('close handler removes session by socket', async () => {
       const gw = new WSGateway();
       gw.start();
 
       const handler = getConnectionHandler();
       const socket = createMockSocket();
       const request = createMockRequest('/');
-      handler(socket, request);
+      await handler(socket, request);
 
       const closeHandler = getSocketHandler(socket, 'close');
       closeHandler(1000, Buffer.from('normal'));
@@ -479,14 +479,14 @@ describe('WSGateway', () => {
       expect(mockSessionManager.removeBySocket).toHaveBeenCalledWith(socket);
     });
 
-    it('pong handler touches session', () => {
+    it('pong handler touches session', async () => {
       const gw = new WSGateway();
       gw.start();
 
       const handler = getConnectionHandler();
       const socket = createMockSocket();
       const request = createMockRequest('/');
-      handler(socket, request);
+      await handler(socket, request);
 
       const pongHandler = getSocketHandler(socket, 'pong');
       pongHandler();
@@ -499,21 +499,21 @@ describe('WSGateway', () => {
   // handleMessage
   // =========================================================================
   describe('handleMessage (via socket message handler)', () => {
-    function setupAndGetMessageHandler(): (data: RawData) => void {
+    async function setupAndGetMessageHandler(): Promise<(data: RawData) => void> {
       const gw = new WSGateway();
       gw.start();
 
       const connectionHandler = getConnectionHandler();
       const socket = createMockSocket();
       const request = createMockRequest('/');
-      connectionHandler(socket, request);
+      await connectionHandler(socket, request);
 
       return getSocketHandler(socket, 'message') as (data: RawData) => void;
     }
 
-    it('rate limits when tokens exhausted (sends RATE_LIMITED error)', () => {
+    it('rate limits when tokens exhausted (sends RATE_LIMITED error)', async () => {
       mockSessionManager.consumeRateLimit.mockReturnValue(false);
-      const messageHandler = setupAndGetMessageHandler();
+      const messageHandler = await setupAndGetMessageHandler();
 
       messageHandler(
         Buffer.from(JSON.stringify({ type: 'chat:send', payload: { content: 'hi' } }))
@@ -525,8 +525,8 @@ describe('WSGateway', () => {
       });
     });
 
-    it('sends PARSE_ERROR on invalid JSON', () => {
-      const messageHandler = setupAndGetMessageHandler();
+    it('sends PARSE_ERROR on invalid JSON', async () => {
+      const messageHandler = await setupAndGetMessageHandler();
 
       messageHandler(Buffer.from('not valid json!!!'));
 
@@ -536,8 +536,8 @@ describe('WSGateway', () => {
       });
     });
 
-    it('sends INVALID_MESSAGE when type is missing', () => {
-      const messageHandler = setupAndGetMessageHandler();
+    it('sends INVALID_MESSAGE when type is missing', async () => {
+      const messageHandler = await setupAndGetMessageHandler();
 
       messageHandler(Buffer.from(JSON.stringify({ payload: { content: 'hi' } })));
 
@@ -547,8 +547,8 @@ describe('WSGateway', () => {
       });
     });
 
-    it('sends INVALID_MESSAGE when type is not a string', () => {
-      const messageHandler = setupAndGetMessageHandler();
+    it('sends INVALID_MESSAGE when type is not a string', async () => {
+      const messageHandler = await setupAndGetMessageHandler();
 
       messageHandler(Buffer.from(JSON.stringify({ type: 123, payload: {} })));
 
@@ -558,8 +558,8 @@ describe('WSGateway', () => {
       });
     });
 
-    it('sends UNKNOWN_EVENT for invalid event types', () => {
-      const messageHandler = setupAndGetMessageHandler();
+    it('sends UNKNOWN_EVENT for invalid event types', async () => {
+      const messageHandler = await setupAndGetMessageHandler();
 
       messageHandler(
         Buffer.from(
@@ -576,8 +576,8 @@ describe('WSGateway', () => {
       });
     });
 
-    it('processes valid events through clientHandler', () => {
-      const messageHandler = setupAndGetMessageHandler();
+    it('processes valid events through clientHandler', async () => {
+      const messageHandler = await setupAndGetMessageHandler();
 
       const payload = { content: 'hello' };
       messageHandler(Buffer.from(JSON.stringify({ type: 'chat:send', payload })));
@@ -586,8 +586,8 @@ describe('WSGateway', () => {
       expect(mockClientHandler.process).toHaveBeenCalledWith('chat:send', payload, 'session-1');
     });
 
-    it('touches session on valid message', () => {
-      const messageHandler = setupAndGetMessageHandler();
+    it('touches session on valid message', async () => {
+      const messageHandler = await setupAndGetMessageHandler();
 
       // Clear any prior calls from connection setup
       mockSessionManager.touch.mockClear();
@@ -599,9 +599,9 @@ describe('WSGateway', () => {
       expect(mockSessionManager.touch).toHaveBeenCalledWith('session-1');
     });
 
-    it('does not process when clientHandler has no handler', () => {
+    it('does not process when clientHandler has no handler', async () => {
       mockClientHandler.has.mockReturnValue(false);
-      const messageHandler = setupAndGetMessageHandler();
+      const messageHandler = await setupAndGetMessageHandler();
 
       messageHandler(
         Buffer.from(JSON.stringify({ type: 'chat:send', payload: { content: 'hi' } }))
@@ -838,14 +838,14 @@ describe('WSGateway', () => {
   // VALID_CLIENT_EVENTS coverage
   // =========================================================================
   describe('VALID_CLIENT_EVENTS (via handleMessage)', () => {
-    function setupAndGetMessageHandler(): (data: RawData) => void {
+    async function setupAndGetMessageHandler(): Promise<(data: RawData) => void> {
       const gw = new WSGateway();
       gw.start();
 
       const connectionHandler = getConnectionHandler();
       const socket = createMockSocket();
       const request = createMockRequest('/');
-      connectionHandler(socket, request);
+      await connectionHandler(socket, request);
 
       return getSocketHandler(socket, 'message') as (data: RawData) => void;
     }
@@ -871,8 +871,8 @@ describe('WSGateway', () => {
       'session:pong',
     ];
 
-    it.each(validEvents)('accepts %s as a valid event type', (eventType) => {
-      const messageHandler = setupAndGetMessageHandler();
+    it.each(validEvents)('accepts %s as a valid event type', async (eventType) => {
+      const messageHandler = await setupAndGetMessageHandler();
 
       // Clear prior send calls from connection:ready
       mockSessionManager.send.mockClear();
@@ -1188,7 +1188,7 @@ describe('WSGateway', () => {
   describe('attachToServer upgrade handler', () => {
     function setupGatewayWithUpgrade(): {
       gw: InstanceType<typeof WSGateway>;
-      upgradeHandler: (...args: unknown[]) => void;
+      upgradeHandler: (...args: unknown[]) => Promise<void>;
       mockHttpServer: { on: ReturnType<typeof vi.fn>; removeListener: ReturnType<typeof vi.fn> };
     } {
       const gw = new WSGateway({ path: '/ws' });
@@ -1196,12 +1196,12 @@ describe('WSGateway', () => {
       gw.attachToServer(mockHttpServer as unknown as import('node:http').Server);
 
       const upgradeCall = mockHttpServer.on.mock.calls.find((c: unknown[]) => c[0] === 'upgrade');
-      const upgradeHandler = upgradeCall![1] as (...args: unknown[]) => void;
+      const upgradeHandler = upgradeCall![1] as (...args: unknown[]) => Promise<void>;
 
       return { gw, upgradeHandler, mockHttpServer };
     }
 
-    it('handles upgrade for matching path', () => {
+    it('handles upgrade for matching path', async () => {
       const { upgradeHandler } = setupGatewayWithUpgrade();
       const mockSocket = { write: vi.fn(), destroy: vi.fn() };
       const request = {
@@ -1217,13 +1217,13 @@ describe('WSGateway', () => {
         }
       );
 
-      upgradeHandler(request, mockSocket, head);
+      await upgradeHandler(request, mockSocket, head);
 
       expect(mockWss.handleUpgrade).toHaveBeenCalled();
       expect(mockWss.emit).toHaveBeenCalledWith('connection', expect.anything(), request);
     });
 
-    it('destroys socket for non-matching path', () => {
+    it('destroys socket for non-matching path', async () => {
       const { upgradeHandler } = setupGatewayWithUpgrade();
       const mockSocket = { write: vi.fn(), destroy: vi.fn() };
       const request = {
@@ -1233,13 +1233,13 @@ describe('WSGateway', () => {
       };
       const head = Buffer.from('');
 
-      upgradeHandler(request, mockSocket, head);
+      await upgradeHandler(request, mockSocket, head);
 
       expect(mockSocket.destroy).toHaveBeenCalled();
       expect(mockWss.handleUpgrade).not.toHaveBeenCalled();
     });
 
-    it('rejects upgrade when token is invalid and API_KEYS are set', () => {
+    it('rejects upgrade when token is invalid and API_KEYS are set', async () => {
       process.env.API_KEYS = 'valid-key';
       const { upgradeHandler } = setupGatewayWithUpgrade();
       const mockSocket = { write: vi.fn(), destroy: vi.fn() };
@@ -1250,14 +1250,14 @@ describe('WSGateway', () => {
       };
       const head = Buffer.from('');
 
-      upgradeHandler(request, mockSocket, head);
+      await upgradeHandler(request, mockSocket, head);
 
       expect(mockSocket.write).toHaveBeenCalledWith('HTTP/1.1 401 Unauthorized\r\n\r\n');
       expect(mockSocket.destroy).toHaveBeenCalled();
       expect(mockWss.handleUpgrade).not.toHaveBeenCalled();
     });
 
-    it('allows upgrade when valid token is provided', () => {
+    it('allows upgrade when valid token is provided', async () => {
       process.env.API_KEYS = 'valid-key';
       const { upgradeHandler } = setupGatewayWithUpgrade();
       const mockSocket = { write: vi.fn(), destroy: vi.fn() };
@@ -1274,7 +1274,7 @@ describe('WSGateway', () => {
         }
       );
 
-      upgradeHandler(request, mockSocket, head);
+      await upgradeHandler(request, mockSocket, head);
 
       expect(mockWss.handleUpgrade).toHaveBeenCalled();
       expect(mockSocket.write).not.toHaveBeenCalled();
@@ -1294,7 +1294,7 @@ describe('WSGateway', () => {
       const connectionHandler = getConnectionHandler();
       const socket = createMockSocket();
       const request = createMockRequest('/');
-      connectionHandler(socket, request);
+      await connectionHandler(socket, request);
 
       const messageHandler = getSocketHandler(socket, 'message') as (data: RawData) => void;
       mockSessionManager.send.mockClear();
@@ -1331,14 +1331,14 @@ describe('WSGateway', () => {
   // socket error handler
   // =========================================================================
   describe('socket error handler', () => {
-    it('handles socket error without crashing', () => {
+    it('handles socket error without crashing', async () => {
       const gw = new WSGateway();
       gw.start();
 
       const handler = getConnectionHandler();
       const socket = createMockSocket();
       const request = createMockRequest('/');
-      handler(socket, request);
+      await handler(socket, request);
 
       const errorHandler = getSocketHandler(socket, 'error');
 

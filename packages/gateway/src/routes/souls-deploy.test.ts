@@ -148,6 +148,26 @@ describe('POST /souls/deploy', () => {
     expect(mockAdapter.transaction).toHaveBeenCalledTimes(2);
   });
 
+  it('uses 6-char hex suffix on name collision retry', async () => {
+    mockAdapter.transaction
+      .mockRejectedValueOnce(
+        new Error('duplicate key value violates unique constraint "agents_name_unique"')
+      )
+      .mockImplementationOnce(async (fn: () => Promise<unknown>) => fn());
+
+    const app = createApp();
+    const res = await app.request('/souls/deploy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identity: { name: 'DupeBot' } }),
+    });
+
+    expect(res.status).toBe(201);
+    const call = mockAgentsRepo.create.mock.calls[0] as [{ name: string }];
+    const name = call[0].name;
+    expect(name).toMatch(/^DupeBot \([0-9a-f]{6}\)$/);
+  });
+
   it('returns 500 when transaction fails with non-name error', async () => {
     mockAdapter.transaction.mockRejectedValue(new Error('connection refused'));
 

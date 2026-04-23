@@ -377,7 +377,7 @@ export function executeConditionNode(
     }
     evalContext.data = lastOutput; // convenience alias for the most recent upstream output
 
-    const vmTimeout = (node.data as ConditionNodeData).timeoutMs || 5000;
+    const vmTimeout = (node.data as ConditionNodeData).timeoutMs ?? 5000;
     const result = safeVmEval(resolvedExpr, evalContext, vmTimeout);
     const branch = Boolean(result);
     const durationMs = Date.now() - startTime;
@@ -505,7 +505,7 @@ export function executeTransformerNode(
     }
     evalContext.data = lastOutput; // convenience alias for the most recent upstream output
 
-    const vmTimeout = (node.data as TransformerNodeData).timeoutMs || 5000;
+    const vmTimeout = (node.data as TransformerNodeData).timeoutMs ?? 5000;
     const result = safeVmEval(resolvedExpr, evalContext, vmTimeout);
     const durationMs = Date.now() - startTime;
 
@@ -612,7 +612,7 @@ export async function executeHttpRequestNode(
     const fetchOptions: RequestInit = {
       method: data.method,
       headers,
-      signal: AbortSignal.timeout(data.timeoutMs || 30_000),
+      signal: AbortSignal.timeout(data.timeoutMs ?? 30_000),
     };
 
     if (['POST', 'PUT', 'PATCH'].includes(data.method) && data.body) {
@@ -1134,7 +1134,7 @@ export function executeFilterNode(
       };
     }
 
-    const vmTimeout = data.timeoutMs || 5000;
+    const vmTimeout = data.timeoutMs ?? 5000;
     if (arr.length > MAX_ARRAY_EVAL_SIZE) {
       return {
         nodeId: node.id,
@@ -1201,7 +1201,7 @@ export function executeMapNode(
       };
     }
 
-    const vmTimeout = data.timeoutMs || 5000;
+    const vmTimeout = data.timeoutMs ?? 5000;
     if (arr.length > MAX_ARRAY_EVAL_SIZE) {
       return {
         nodeId: node.id,
@@ -1428,7 +1428,7 @@ export function executeSwitchNode(
     }
     evalContext.data = lastOutput; // convenience alias for the most recent upstream output
 
-    const vmTimeout = data.timeoutMs || 5000;
+    const vmTimeout = data.timeoutMs ?? 5000;
     const result = safeVmEval(resolvedExpr, evalContext, vmTimeout);
     const resultStr = String(result);
 

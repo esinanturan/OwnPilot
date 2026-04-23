@@ -216,6 +216,7 @@ describe('AgentMessagesRepository', () => {
       const result = await repo.findConversation('agent-A', 'agent-B', 10);
       expect(result).toHaveLength(1);
       const [sql, params] = mockAdapter.query.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('UNION ALL');
       expect(sql).toContain('from_agent_id = $1 AND to_agent_id = $2');
       expect(sql).toContain('from_agent_id = $2 AND to_agent_id = $1');
       expect(params[2]).toBe(10);

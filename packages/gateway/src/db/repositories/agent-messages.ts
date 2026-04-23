@@ -134,9 +134,9 @@ export class AgentMessagesRepository extends BaseRepository {
 
   async findConversation(a1: string, a2: string, limit: number): Promise<AgentMessage[]> {
     const rows = await this.query<MessageRow>(
-      `SELECT * FROM agent_messages
-       WHERE (from_agent_id = $1 AND to_agent_id = $2)
-          OR (from_agent_id = $2 AND to_agent_id = $1)
+      `(SELECT * FROM agent_messages WHERE from_agent_id = $1 AND to_agent_id = $2)
+       UNION ALL
+       (SELECT * FROM agent_messages WHERE from_agent_id = $2 AND to_agent_id = $1)
        ORDER BY created_at DESC
        LIMIT $3`,
       [a1, a2, limit]

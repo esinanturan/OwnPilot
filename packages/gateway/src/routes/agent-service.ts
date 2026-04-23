@@ -600,7 +600,7 @@ async function createChatAgentInstance(
     const { createTempWorkspace } = await import('../mcp/workspace.js');
     correlationId = crypto.randomUUID();
     const { createMcpSession } = await import('../services/ui-session.js');
-    const mcpSession = createMcpSession();
+    const mcpSession = await createMcpSession();
     const workspace = await createTempWorkspace({
       correlationId,
       sessionToken: mcpSession.token,

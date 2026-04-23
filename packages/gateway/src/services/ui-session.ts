@@ -1,29 +1,37 @@
 /**
  * UI Session Service
  *
- * Password hashing + in-memory session store for web UI protection.
- * Uses settingsRepo for persistent password hash storage.
+ * Password hashing + persistent session store for web UI protection.
+ * Sessions are backed by PostgreSQL with an in-process TTLCache read cache.
  */
 
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { settingsRepo } from '../db/repositories/settings.js';
+import { uiSessionsRepo } from '../db/repositories/ui-sessions.js';
+import { TTLCache } from '../utils/ttl-cache.js';
 import { getLog } from './log.js';
 
 const log = getLog('UISession');
 
 const SETTINGS_KEY = 'ui_password_hash';
+const HASH_CREATED_AT_KEY = 'ui_password_hash_created_at';
 const DEFAULT_SESSION_TTL_HOURS = 7 * 24; // 7 days
-const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const MCP_SESSION_TTL_DAYS = 30;
+const CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const SCRYPT_KEY_LENGTH = 64;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-interface SessionInfo {
-  token: string;
-  createdAt: Date;
+interface CachedSession {
+  tokenHash: string;
   expiresAt: Date;
 }
 
-// In-memory session store
-const sessions = new Map<string, SessionInfo>();
+// In-process read cache ( Postgres is source of truth)
+const sessionCache = new TTLCache<string, CachedSession>({
+  defaultTtlMs: CACHE_TTL_MS,
+  maxEntries: 2000,
+});
+
 let cleanupTimer: NodeJS.Timeout | null = null;
 
 // ── Password Hashing ──────────────────────────────────────────────────────
@@ -59,16 +67,22 @@ function getSessionTtlMs(): number {
   return (Number.isNaN(hours) || hours <= 0 ? DEFAULT_SESSION_TTL_HOURS : hours) * 60 * 60 * 1000;
 }
 
+function hashToken(token: string): string {
+  return scryptSync(token, 'ui-session-salt', 32).toString('hex');
+}
+
 /**
  * Create a new session. Returns token and expiration.
  */
-export function createSession(): { token: string; expiresAt: Date } {
+export async function createSession(): Promise<{ token: string; expiresAt: Date }> {
   const token = randomBytes(32).toString('hex');
+  const tokenHash = hashToken(token);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + getSessionTtlMs());
 
-  sessions.set(token, { token, createdAt: now, expiresAt });
-  log.info('Session created', { sessionCount: sessions.size });
+  await uiSessionsRepo.createSession(tokenHash, 'ui', 'default', expiresAt);
+  sessionCache.set(tokenHash, { tokenHash, expiresAt }, getSessionTtlMs());
+  log.info('Session created');
 
   return { token, expiresAt };
 }
@@ -77,46 +91,71 @@ export function createSession(): { token: string; expiresAt: Date } {
  * Create a session token for MCP clients (e.g. CLI tools connecting via Streamable HTTP).
  * Uses the same session store but with a 30-day TTL by default.
  */
-export function createMcpSession(): { token: string; expiresAt: Date } {
+export async function createMcpSession(): Promise<{ token: string; expiresAt: Date }> {
   const token = randomBytes(32).toString('hex');
+  const tokenHash = hashToken(token);
   const now = new Date();
-  const ttlMs = 30 * 24 * 60 * 60 * 1000; // 30 days
+  const ttlMs = MCP_SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
   const expiresAt = new Date(now.getTime() + ttlMs);
 
-  sessions.set(token, { token, createdAt: now, expiresAt });
-  log.info('MCP session created', { sessionCount: sessions.size });
+  await uiSessionsRepo.createSession(tokenHash, 'mcp', 'default', expiresAt);
+  sessionCache.set(tokenHash, { tokenHash, expiresAt }, ttlMs);
+  log.info('MCP session created');
 
   return { token, expiresAt };
 }
 
 /**
- * Validate a session token. Returns true if token exists and is not expired.
+ * Validate a session token. Returns true if token exists, is not expired,
+ * and was created after the last password change.
  */
-export function validateSession(token: string): boolean {
-  const session = sessions.get(token);
-  if (!session) return false;
+export async function validateSession(token: string): Promise<boolean> {
+  const tokenHash = hashToken(token);
 
-  if (session.expiresAt.getTime() < Date.now()) {
-    sessions.delete(token);
+  // 1. Check read cache
+  const cached = sessionCache.get(tokenHash);
+  if (cached) {
+    if (cached.expiresAt.getTime() > Date.now()) {
+      return true;
+    }
+    sessionCache.invalidate(tokenHash);
     return false;
   }
 
+  // 2. Fall back to DB
+  const record = await uiSessionsRepo.getByTokenHash(tokenHash);
+  if (!record) return false;
+
+  if (record.expiresAt.getTime() < Date.now()) {
+    return false;
+  }
+
+  // 3. Reject sessions created before the last password change
+  const hashCreatedAt = getPasswordHashCreatedAt();
+  if (hashCreatedAt && record.createdAt.getTime() < hashCreatedAt) {
+    return false;
+  }
+
+  // 4. Populate cache
+  sessionCache.set(tokenHash, { tokenHash, expiresAt: record.expiresAt });
   return true;
 }
 
 /**
  * Invalidate (remove) a single session.
  */
-export function invalidateSession(token: string): void {
-  sessions.delete(token);
+export async function invalidateSession(token: string): Promise<void> {
+  const tokenHash = hashToken(token);
+  sessionCache.invalidate(tokenHash);
+  await uiSessionsRepo.deleteByTokenHash(tokenHash);
 }
 
 /**
  * Invalidate all sessions (e.g. on password change/remove).
  */
-export function invalidateAllSessions(): void {
-  const count = sessions.size;
-  sessions.clear();
+export async function invalidateAllSessions(): Promise<void> {
+  sessionCache.clear();
+  const count = await uiSessionsRepo.deleteAll();
   if (count > 0) {
     log.info('All sessions invalidated', { count });
   }
@@ -125,13 +164,8 @@ export function invalidateAllSessions(): void {
 /**
  * Get the number of active (non-expired) sessions.
  */
-export function getActiveSessionCount(): number {
-  const now = Date.now();
-  let count = 0;
-  for (const session of sessions.values()) {
-    if (session.expiresAt.getTime() > now) count++;
-  }
-  return count;
+export async function getActiveSessionCount(): Promise<number> {
+  return uiSessionsRepo.countActive();
 }
 
 // ── Password Persistence ──────────────────────────────────────────────────
@@ -151,10 +185,19 @@ export function getPasswordHash(): string | null {
 }
 
 /**
- * Store a password hash in the database.
+ * Get the timestamp when the password hash was last set.
+ */
+export function getPasswordHashCreatedAt(): number | null {
+  const val = settingsRepo.get<number>(HASH_CREATED_AT_KEY);
+  return typeof val === 'number' ? val : null;
+}
+
+/**
+ * Store a password hash in the database and record the change time.
  */
 export async function setPasswordHash(hash: string): Promise<void> {
   await settingsRepo.set(SETTINGS_KEY, hash);
+  await settingsRepo.set(HASH_CREATED_AT_KEY, Date.now());
 }
 
 /**
@@ -162,36 +205,36 @@ export async function setPasswordHash(hash: string): Promise<void> {
  */
 export async function removePassword(): Promise<void> {
   await settingsRepo.delete(SETTINGS_KEY);
-  invalidateAllSessions();
+  await settingsRepo.delete(HASH_CREATED_AT_KEY);
+  await invalidateAllSessions();
   log.info('UI password removed');
 }
 
 // ── Cleanup ───────────────────────────────────────────────────────────────
 
 /**
- * Purge expired sessions from the in-memory store.
+ * Purge expired sessions from the database and cache.
  */
-export function purgeExpiredSessions(): number {
-  const now = Date.now();
-  let purged = 0;
-  for (const [token, session] of sessions) {
-    if (session.expiresAt.getTime() < now) {
-      sessions.delete(token);
-      purged++;
-    }
-  }
+export async function purgeExpiredSessions(): Promise<number> {
+  const purged = await uiSessionsRepo.deleteExpired();
   if (purged > 0) {
-    log.debug('Purged expired sessions', { purged, remaining: sessions.size });
+    // Clear cache to be safe; active sessions will be re-populated on next validate
+    sessionCache.clear();
+    log.debug('Purged expired sessions', { purged });
   }
   return purged;
 }
 
 /**
- * Start hourly cleanup of expired sessions.
+ * Start background cleanup of expired sessions.
  */
 export function startCleanup(): void {
   if (cleanupTimer) return;
-  cleanupTimer = setInterval(purgeExpiredSessions, CLEANUP_INTERVAL_MS);
+  cleanupTimer = setInterval(() => {
+    purgeExpiredSessions().catch((err) => {
+      log.error('Session cleanup failed', { error: String(err) });
+    });
+  }, CLEANUP_INTERVAL_MS);
   cleanupTimer.unref();
 }
 

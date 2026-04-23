@@ -9,6 +9,19 @@ vi.mock('../db/repositories/settings.js', () => ({
   },
 }));
 
+// Mock uiSessionsRepo before importing the module
+vi.mock('../db/repositories/ui-sessions.js', () => ({
+  uiSessionsRepo: {
+    createSession: vi.fn(),
+    getByTokenHash: vi.fn(),
+    deleteByTokenHash: vi.fn(),
+    deleteAll: vi.fn(),
+    deleteExpired: vi.fn(),
+    countActive: vi.fn(),
+    listActive: vi.fn(),
+  },
+}));
+
 vi.mock('./log.js', () => ({
   getLog: () => ({
     info: vi.fn(),
@@ -22,12 +35,14 @@ import {
   hashPassword,
   verifyPassword,
   createSession,
+  createMcpSession,
   validateSession,
   invalidateSession,
   invalidateAllSessions,
   getActiveSessionCount,
   isPasswordConfigured,
   getPasswordHash,
+  getPasswordHashCreatedAt,
   setPasswordHash,
   removePassword,
   purgeExpiredSessions,
@@ -35,13 +50,16 @@ import {
   stopCleanup,
 } from './ui-session.js';
 import { settingsRepo } from '../db/repositories/settings.js';
+import { uiSessionsRepo } from '../db/repositories/ui-sessions.js';
 
 const mockSettingsRepo = vi.mocked(settingsRepo);
+const mockUiSessionsRepo = vi.mocked(uiSessionsRepo);
 
 describe('UI Session Service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    invalidateAllSessions();
+    // Reset TTLCache by invalidating all sessions (clears cache + mocks)
+    mockUiSessionsRepo.deleteAll.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -86,9 +104,7 @@ describe('UI Session Service', () => {
       expect(verifyPassword('test', ':')).toBe(false);
     });
 
-    it('returns false when stored hash buffer length differs from key length (line 51)', () => {
-      // Create a fake stored hash where the hash part is 32 bytes (64 hex chars)
-      // instead of the expected 64 bytes (128 hex chars). Length mismatch → false.
+    it('returns false when stored hash buffer length differs from key length', () => {
       const fakeSalt = 'aa'.repeat(32); // 64-char hex salt
       const fakeHash = 'bb'.repeat(32); // 64-char hex hash (32 bytes, not 64)
       const stored = `${fakeSalt}:${fakeHash}`;
@@ -99,78 +115,176 @@ describe('UI Session Service', () => {
   // ── Session Management ────────────────────────────────────────────
 
   describe('createSession', () => {
-    it('returns token and expiration', () => {
-      const session = createSession();
+    it('returns token and expiration', async () => {
+      mockUiSessionsRepo.createSession.mockResolvedValue(undefined);
+      const session = await createSession();
       expect(session.token).toHaveLength(64); // 32 bytes hex
       expect(session.expiresAt).toBeInstanceOf(Date);
       expect(session.expiresAt.getTime()).toBeGreaterThan(Date.now());
+      expect(mockUiSessionsRepo.createSession).toHaveBeenCalledTimes(1);
     });
 
-    it('creates unique tokens', () => {
-      const s1 = createSession();
-      const s2 = createSession();
+    it('creates unique tokens', async () => {
+      mockUiSessionsRepo.createSession.mockResolvedValue(undefined);
+      const s1 = await createSession();
+      const s2 = await createSession();
       expect(s1.token).not.toBe(s2.token);
     });
   });
 
+  describe('createMcpSession', () => {
+    it('returns token and 30-day expiration', async () => {
+      mockUiSessionsRepo.createSession.mockResolvedValue(undefined);
+      const session = await createMcpSession();
+      expect(session.token).toHaveLength(64);
+      expect(session.expiresAt).toBeInstanceOf(Date);
+      // Should be roughly 30 days from now
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      const diff = session.expiresAt.getTime() - Date.now();
+      expect(diff).toBeGreaterThan(thirtyDaysMs - 60000);
+      expect(diff).toBeLessThan(thirtyDaysMs + 60000);
+    });
+  });
+
   describe('validateSession', () => {
-    it('returns true for valid session', () => {
-      const session = createSession();
-      expect(validateSession(session.token)).toBe(true);
+    it('returns true for valid session', async () => {
+      mockUiSessionsRepo.createSession.mockResolvedValue(undefined);
+      const session = await createSession();
+
+      // createSession warms the cache, so first validate is a cache hit
+      expect(await validateSession(session.token)).toBe(true);
+      expect(mockUiSessionsRepo.getByTokenHash).toHaveBeenCalledTimes(0);
+
+      // After cache expires (or if we had invalidated it), DB lookup would happen.
+      // For now, re-validation stays a cache hit.
+      expect(await validateSession(session.token)).toBe(true);
+      expect(mockUiSessionsRepo.getByTokenHash).toHaveBeenCalledTimes(0);
     });
 
-    it('returns false for unknown token', () => {
-      expect(validateSession('unknown-token')).toBe(false);
+    it('returns true for valid session after cache miss', async () => {
+      mockUiSessionsRepo.getByTokenHash.mockResolvedValue({
+        tokenHash: 'any',
+        kind: 'ui',
+        userId: 'default',
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        metadata: {},
+      });
+      // Token not in cache → hits DB
+      expect(await validateSession('some-cached-miss-token')).toBe(true);
+      expect(mockUiSessionsRepo.getByTokenHash).toHaveBeenCalledTimes(1);
+
+      // Second call hits cache → no extra DB call
+      expect(await validateSession('some-cached-miss-token')).toBe(true);
+      expect(mockUiSessionsRepo.getByTokenHash).toHaveBeenCalledTimes(1);
     });
 
-    it('returns false for expired session', () => {
-      // Create a session then manually expire it
-      vi.useFakeTimers();
-      const session = createSession();
-      // Advance time past default TTL (7 days)
-      vi.advanceTimersByTime(8 * 24 * 60 * 60 * 1000);
-      expect(validateSession(session.token)).toBe(false);
-      vi.useRealTimers();
+    it('returns false for unknown token', async () => {
+      mockUiSessionsRepo.getByTokenHash.mockResolvedValue(null);
+      expect(await validateSession('unknown-token')).toBe(false);
+    });
+
+    it('returns false for expired session', async () => {
+      mockUiSessionsRepo.getByTokenHash.mockResolvedValue({
+        tokenHash: 'any',
+        kind: 'ui',
+        userId: 'default',
+        createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        metadata: {},
+      });
+      expect(await validateSession('some-token')).toBe(false);
+    });
+
+    it('returns false for session created before password change', async () => {
+      const hashCreatedAt = Date.now() - 60_000; // 1 minute ago
+      mockSettingsRepo.get.mockReturnValue(hashCreatedAt);
+      mockUiSessionsRepo.getByTokenHash.mockResolvedValue({
+        tokenHash: 'any',
+        kind: 'ui',
+        userId: 'default',
+        createdAt: new Date(hashCreatedAt - 60_000), // older than password change
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        metadata: {},
+      });
+      expect(await validateSession('old-session-token')).toBe(false);
+    });
+
+    it('returns true when hashCreatedAt is not set (backward compat)', async () => {
+      mockSettingsRepo.get.mockReturnValue(null);
+      mockUiSessionsRepo.getByTokenHash.mockResolvedValue({
+        tokenHash: 'any',
+        kind: 'ui',
+        userId: 'default',
+        createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        metadata: {},
+      });
+      expect(await validateSession('legacy-session-token')).toBe(true);
     });
   });
 
   describe('invalidateSession', () => {
-    it('removes a specific session', () => {
-      const session = createSession();
-      expect(validateSession(session.token)).toBe(true);
-      invalidateSession(session.token);
-      expect(validateSession(session.token)).toBe(false);
+    it('removes a specific session', async () => {
+      mockUiSessionsRepo.createSession.mockResolvedValue(undefined);
+      mockUiSessionsRepo.deleteByTokenHash.mockResolvedValue(true);
+      const session = await createSession();
+
+      // Validate should work via cache after creation
+      mockUiSessionsRepo.getByTokenHash.mockResolvedValue({
+        tokenHash: 'any',
+        kind: 'ui',
+        userId: 'default',
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        metadata: {},
+      });
+      expect(await validateSession(session.token)).toBe(true);
+
+      await invalidateSession(session.token);
+      expect(mockUiSessionsRepo.deleteByTokenHash).toHaveBeenCalledTimes(1);
+
+      // After invalidation, DB returns null
+      mockUiSessionsRepo.getByTokenHash.mockResolvedValue(null);
+      expect(await validateSession(session.token)).toBe(false);
     });
   });
 
   describe('invalidateAllSessions', () => {
-    it('removes all sessions', () => {
-      const s1 = createSession();
-      const s2 = createSession();
-      expect(validateSession(s1.token)).toBe(true);
-      expect(validateSession(s2.token)).toBe(true);
+    it('removes all sessions', async () => {
+      mockUiSessionsRepo.createSession.mockResolvedValue(undefined);
+      mockUiSessionsRepo.deleteAll.mockResolvedValue(2);
 
-      invalidateAllSessions();
-      expect(validateSession(s1.token)).toBe(false);
-      expect(validateSession(s2.token)).toBe(false);
+      const s1 = await createSession();
+      const s2 = await createSession();
+
+      // Pre-invalidation: both valid in cache
+      mockUiSessionsRepo.getByTokenHash.mockResolvedValue({
+        tokenHash: 'any',
+        kind: 'ui',
+        userId: 'default',
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        metadata: {},
+      });
+      expect(await validateSession(s1.token)).toBe(true);
+      expect(await validateSession(s2.token)).toBe(true);
+
+      await invalidateAllSessions();
+      expect(mockUiSessionsRepo.deleteAll).toHaveBeenCalledTimes(1);
+
+      // After clearing cache + DB, both invalid
+      mockUiSessionsRepo.getByTokenHash.mockResolvedValue(null);
+      expect(await validateSession(s1.token)).toBe(false);
+      expect(await validateSession(s2.token)).toBe(false);
     });
   });
 
   describe('getActiveSessionCount', () => {
-    it('returns count of non-expired sessions', () => {
-      expect(getActiveSessionCount()).toBe(0);
-      createSession();
-      createSession();
-      expect(getActiveSessionCount()).toBe(2);
-    });
-
-    it('excludes expired sessions', () => {
-      vi.useFakeTimers();
-      createSession();
-      vi.advanceTimersByTime(8 * 24 * 60 * 60 * 1000);
-      createSession(); // This one is still valid
-      expect(getActiveSessionCount()).toBe(1);
-      vi.useRealTimers();
+    it('returns count from repository', async () => {
+      mockUiSessionsRepo.countActive.mockResolvedValue(5);
+      expect(await getActiveSessionCount()).toBe(5);
+      expect(mockUiSessionsRepo.countActive).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -200,44 +314,60 @@ describe('UI Session Service', () => {
     });
   });
 
+  describe('getPasswordHashCreatedAt', () => {
+    it('returns stored timestamp', () => {
+      mockSettingsRepo.get.mockReturnValue(1_000_000);
+      expect(getPasswordHashCreatedAt()).toBe(1_000_000);
+    });
+
+    it('returns null when not set', () => {
+      mockSettingsRepo.get.mockReturnValue(null);
+      expect(getPasswordHashCreatedAt()).toBeNull();
+    });
+
+    it('returns null for non-number values', () => {
+      mockSettingsRepo.get.mockReturnValue('not-a-number');
+      expect(getPasswordHashCreatedAt()).toBeNull();
+    });
+  });
+
   describe('setPasswordHash', () => {
-    it('stores hash in settings', async () => {
+    it('stores hash and timestamp in settings', async () => {
       mockSettingsRepo.set.mockResolvedValue(undefined);
       await setPasswordHash('salt:hash');
       expect(mockSettingsRepo.set).toHaveBeenCalledWith('ui_password_hash', 'salt:hash');
+      expect(mockSettingsRepo.set).toHaveBeenCalledWith('ui_password_hash_created_at', expect.any(Number));
     });
   });
 
   describe('removePassword', () => {
-    it('deletes hash and invalidates sessions', async () => {
+    it('deletes hash, timestamp, and invalidates sessions', async () => {
       mockSettingsRepo.delete.mockResolvedValue(true);
-      const session = createSession();
-      expect(validateSession(session.token)).toBe(true);
+      mockUiSessionsRepo.deleteAll.mockResolvedValue(1);
 
       await removePassword();
       expect(mockSettingsRepo.delete).toHaveBeenCalledWith('ui_password_hash');
-      expect(validateSession(session.token)).toBe(false);
+      expect(mockSettingsRepo.delete).toHaveBeenCalledWith('ui_password_hash_created_at');
+      expect(mockUiSessionsRepo.deleteAll).toHaveBeenCalledTimes(1);
     });
   });
 
   // ── Cleanup ───────────────────────────────────────────────────────
 
   describe('purgeExpiredSessions', () => {
-    it('removes expired sessions', () => {
-      vi.useFakeTimers();
-      createSession();
-      vi.advanceTimersByTime(8 * 24 * 60 * 60 * 1000);
-      createSession(); // Still valid
+    it('removes expired sessions and clears cache', async () => {
+      mockUiSessionsRepo.deleteExpired.mockResolvedValue(3);
 
-      const purged = purgeExpiredSessions();
-      expect(purged).toBe(1);
-      expect(getActiveSessionCount()).toBe(1);
-      vi.useRealTimers();
+      const purged = await purgeExpiredSessions();
+      expect(purged).toBe(3);
+      expect(mockUiSessionsRepo.deleteExpired).toHaveBeenCalledTimes(1);
     });
 
-    it('returns 0 when no expired sessions', () => {
-      createSession();
-      expect(purgeExpiredSessions()).toBe(0);
+    it('returns 0 when no expired sessions', async () => {
+      mockUiSessionsRepo.deleteExpired.mockResolvedValue(0);
+
+      const purged = await purgeExpiredSessions();
+      expect(purged).toBe(0);
     });
   });
 

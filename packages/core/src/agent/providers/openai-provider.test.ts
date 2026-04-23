@@ -76,6 +76,7 @@ function mockFetchOk(data: unknown) {
   return vi.fn().mockResolvedValue({
     ok: true,
     status: 200,
+    headers: { get: () => null },
     json: () => Promise.resolve(data),
     text: () => Promise.resolve(JSON.stringify(data)),
     body: null,

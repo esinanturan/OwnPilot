@@ -45,18 +45,26 @@ const loginThrottle = createLoginThrottle({
   lockoutMs: 15 * MS_PER_MINUTE,
 });
 
+/** Periodic cleanup of stale throttle entries — unref so it doesn't block process exit */
+const loginThrottleCleanup = setInterval(() => {
+  loginThrottle.cleanup();
+}, 2 * 60_000);
+if (typeof loginThrottleCleanup === 'object' && 'unref' in loginThrottleCleanup) {
+  loginThrottleCleanup.unref();
+}
+
 export const uiAuthRoutes = new Hono();
 
 /**
  * GET /auth/status — Public
  * Returns whether a password is configured and whether the current request is authenticated.
  */
-uiAuthRoutes.get('/status', (c) => {
+uiAuthRoutes.get('/status', async (c) => {
   const passwordConfigured = isPasswordConfigured();
 
   // Check if the request has a valid session token
   const token = c.req.header('X-Session-Token');
-  const authenticated = token ? validateSession(token) : false;
+  const authenticated = token ? await validateSession(token) : false;
 
   return apiResponse(c, {
     passwordConfigured,
@@ -103,7 +111,7 @@ uiAuthRoutes.post('/login', async (c) => {
   }
 
   loginThrottle.recordSuccess(clientIp);
-  const session = createSession();
+  const session = await createSession();
   return apiResponse(c, {
     token: session.token,
     expiresAt: session.expiresAt.toISOString(),
@@ -114,13 +122,13 @@ uiAuthRoutes.post('/login', async (c) => {
  * POST /auth/logout — Requires session
  * Invalidate the current session.
  */
-uiAuthRoutes.post('/logout', (c) => {
+uiAuthRoutes.post('/logout', async (c) => {
   const token = c.req.header('X-Session-Token');
-  if (!token || !validateSession(token)) {
+  if (!token || !(await validateSession(token))) {
     return apiError(c, { code: ERROR_CODES.UNAUTHORIZED, message: 'Not authenticated' }, 401);
   }
 
-  invalidateSession(token);
+  await invalidateSession(token);
   return apiResponse(c, { message: 'Logged out' });
 });
 
@@ -155,7 +163,7 @@ uiAuthRoutes.post('/password', async (c) => {
   if (existingHash) {
     // Changing password — require valid session + current password
     const token = c.req.header('X-Session-Token');
-    if (!token || !validateSession(token)) {
+    if (!token || !(await validateSession(token))) {
       return apiError(
         c,
         { code: ERROR_CODES.UNAUTHORIZED, message: 'Authentication required' },
@@ -188,10 +196,10 @@ uiAuthRoutes.post('/password', async (c) => {
   await setPasswordHash(hash);
 
   // Invalidate all existing sessions
-  invalidateAllSessions();
+  await invalidateAllSessions();
 
   // Create a fresh session for the user who just set/changed the password
-  const session = createSession();
+  const session = await createSession();
 
   return apiResponse(c, {
     message: existingHash ? 'Password changed' : 'Password set',
@@ -206,7 +214,7 @@ uiAuthRoutes.post('/password', async (c) => {
  */
 uiAuthRoutes.delete('/password', async (c) => {
   const token = c.req.header('X-Session-Token');
-  if (!token || !validateSession(token)) {
+  if (!token || !(await validateSession(token))) {
     return apiError(c, { code: ERROR_CODES.UNAUTHORIZED, message: 'Authentication required' }, 401);
   }
 
@@ -222,11 +230,11 @@ uiAuthRoutes.delete('/password', async (c) => {
  * GET /auth/sessions — Requires session
  * Returns count of active sessions (for Security settings page).
  */
-uiAuthRoutes.get('/sessions', (c) => {
+uiAuthRoutes.get('/sessions', async (c) => {
   const token = c.req.header('X-Session-Token');
-  if (!token || !validateSession(token)) {
+  if (!token || !(await validateSession(token))) {
     return apiError(c, { code: ERROR_CODES.UNAUTHORIZED, message: 'Authentication required' }, 401);
   }
 
-  return apiResponse(c, { activeSessions: getActiveSessionCount() });
+  return apiResponse(c, { activeSessions: await getActiveSessionCount() });
 });

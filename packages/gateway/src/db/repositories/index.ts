@@ -442,3 +442,12 @@ export { SoulsRepository, getSoulsRepository } from './souls.js';
 export { CrewsRepository, getCrewsRepository } from './crews.js';
 export { AgentMessagesRepository, getAgentMessagesRepository } from './agent-messages.js';
 export { HeartbeatLogRepository, getHeartbeatLogRepository } from './heartbeat-log.js';
+
+// UI Sessions repository
+export {
+  UISessionsRepository,
+  uiSessionsRepo,
+  createUISessionsRepository,
+  initializeUISessionsRepo,
+  type UISession,
+} from './ui-sessions.js';

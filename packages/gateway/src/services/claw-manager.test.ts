@@ -212,6 +212,51 @@ describe('ClawManager', () => {
     });
   });
 
+  describe('inbox handling', () => {
+    it('passes inbox messages to runCycle intact', async () => {
+      setupRepo(makeConfig({ mode: 'continuous' }));
+      await manager.startClaw('claw-1', 'user-1');
+      const sent = await manager.sendMessage('claw-1', 'Process this');
+      expect(sent).toBe(true);
+
+      let capturedInbox: string[] = [];
+      mockRunCycle.mockImplementation((session: ClawSession) => {
+        capturedInbox = [...session.inbox];
+        return Promise.resolve(makeCycleResult());
+      });
+
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(mockRunCycle).toHaveBeenCalledTimes(1);
+      expect(capturedInbox).toContain('Process this');
+    });
+
+    it('clears processed inbox messages after successful cycle', async () => {
+      setupRepo(makeConfig({ mode: 'continuous' }));
+      await manager.startClaw('claw-1', 'user-1');
+      await manager.sendMessage('claw-1', 'Process this');
+
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(manager.getSession('claw-1')?.inbox).toEqual([]);
+    });
+
+    it('preserves messages that arrive during cycle execution', async () => {
+      setupRepo(makeConfig({ mode: 'continuous' }));
+      await manager.startClaw('claw-1', 'user-1');
+      await manager.sendMessage('claw-1', 'Process this');
+
+      mockRunCycle.mockImplementation(async (session: ClawSession) => {
+        session.inbox.push('New mid-cycle message');
+        return makeCycleResult();
+      });
+
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(manager.getSession('claw-1')?.inbox).toEqual(['New mid-cycle message']);
+    });
+  });
+
   describe('single-shot mode', () => {
     it('should execute one cycle and stop', async () => {
       const config = makeConfig({ mode: 'single-shot' });

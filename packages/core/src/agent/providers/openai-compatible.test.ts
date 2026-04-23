@@ -89,6 +89,7 @@ function mockFetchResponse(data: unknown, ok = true, status = 200) {
   return vi.fn().mockResolvedValue({
     ok,
     status,
+    headers: { get: () => null },
     json: () => Promise.resolve(data),
     text: () => Promise.resolve(JSON.stringify(data)),
     body: null,
@@ -112,6 +113,7 @@ function mockFetchStream(chunks: string[], ok = true, status = 200) {
   return vi.fn().mockResolvedValue({
     ok,
     status,
+    headers: { get: () => null },
     body,
     json: () => Promise.resolve({}),
     text: () => Promise.resolve(''),

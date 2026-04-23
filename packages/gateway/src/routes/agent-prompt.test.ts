@@ -69,10 +69,10 @@ describe('agent-prompt', () => {
       expect(BASE_SYSTEM_PROMPT).toContain('## Suggestions');
     });
 
-    it('has exactly 5 level-2 headings', () => {
+    it('has exactly 6 level-2 headings', () => {
       const h2Matches = BASE_SYSTEM_PROMPT.match(/^## /gm);
       expect(h2Matches).not.toBeNull();
-      expect(h2Matches!.length).toBe(5);
+      expect(h2Matches!.length).toBe(6);
     });
   });
 

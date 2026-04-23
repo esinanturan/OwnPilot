@@ -272,17 +272,13 @@ chatRoutes.post('/', async (c) => {
   }
 
   // Load conversation if specified
-  console.log(`[SESSION-FIX] body.conversationId=${body.conversationId ?? 'NONE'}, agent.conv=${agent.getConversation().id.slice(0,8)}`);
   if (body.conversationId) {
-    // FIX: Capture agent's initial systemPrompt BEFORE any loadConversation switching.
-    // The agent was initialized with a rich 8796-char prompt (OwnPilot identity + tools
-    // + capabilities). When loadConversation switches to a new conversation without a
-    // systemPrompt, that prompt is lost and the middleware falls back to a generic
-    // "You are a helpful AI assistant." — causing identity drift (MiniMax → "I'm Claude").
+    // Capture agent's initial systemPrompt BEFORE any loadConversation switching.
+    // Without this, switching to a conversation without a stored systemPrompt causes
+    // identity drift — the rich OwnPilot prompt is replaced by a generic fallback.
     const agentInitialPrompt = agent.getConversation().systemPrompt;
 
     let loaded = agent.loadConversation(body.conversationId);
-    console.log(`[SESSION-FIX] loadConversation(${body.conversationId.slice(0,8)}) = ${loaded}`);
 
     // DB fallback: if conversation exists in DB but not in agent memory
     // (agent was reset/evicted), reconstruct it from database messages.

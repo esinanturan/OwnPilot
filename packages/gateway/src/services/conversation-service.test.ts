@@ -223,6 +223,7 @@ describe('ConversationService', () => {
     mockExtractMemories.mockResolvedValue(0);
     mockUpdateGoalProgress.mockResolvedValue(undefined);
     mockEvaluateTriggers.mockResolvedValue({ triggered: [], pending: [], executed: [] });
+    mockChatRepo.getMessages.mockResolvedValue([]);
     service = new ConversationService('user-1');
   });
 
@@ -662,6 +663,7 @@ describe('saveChatToDatabase', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDebugLog.getRecent.mockReturnValue([]);
+    mockChatRepo.getMessages.mockResolvedValue([]);
   });
 
   it('instantiates ConversationService with userId and calls saveChat', async () => {
@@ -702,6 +704,7 @@ describe('saveStreamingChat (standalone)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDebugLog.getRecent.mockReturnValue([]);
+    mockChatRepo.getMessages.mockResolvedValue([]);
   });
 
   it('instantiates ConversationService with userId and calls saveStreamingChat', async () => {

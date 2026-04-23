@@ -140,4 +140,38 @@ describe('createLoginThrottle', () => {
     const throttle = createLoginThrottle(opts);
     expect(() => throttle.recordSuccess('9.9.9.9')).not.toThrow();
   });
+
+  // ── cleanup ───────────────────────────────────────────────────
+
+  it('cleanup removes expired entries', () => {
+    vi.useFakeTimers();
+    const throttle = createLoginThrottle(opts);
+
+    throttle.check('1.2.3.4');
+    throttle.check('5.5.5.5');
+
+    // Advance past window and lockout for both
+    vi.advanceTimersByTime(31_000);
+
+    throttle.cleanup();
+
+    // Both entries should be gone — fresh attempts allowed
+    expect(throttle.check('1.2.3.4')).toEqual({ allowed: true });
+    expect(throttle.check('5.5.5.5')).toEqual({ allowed: true });
+  });
+
+  it('cleanup preserves active entries', () => {
+    const throttle = createLoginThrottle(opts);
+
+    throttle.check('1.2.3.4');
+    throttle.check('1.2.3.4');
+
+    throttle.cleanup();
+
+    // Entry still active — 3rd attempt allowed, 4th and 5th too, 6th denied
+    expect(throttle.check('1.2.3.4')).toEqual({ allowed: true });
+    expect(throttle.check('1.2.3.4')).toEqual({ allowed: true });
+    expect(throttle.check('1.2.3.4')).toEqual({ allowed: true });
+    expect(throttle.check('1.2.3.4').allowed).toBe(false);
+  });
 });

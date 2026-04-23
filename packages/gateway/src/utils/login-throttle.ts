@@ -35,19 +35,6 @@ export function createLoginThrottle(opts: LoginThrottleOptions) {
   const { maxAttempts, windowMs, lockoutMs } = opts;
   const attempts = new Map<string, ThrottleEntry>();
 
-  /** Periodic cleanup — unref so it doesn't block process exit */
-  const cleanupTimer = setInterval(() => {
-    const now = Date.now();
-    for (const [ip, entry] of attempts) {
-      if (entry.resetAt <= now && entry.lockedUntil <= now) {
-        attempts.delete(ip);
-      }
-    }
-  }, 2 * 60_000);
-  if (typeof cleanupTimer === 'object' && 'unref' in cleanupTimer) {
-    cleanupTimer.unref();
-  }
-
   function check(ip: string): LoginThrottleResult {
     const now = Date.now();
     const entry = attempts.get(ip);
@@ -90,9 +77,18 @@ export function createLoginThrottle(opts: LoginThrottleOptions) {
     attempts.delete(ip);
   }
 
+  function cleanup(): void {
+    const now = Date.now();
+    for (const [ip, entry] of attempts) {
+      if (entry.resetAt <= now && entry.lockedUntil <= now) {
+        attempts.delete(ip);
+      }
+    }
+  }
+
   function reset(): void {
     attempts.clear();
   }
 
-  return { check, recordFailure, recordSuccess, reset };
+  return { check, recordFailure, recordSuccess, cleanup, reset };
 }

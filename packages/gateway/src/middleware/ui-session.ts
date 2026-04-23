@@ -30,7 +30,7 @@ export const uiSessionMiddleware = createMiddleware(async (c, next) => {
 
   // 2. Check for session token
   const token = c.req.header('X-Session-Token');
-  if (token && validateSession(token)) {
+  if (token && (await validateSession(token))) {
     c.set('sessionAuthenticated', true);
     c.set('userId', 'default');
     return next();

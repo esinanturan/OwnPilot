@@ -5,7 +5,7 @@
  */
 
 import { Hono } from 'hono';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
 import { getSoulsRepository } from '../db/repositories/souls.js';
 import { agentsRepo } from '../db/repositories/agents.js';
 import { createTriggersRepository } from '../db/repositories/triggers.js';
@@ -195,9 +195,7 @@ soulDeployRoutes.post('/deploy', async (c) => {
         const errorMessage = getErrorMessage(txErr).toLowerCase();
         if (errorMessage.includes('duplicate') && errorMessage.includes('name')) {
           attempts++;
-          const randomSuffix = Math.floor(Math.random() * 10000)
-            .toString()
-            .padStart(4, '0');
+          const randomSuffix = randomBytes(3).toString('hex');
           agentName = `${body.identity?.name ?? 'Unnamed Agent'} (${randomSuffix})`;
         } else {
           break; // Non-name error — don't retry

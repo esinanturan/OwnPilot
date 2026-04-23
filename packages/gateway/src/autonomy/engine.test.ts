@@ -10,6 +10,7 @@ import {
   stopAutonomyEngine,
   DEFAULT_PULSE_DIRECTIVES,
 } from './engine.js';
+import { createAutonomyLogRepo } from '../db/repositories/autonomy-log.js';
 
 // ============================================================================
 // Mocks
@@ -64,18 +65,20 @@ vi.mock('../db/repositories/settings.js', () => ({
   },
 }));
 
-vi.mock('../db/repositories/autonomy-log.js', () => ({
-  createAutonomyLogRepo: () => ({
-    insert: vi.fn().mockResolvedValue('log-1'),
-    getRecent: vi.fn().mockResolvedValue([]),
-    getStats: vi.fn().mockResolvedValue({
-      totalPulses: 0,
-      llmCallRate: 0,
-      avgDurationMs: 0,
-      actionsExecuted: 0,
-    }),
-    cleanup: vi.fn().mockResolvedValue(0),
+const mockAutonomyLogRepo = {
+  insert: vi.fn().mockResolvedValue('log-1'),
+  getRecent: vi.fn().mockResolvedValue([]),
+  getStats: vi.fn().mockResolvedValue({
+    totalPulses: 0,
+    llmCallRate: 0,
+    avgDurationMs: 0,
+    actionsExecuted: 0,
   }),
+  cleanup: vi.fn().mockResolvedValue(0),
+};
+
+vi.mock('../db/repositories/autonomy-log.js', () => ({
+  createAutonomyLogRepo: vi.fn(() => mockAutonomyLogRepo),
 }));
 
 vi.mock('@ownpilot/core', async (importOriginal) => {
@@ -140,6 +143,26 @@ describe('AutonomyEngine', () => {
       const disabled = new AutonomyEngine({ userId: 'u1', enabled: false });
       disabled.start();
       expect(disabled.isRunning()).toBe(false);
+    });
+
+    it('runs cleanup immediately on start', async () => {
+      engine.start();
+      expect(mockAutonomyLogRepo.cleanup).toHaveBeenCalled();
+    });
+
+    it('runs cleanup daily after start', async () => {
+      engine.start();
+      vi.clearAllMocks();
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+      expect(mockAutonomyLogRepo.cleanup).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops cleanup timer on stop', async () => {
+      engine.start();
+      engine.stop();
+      vi.clearAllMocks();
+      await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+      expect(mockAutonomyLogRepo.cleanup).not.toHaveBeenCalled();
     });
   });
 

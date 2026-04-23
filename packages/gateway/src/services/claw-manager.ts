@@ -174,7 +174,7 @@ export class ClawManager {
     }
 
     // Scaffold .claw/ directory with initial files if not exists
-    this.scaffoldClawDir(workspaceId, config);
+    await this.scaffoldClawDir(workspaceId, config);
 
     // Load or create session
     const savedSession = await repo.loadSession(clawId);
@@ -473,19 +473,17 @@ export class ClawManager {
         }
       }
 
-      // Consume inbox messages for this cycle — keep a backup to restore on failure
+      // Snapshot inbox for this cycle but do NOT clear it —
+      // runCycle reads session.inbox to build the prompt.
       const inboxSnapshot = [...managed.session.inbox];
-      managed.session.inbox = [];
 
       // Execute
-      let result;
-      try {
-        result = await managed.runner.runCycle(managed.session);
-      } catch (err) {
-        // Restore inbox messages so they aren't lost on cycle failure
-        managed.session.inbox.push(...inboxSnapshot);
-        throw err;
-      }
+      const result = await managed.runner.runCycle(managed.session);
+
+      // After successful cycle, remove only the messages that were
+      // present at cycle start. Messages that arrived during the
+      // cycle remain for the next cycle.
+      managed.session.inbox = managed.session.inbox.slice(inboxSnapshot.length);
 
       // Update session
       managed.session.cyclesCompleted = cycleNumber;
@@ -822,7 +820,7 @@ export class ClawManager {
         });
       }
     } catch (err) {
-      log.debug('Failed to persist claw conversation (best-effort)', { clawId, error: String(err) });
+      log.warn('Failed to persist claw conversation', { clawId, error: String(err) });
     }
   }
 
@@ -830,18 +828,19 @@ export class ClawManager {
    * Scaffold .claw/ directory with initial instruction files.
    * Only creates files that don't already exist (idempotent).
    */
-  private scaffoldClawDir(
+  private async scaffoldClawDir(
     workspaceId: string,
     config: { name: string; mission: string; mode: string }
-  ): void {
+  ): Promise<void> {
     try {
-      // INSTRUCTIONS.md — persistent directives the claw reads every cycle
-      if (!readSessionWorkspaceFile(workspaceId, '.claw/INSTRUCTIONS.md')) {
-        writeSessionWorkspaceFile(
-          workspaceId,
-          '.claw/INSTRUCTIONS.md',
-          Buffer.from(
-            `# ${config.name} — Instructions
+      await Promise.all([
+        (async () => {
+          if (!readSessionWorkspaceFile(workspaceId, '.claw/INSTRUCTIONS.md')) {
+            writeSessionWorkspaceFile(
+              workspaceId,
+              '.claw/INSTRUCTIONS.md',
+              Buffer.from(
+                `# ${config.name} — Instructions
 
 ## Mission
 ${config.mission}
@@ -856,18 +855,18 @@ ${config.mission}
 ## Notes
 Add custom directives here. This file persists across cycles.
 `,
-            'utf-8'
-          )
-        );
-      }
-
-      // TASKS.md — checklist the claw maintains
-      if (!readSessionWorkspaceFile(workspaceId, '.claw/TASKS.md')) {
-        writeSessionWorkspaceFile(
-          workspaceId,
-          '.claw/TASKS.md',
-          Buffer.from(
-            `# Tasks
+                'utf-8'
+              )
+            );
+          }
+        })(),
+        (async () => {
+          if (!readSessionWorkspaceFile(workspaceId, '.claw/TASKS.md')) {
+            writeSessionWorkspaceFile(
+              workspaceId,
+              '.claw/TASKS.md',
+              Buffer.from(
+                `# Tasks
 
 ## TODO
 - [ ] Start working on the mission
@@ -880,18 +879,18 @@ Add custom directives here. This file persists across cycles.
 
 ## DONE
 `,
-            'utf-8'
-          )
-        );
-      }
-
-      // MEMORY.md — persistent notes across cycles
-      if (!readSessionWorkspaceFile(workspaceId, '.claw/MEMORY.md')) {
-        writeSessionWorkspaceFile(
-          workspaceId,
-          '.claw/MEMORY.md',
-          Buffer.from(
-            `# Memory
+                'utf-8'
+              )
+            );
+          }
+        })(),
+        (async () => {
+          if (!readSessionWorkspaceFile(workspaceId, '.claw/MEMORY.md')) {
+            writeSessionWorkspaceFile(
+              workspaceId,
+              '.claw/MEMORY.md',
+              Buffer.from(
+                `# Memory
 
 Persistent notes across cycles. Write findings, decisions, and context here.
 The claw reads this every cycle to maintain continuity.
@@ -902,25 +901,27 @@ The claw reads this every cycle to maintain continuity.
 
 ## Context
 `,
-            'utf-8'
-          )
-        );
-      }
-
-      // LOG.md — execution log
-      if (!readSessionWorkspaceFile(workspaceId, '.claw/LOG.md')) {
-        writeSessionWorkspaceFile(
-          workspaceId,
-          '.claw/LOG.md',
-          Buffer.from(
-            `# Execution Log
+                'utf-8'
+              )
+            );
+          }
+        })(),
+        (async () => {
+          if (!readSessionWorkspaceFile(workspaceId, '.claw/LOG.md')) {
+            writeSessionWorkspaceFile(
+              workspaceId,
+              '.claw/LOG.md',
+              Buffer.from(
+                `# Execution Log
 
 Append cycle summaries here for a running log of what happened.
 `,
-            'utf-8'
-          )
-        );
-      }
+                'utf-8'
+              )
+            );
+          }
+        })(),
+      ]);
     } catch (err) {
       log.warn(`Failed to scaffold .claw/ dir: ${getErrorMessage(err)}`);
     }

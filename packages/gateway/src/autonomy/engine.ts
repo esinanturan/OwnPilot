@@ -37,6 +37,7 @@ import {
   PULSE_QUIET_HOURS_END,
   PULSE_MAX_ACTIONS,
   PULSE_LOG_RETENTION_DAYS,
+  MS_PER_DAY,
 } from '../config/defaults.js';
 import { getLog } from '../services/log.js';
 
@@ -85,6 +86,7 @@ export interface AutonomyEngineConfig {
 export class AutonomyEngine implements IPulseService {
   private config: Required<AutonomyEngineConfig>;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private cleanupTimer: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private activePulse: { pulseId: string; stage: string; startedAt: number } | null = null;
   private lastPulseResult?: PulseResult;
@@ -117,6 +119,7 @@ export class AutonomyEngine implements IPulseService {
       quietHours: `${this.config.quietHoursStart}:00-${this.config.quietHoursEnd}:00`,
     });
     this.scheduleNext(this.config.maxIntervalMs);
+    this.startCleanupTimer();
   }
 
   stop(): void {
@@ -125,6 +128,10 @@ export class AutonomyEngine implements IPulseService {
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
+    }
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
     }
     log.info('Autonomy Engine stopped.');
   }
@@ -557,6 +564,29 @@ export class AutonomyEngine implements IPulseService {
     this.timer.unref(); // Don't block process exit
   }
 
+  private startCleanupTimer(): void {
+    if (this.cleanupTimer) return;
+    this.runCleanup();
+    this.cleanupTimer = setInterval(() => {
+      this.runCleanup().catch((err) => {
+        log.warn('Pulse log cleanup failed', { error: String(err) });
+      });
+    }, MS_PER_DAY);
+    this.cleanupTimer.unref();
+  }
+
+  private async runCleanup(): Promise<void> {
+    try {
+      const repo = createAutonomyLogRepo(this.config.userId);
+      const purged = await repo.cleanup(PULSE_LOG_RETENTION_DAYS);
+      if (purged > 0) {
+        log.debug('Purged old pulse logs', { purged });
+      }
+    } catch (err) {
+      log.warn('Pulse log cleanup failed', { error: String(err) });
+    }
+  }
+
   private async tick(): Promise<void> {
     if (!this.running || this.activePulse) return;
 
@@ -607,11 +637,6 @@ export class AutonomyEngine implements IPulseService {
         signalIds: result.signalIds ?? [],
         urgencyScore: result.urgencyScore ?? 0,
       });
-
-      // Periodic cleanup
-      if (Math.random() < 0.05) {
-        await repo.cleanup(PULSE_LOG_RETENTION_DAYS);
-      }
     } catch (error) {
       log.warn('Failed to persist pulse result to DB', { error: String(error) });
     }

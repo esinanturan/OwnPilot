@@ -556,6 +556,26 @@ Each page reduces to a thin shell routing between sub-components, each under ~40
 **Effort:** L per page (so ClawsPage + FleetPage = two PRs)
 **Dependencies:** none
 
+**Progress (ClawsPage)** — done, 2972 → 444 LoC (85% reduction)
+- `packages/ui/src/pages/claws/utils.ts` — `authedFetch`, `getStateBadge`, `formatDuration`, `formatCost`, `timeAgo`, `inputClass`, `labelClass` (66 LoC)
+- `packages/ui/src/pages/claws/CreateClawModal.tsx` — modal + CLAW_TEMPLATES (452 LoC)
+- `packages/ui/src/pages/claws/ClawCard.tsx` — card component (192 LoC)
+- `packages/ui/src/pages/claws/FileBrowser.tsx` — FileBrowser + FileEditorModal (358 LoC)
+- `packages/ui/src/pages/claws/ClawHomeTab.tsx` — landing-page stats view (312 LoC)
+- `packages/ui/src/pages/claws/ClawDetailTabs.tsx` — 8 tab components: Overview/Settings/Skills/History/Audit/Files/Output/Conversation + shared types (947 LoC; each tab self-contained, most under 150 LoC — file size is aggregate of 8 siblings, not a single god-component)
+- `packages/ui/src/pages/claws/ClawManagementPanel.tsx` — thin detail-panel shell: state orchestration + WS subscription + tab bar dispatcher (434 LoC)
+- Typecheck clean; all 176 UI tests pass
+
+**Progress (FleetPage)** — done, 2368 → 447 LoC (81% reduction)
+- `packages/ui/src/pages/fleet/utils.ts` — `getStateBadge`, `getWorkerTypeIcon/Label/Color`, `getScheduleLabel`, `getTaskStatusColor`, `formatCost` (102 LoC)
+- `packages/ui/src/pages/fleet/BroadcastModal.tsx` — broadcast-to-workers modal (75 LoC)
+- `packages/ui/src/pages/fleet/AddTasksModal.tsx` — multi-task entry modal (161 LoC)
+- `packages/ui/src/pages/fleet/FleetCard.tsx` — grid card with inline start/pause/stop/broadcast/delete actions (199 LoC)
+- `packages/ui/src/pages/fleet/FleetDetailPanel.tsx` — slide-in detail with tasks/history/activity sections + WS subscriptions (620 LoC)
+- `packages/ui/src/pages/fleet/CreateFleetModal.tsx` — templates + two-step create form with workers, schedule, stop condition (777 LoC)
+- `packages/ui/src/pages/FleetPage.tsx` — thin shell: tab routing, load/subscribe, handleAction dispatcher (447 LoC)
+- Typecheck clean; all 176 UI tests pass
+
 ---
 
 ### M2. `Math.random()` suffix for name-collision retry
@@ -847,25 +867,25 @@ These are genuinely impressive pieces of the codebase; don't touch them in the c
 
 | ID  | Title                                                             | Status    |
 |-----|-------------------------------------------------------------------|-----------|
-| C1  | Extension sandbox permission bypass                               | planned   |
-| C2  | No rate-limit on UI login                                         | planned   |
-| C3  | Signal registration ID uses Math.random()                         | planned   |
-| C4  | UI sessions are in-memory only                                    | planned   |
+| C1  | Extension sandbox permission bypass                               | done      |
+| C2  | No rate-limit on UI login                                         | done      |
+| C3  | Signal registration ID uses Math.random()                         | done      |
+| C4  | UI sessions are in-memory only                                    | done      |
 | H1  | Workflow HTTP node follows redirects blindly                      | done      |
 | H2  | BrowserService skips DNS-rebinding check                          | done      |
 | H3  | safeVmEval sandbox prototype-chain leak                           | done      |
-| H4  | invalidateAllSessions not fired on all password-state transitions | planned   |
+| H4  | invalidateAllSessions not fired on all password-state transitions | done      |
 | H5  | Claw executeCycle emits cycle.start before concurrency guard      | done      |
 | H6  | Fleet pause/stop doesn't await in-flight cycle                    | done      |
 | H7  | Workflow HTTP node missing request-body size cap                  | done      |
-| M1  | God files: ClawsPage / FleetPage                                  | planned   |
-| M2  | Math.random suffix for name-collision retry                       | planned   |
-| M3  | Unused escapeHtml in WS server                                    | planned   |
-| M4  | Probabilistic pulse-log cleanup                                   | planned   |
-| M5  | agent_messages.findConversation OR-query                          | planned   |
-| M6  | Claw inbox race                                                   | planned   |
-| M7  | WS _authCleanupTimer runs on module import                        | planned   |
-| M8  | Transformer/HTTP \|\| N timeout fallback                          | planned   |
-| L1  | ClawManager conversation-lookup logged at debug                   | planned   |
-| L2  | scaffoldClawDir does 4 sync disk I/Os on startClaw                | planned   |
-| L3  | checkPermission is a dead export                                  | planned   |
+| M1  | God files: ClawsPage / FleetPage                                  | done                                            |
+| M2  | Math.random suffix for name-collision retry                       | done      |
+| M3  | Unused escapeHtml in WS server                                    | done      |
+| M4  | Probabilistic pulse-log cleanup                                   | done      |
+| M5  | agent_messages.findConversation OR-query                          | done      |
+| M6  | Claw inbox race                                                   | done      |
+| M7  | WS _authCleanupTimer runs on module import                        | done      |
+| M8  | Transformer/HTTP \|\| N timeout fallback                          | done      |
+| L1  | ClawManager conversation-lookup logged at debug                   | done      |
+| L2  | scaffoldClawDir does 4 sync disk I/Os on startClaw                | done      |
+| L3  | checkPermission is a dead export                                  | done      |

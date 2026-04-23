@@ -1295,7 +1295,7 @@ describe('Chat Routes', () => {
       expect(res.status).not.toBe(404);
       expect(mockMemory.createWithId).toHaveBeenCalledWith(
         'client-generated-uuid',
-        undefined,
+        'test',
         expect.objectContaining({ source: 'client-generated' })
       );
     });
